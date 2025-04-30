@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -71,7 +71,8 @@ class AesGenericCiphersT
   public:
     AesGenericCiphersT()
         : AesGenericInit((static_cast<Uint32>(keyLenBits)) / 8, mode)
-    {}
+    {
+    }
     ~AesGenericCiphersT() = default;
 
   public:
@@ -81,6 +82,7 @@ class AesGenericCiphersT
     alc_error_t decrypt(const Uint8* pCipherText,
                         Uint8*       pPlainText,
                         Uint64       len) override;
+    alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override;
     alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
 };
 

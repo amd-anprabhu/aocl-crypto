@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -127,7 +127,8 @@ class ALCP_API_EXPORT CcmHash
   public:
     CcmHash(Uint32 keyLen_in_bytes, CipherMode mode)
         : Ccm(keyLen_in_bytes, mode)
-    {}
+    {
+    }
     ~CcmHash() {}
 
     alc_error_t setAad(const Uint8* pInput, Uint64 aadLen) override;
@@ -146,7 +147,8 @@ class CcmT
   public:
     CcmT()
         : CcmHash((static_cast<Uint32>(keyLenBits)) / 8, CipherMode::eAesCCM)
-    {}
+    {
+    }
     ~CcmT() = default;
 
   public:
@@ -156,6 +158,11 @@ class CcmT
     alc_error_t decrypt(const Uint8* pCipherText,
                         Uint8*       pPlainText,
                         Uint64       len) override;
+    alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+
     alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
 };
 

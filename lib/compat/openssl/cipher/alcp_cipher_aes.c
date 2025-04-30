@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -48,24 +48,32 @@ aes_freectx(void* vctx)
     OPENSSL_clear_free(ctx, sizeof(*ctx));
 }
 
-// FIXME: to be implemented
+
 static void*
-aes_dupctx(void* ctx)
+aes_dupctx(void* vctx)
 {
-    // ALCP_PROV_AES_CTX* in = (ALCP_PROV_AES_CTX*)ctx;
-    ALCP_PROV_CIPHER_CTX* ret;
-
-    // if (!ossl_prov_is_running())
-    //  return NULL;
-
-    ret = OPENSSL_malloc(sizeof(*ret));
-    if (ret == NULL) {
-        ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+    ENTER();
+    ALCP_PROV_CIPHER_CTX* src_ctx = vctx;
+    ALCP_PROV_CIPHER_CTX* dest_ctx = OPENSSL_memdup(src_ctx, sizeof(*src_ctx));
+    Uint64                size;
+    if (dest_ctx != NULL) {
+        size                     = alcp_cipher_context_size();
+        dest_ctx->handle.ch_context = OPENSSL_zalloc(size);
+    } else {
         return NULL;
     }
-    // in->base->copyctx(&ret->base, &in->base);
 
-    return ret;
+    alc_error_t err =
+        alcp_cipher_context_copy(&src_ctx->handle, &dest_ctx->handle);
+    if (err != ALC_ERROR_NONE) {
+        printf("Provider: alcp_cipher_context_copy failed in dupctx\n");
+        OPENSSL_clear_free(dest_ctx->handle.ch_context, size);
+        OPENSSL_clear_free(dest_ctx, sizeof(*dest_ctx));
+        return NULL;
+    }
+
+    EXIT();
+    return dest_ctx;
 }
 
 // dummy function

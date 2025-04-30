@@ -158,7 +158,8 @@ class ALCP_API_EXPORT GcmAuth
   public:
     GcmAuth(Uint32 keyLen_in_bytes)
         : Gcm(keyLen_in_bytes)
-    {}
+    {
+    }
     ~GcmAuth() {}
 
     alc_error_t setAad(const Uint8* pInput, Uint64 aadLen) override;
@@ -174,7 +175,8 @@ class GcmT
   public:
     GcmT()
         : GcmAuth((static_cast<Uint32>(keyLenBits)) / 8)
-    {}
+    {
+    }
 
     GcmT(alc_cipher_state_t* pCipherState)
         : GcmAuth((static_cast<Uint32>(keyLenBits)) / 8)
@@ -191,6 +193,10 @@ class GcmT
     alc_error_t decrypt(const Uint8* pCipherText,
                         Uint8*       pPlainText,
                         Uint64       len) override;
+    alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
     alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
 };
 

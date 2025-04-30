@@ -221,6 +221,30 @@ alcp_cipher_decrypt(const alc_cipher_handle_p pCipherHandle,
 ALCP_API_EXPORT void
 alcp_cipher_finish(const alc_cipher_handle_p pCipherHandle);
 
+/**
+ * @brief Copy a cipher context from source to destination
+ *
+ * @parblock <br> &nbsp;
+ * <b>This API allows copying all state information from one cipher context to
+ * another. Both source and destination must be initialized with the same cipher
+ * mode and key length.</b>
+ * @endparblock
+ *
+ * @param[in]  src  Source cipher handle containing the context to copy from
+ * @param[in]  dst  Destination cipher handle where the context will be copied
+ * to
+ *
+ * @return Error code:
+ *         - ALC_ERROR_NONE          Success
+ *         - ALC_ERROR_BAD_STATE     Either src or dst is in an invalid state
+ *         - ALC_ERROR_INVALID_ARG   Source and destination context types don't
+ * match
+ *         - ALC_ERROR_GENERIC       Generic error during copy operation
+ */
+ALCP_API_EXPORT alc_error_t
+alcp_cipher_context_copy(const alc_cipher_handle_p src,
+                         alc_cipher_handle_p       dst);
+
 EXTERN_C_END
 
 #endif /* _ALCP_CIPHER_H_ */

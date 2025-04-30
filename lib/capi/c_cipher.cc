@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -29,6 +29,7 @@
 #include "alcp/alcp.hh"
 #include "alcp/cipher.h"
 #include "alcp/cipher.hh"
+#include "alcp/cipher/aes_generic.hh"
 
 #include "alcp/capi/cipher/ctx.hh"
 #include "alcp/capi/defs.hh"
@@ -235,6 +236,68 @@ alcp_cipher_finish(const alc_cipher_handle_p pCipherHandle)
     }
 
     ctx->~Context();
+
+#ifdef ALCP_ENABLE_DEBUG_LOGGING
+    ALCP_DEBUG_LOG(LOG_DBG, "Cipher finish done");
+#endif
+}
+
+alc_error_t
+alcp_cipher_context_copy(const alc_cipher_handle_p pSrcCipherHandle,
+                         alc_cipher_handle_p       pDstCipherHandle)
+{
+#ifdef ALCP_ENABLE_DEBUG_LOGGING
+    ALCP_DEBUG_LOG(LOG_DBG, "Cipher context copy");
+#endif
+    alc_error_t err = ALC_ERROR_NONE;
+
+    ALCP_BAD_PTR_ERR_RET(pSrcCipherHandle, err);
+    ALCP_BAD_PTR_ERR_RET(pSrcCipherHandle->ch_context, err);
+
+    ALCP_BAD_PTR_ERR_RET(pDstCipherHandle, err);
+    ALCP_BAD_PTR_ERR_RET(pDstCipherHandle->ch_context, err);
+
+    auto src_ctx = static_cast<Context*>(pSrcCipherHandle->ch_context);
+    auto dst_ctx = static_cast<Context*>(pDstCipherHandle->ch_context);
+
+    new (dst_ctx) Context;
+
+    auto alcpCipher           = new CipherFactory<iCipher>;
+    dst_ctx->m_cipher_factory = static_cast<void*>(alcpCipher);
+
+    auto aead = alcpCipher->create(
+        static_cast<CipherFactory<iCipher>*>(src_ctx->m_cipher_factory)
+            ->m_cipher_mode,
+        static_cast<CipherFactory<iCipher>*>(src_ctx->m_cipher_factory)
+            ->m_keyLen);
+
+    dst_ctx->m_cipher = static_cast<void*>(aead);
+
+    if (!dst_ctx->m_cipher) {
+        return ALC_ERROR_BAD_STATE;
+    }
+
+    // Check destruction state
+    if (src_ctx->destructed == 1 || dst_ctx->destructed == 1) {
+        return ALC_ERROR_BAD_STATE;
+    }
+    // Validate cipher objects exist
+    ALCP_BAD_PTR_ERR_RET(src_ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(dst_ctx->m_cipher, err);
+
+    auto src_cipher = static_cast<iCipher*>(src_ctx->m_cipher);
+    auto dst_cipher = static_cast<iCipher*>(dst_ctx->m_cipher);
+    err             = src_cipher->CopyCtx(src_cipher, dst_cipher);
+
+    if (err != ALC_ERROR_NONE) {
+        return err;
+    }
+
+#ifdef ALCP_ENABLE_DEBUG_LOGGING
+    ALCP_DEBUG_LOG(LOG_DBG, "Cipher context copied successfully");
+#endif
+
+    return ALC_ERROR_NONE;
 }
 
 EXTERN_C_END

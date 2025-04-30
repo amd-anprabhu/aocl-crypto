@@ -95,7 +95,8 @@ alcp_cipher_aead_request(const alc_cipher_mode_t mode,
 
     ALCP_ZERO_LEN_ERR_RET(keyLen, err);
 
-    auto alcpCipher       = new CipherFactory<iCipherAead>;
+    auto alcpCipher = new CipherFactory<iCipherAead>;
+
     ctx->m_cipher_factory = static_cast<void*>(alcpCipher);
 
     auto aead = alcpCipher->create(getCipherAeadMode(mode), getKeyLen(keyLen));

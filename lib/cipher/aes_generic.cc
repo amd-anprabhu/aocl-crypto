@@ -181,6 +181,63 @@ AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pinput,
     return err;
 }
 
+/*
+ * @brief        CopyCtx
+ * @param[in]    pSrc
+ * @param[in]    pDst
+ * @return       ALC_ERROR_NONE
+ */
+template<alcp::cipher::CipherMode       mode,
+         alcp::cipher::CipherKeyLen     keyLenBits,
+         alcp::utils::CpuCipherFeatures arch>
+alc_error_t
+AesGenericCiphersT<mode, keyLenBits, arch>::CopyCtx(const iCipher* pSrc,
+                                                    iCipher*       pDst)
+{
+    if (pSrc == nullptr || pDst == nullptr) {
+        return ALC_ERROR_BAD_STATE;
+    }
+
+    // Cast to the correct derived class type
+    const auto* src =
+        dynamic_cast<const AesGenericCiphersT<mode, keyLenBits, arch>*>(pSrc);
+    auto* dst = dynamic_cast<AesGenericCiphersT<mode, keyLenBits, arch>*>(pDst);
+
+    if (src == nullptr || dst == nullptr) {
+        return ALC_ERROR_INVALID_ARG; // Types don't match
+    }
+
+    // Copy cipher key data (includes both encryption and decryption keys)
+    // Copy IV if it exists
+    if (src->m_pIv_aes != nullptr && src->m_ivLen_aes > 0) {
+        if (dst->m_pIv_aes != nullptr) {
+            memcpy(dst->m_pIv_aes, src->m_pIv_aes, src->m_ivLen_aes);
+        } else {
+            return ALC_ERROR_BAD_STATE; // Destination IV buffer not allocated
+        }
+    }
+
+    dst->m_cipher_key_data.m_enc_key = dst->Rijndael::getEncryptKeysRound();
+    dst->m_cipher_key_data.m_dec_key = dst->Rijndael::getDecryptKeysRound();
+
+    memcpy((void*)dst->m_cipher_key_data.m_enc_key,
+           src->m_cipher_key_data.m_enc_key,
+           alcp::cipher::Rijndael::cRoundKeySize);
+    memcpy((void*)dst->m_cipher_key_data.m_dec_key,
+           src->m_cipher_key_data.m_dec_key,
+           alcp::cipher::Rijndael::cRoundKeySize);
+
+    // Copy state variables
+    dst->m_isKeySet_aes = src->m_isKeySet_aes;
+    dst->m_isEnc_aes    = src->m_isEnc_aes;
+    dst->Rijndael::setRounds(src->getRounds());
+
+    dst->m_keyLen_in_bytes_aes = src->m_keyLen_in_bytes_aes;
+    dst->m_dataLen             = src->m_dataLen;
+
+    return ALC_ERROR_NONE;
+}
+
 #if 1
 
 /*

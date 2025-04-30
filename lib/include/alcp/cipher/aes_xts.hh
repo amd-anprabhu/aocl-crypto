@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -119,7 +119,8 @@ class XtsT
   public:
     XtsT()
         : Xts((static_cast<Uint32>(keyLenBits)) / 8, CipherMode::eAesXTS)
-    {}
+    {
+    }
     ~XtsT() = default;
 
   public:
@@ -130,6 +131,10 @@ class XtsT
                         Uint8*       pPlainText,
                         Uint64       len) override;
     alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
+    alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
 };
 
 /* iCipherSeg classes */
@@ -141,7 +146,8 @@ class XtsBlockT
   public:
     XtsBlockT()
         : Xts((static_cast<Uint32>(keyLenBits)) / 8, CipherMode::eAesXTS)
-    {}
+    {
+    }
     ~XtsBlockT() = default;
 
   public:
@@ -167,6 +173,10 @@ class XtsBlockT
                                Uint64       currSrcLen,
                                Uint64       startBlockNum) override;
     alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
+    alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
 };
 
 } // namespace alcp::cipher

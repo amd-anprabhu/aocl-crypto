@@ -95,6 +95,9 @@ namespace alcp { namespace cipher {
         virtual alc_error_t encrypt(const Uint8* pSrt,
                                     Uint8*       pDrc,
                                     Uint64       len) = 0;
+
+        virtual alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) = 0;
+
         virtual alc_error_t finish(const void*) = 0;
     };
 
@@ -109,22 +112,23 @@ namespace alcp { namespace cipher {
         virtual alc_error_t init(const Uint8* pKey,
                                  Uint64       keyLen,
                                  const Uint8* pIv,
-                                 Uint64       ivLen)                   = 0;
+                                 Uint64       ivLen)                          = 0;
         virtual alc_error_t decrypt(const Uint8* pSrc,
                                     Uint8*       pDst,
-                                    Uint64       len)                  = 0;
+                                    Uint64       len)                         = 0;
         virtual alc_error_t encrypt(const Uint8* pSrt,
                                     Uint8*       pDrc,
-                                    Uint64       len)                  = 0;
+                                    Uint64       len)                         = 0;
         virtual alc_error_t decryptSegment(const Uint8* pSrc,
                                            Uint8*       pDst,
                                            Uint64       len,
-                                           Uint64       startBlockNum) = 0;
+                                           Uint64       startBlockNum)        = 0;
         virtual alc_error_t encryptSegment(const Uint8* pSrt,
                                            Uint8*       pDrc,
                                            Uint64       len,
-                                           Uint64       startBlockNum) = 0;
-        virtual alc_error_t finish(const void*)                  = 0;
+                                           Uint64       startBlockNum)        = 0;
+        virtual alc_error_t finish(const void*)                         = 0;
+        virtual alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) = 0;
     };
 
     // Additional Authentication functionality used for AEAD schemes
@@ -163,8 +167,6 @@ namespace alcp { namespace cipher {
         CpuCipherFeatures m_arch =
             CpuCipherFeatures::eVaes512; // default zen4 arch
         CpuCipherFeatures   m_currentArch  = getCpuCipherFeature();
-        CipherKeyLen        m_keyLen       = CipherKeyLen::eKey128Bit;
-        CipherMode          m_cipher_mode  = CipherMode::eCipherModeNone;
         INTERFACE*          m_iCipher      = nullptr;
         cipherAlgoMapT      m_cipherMap    = {};
         alc_cipher_state_t* m_cipher_state = nullptr;
@@ -173,6 +175,8 @@ namespace alcp { namespace cipher {
         CipherFactory();
         ~CipherFactory();
 
+        CipherKeyLen m_keyLen      = CipherKeyLen::eKey128Bit;
+        CipherMode   m_cipher_mode = CipherMode::eCipherModeNone;
         // cipher creators
         INTERFACE* create(const string& name);
         INTERFACE* create(const string& name, CpuCipherFeatures arch);

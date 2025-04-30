@@ -175,6 +175,58 @@ TEST(CBC, BasicDecryption)
     delete alcpCipher;
 }
 
+TEST(CBC, ContextCopyEncryption)
+{
+    auto alcpCipher = new CipherFactory<iCipher>;
+    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+
+    if (cbc == nullptr) {
+        delete alcpCipher;
+        FAIL();
+    }
+    std::vector<Uint8> output(cipherText.size());
+
+    cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
+
+    // Copy the context
+    auto alcpCipher2_cpy = new CipherFactory<iCipher>;
+    auto cbc_copy        = alcpCipher2_cpy->create("aes-cbc-128");
+    cbc->CopyCtx(cbc, cbc_copy);
+
+    cbc_copy->encrypt(&plainText[0], &output[0], plainText.size());
+
+    EXPECT_EQ(cipherText, output);
+
+    delete alcpCipher;
+    delete alcpCipher2_cpy;
+}
+
+TEST(CBC, ContextCopyDecryption)
+{
+    auto alcpCipher = new CipherFactory<iCipher>;
+    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+
+    if (cbc == nullptr) {
+        delete alcpCipher;
+        FAIL();
+    }
+    std::vector<Uint8> output(cipherText.size());
+
+    cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
+
+    // Copy the context
+    auto alcpCipher2_cpy = new CipherFactory<iCipher>;
+    auto cbc_copy        = alcpCipher2_cpy->create("aes-cbc-128");
+    cbc->CopyCtx(cbc, cbc_copy);
+
+    cbc_copy->decrypt(&cipherText[0], &output[0], cipherText.size());
+
+    EXPECT_EQ(plainText, output);
+
+    delete alcpCipher;
+    delete alcpCipher2_cpy;
+}
+
 TEST(CBC, MultiUpdateEncryption)
 {
 #ifndef AES_MULTI_UPDATE
