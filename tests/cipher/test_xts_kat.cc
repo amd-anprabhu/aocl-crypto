@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -37,22 +37,22 @@ using namespace alcp::testing;
 
 TEST(AES_ENC_128, KAT_128)
 {
-    CipherKatTest(128, ENCRYPT, ALC_MODE);
+    CipherKatTest(128, ENCRYPT, ALC_MODE, false);
 }
 
 TEST(AES_ENC_256, KAT_256)
 {
-    CipherKatTest(256, ENCRYPT, ALC_MODE);
+    CipherKatTest(256, ENCRYPT, ALC_MODE, false);
 }
 
 TEST(AES_DEC_128, KAT_128)
 {
-    CipherKatTest(128, DECRYPT, ALC_MODE);
+    CipherKatTest(128, DECRYPT, ALC_MODE, false);
 }
 
 TEST(AES_DEC_256, KAT_256)
 {
-    CipherKatTest(256, DECRYPT, ALC_MODE);
+    CipherKatTest(256, DECRYPT, ALC_MODE, false);
 }
 
 int

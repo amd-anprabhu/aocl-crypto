@@ -205,6 +205,7 @@ class AlcpCipherAeadBase : public CipherAeadBase
     bool encrypt(alcp_dc_ex_t& data);
     bool decrypt(alcp_dc_ex_t& data);
     bool reset();
+    bool context_copy();
 };
 
 } // namespace alcp::testing

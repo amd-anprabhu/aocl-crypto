@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -57,8 +57,12 @@ namespace alcp::testing {
 class OpenSSLCipherBase : public CipherBase
 {
   private:
-    EVP_CIPHER_CTX*   m_ctx_enc = nullptr;
-    EVP_CIPHER_CTX*   m_ctx_dec = nullptr;
+    EVP_CIPHER_CTX* m_ctx_enc = nullptr;
+    EVP_CIPHER_CTX* m_ctx_dec = nullptr;
+
+    EVP_CIPHER_CTX* m_ctx_enc_dup = nullptr;
+    EVP_CIPHER_CTX* m_ctx_dec_dup = nullptr;
+
     EVP_CIPHER*       m_cipher  = nullptr;
     alc_cipher_mode_t m_mode    = {};
     const Uint8*      m_iv      = nullptr;
@@ -141,5 +145,8 @@ class OpenSSLCipherBase : public CipherBase
     bool decrypt(const Uint8* ciphertxt, size_t len, Uint8* plaintxt);
     bool decrypt(alcp_dc_ex_t& data);
     bool reset();
+    /* FIXME: not implemented as of now, cross tests are not designed for Cipher
+     * Context copy*/
+    bool context_copy();
 };
 } // namespace alcp::testing

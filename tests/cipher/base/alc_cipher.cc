@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,7 +33,8 @@ namespace alcp::testing {
 AlcpCipherBase::AlcpCipherBase(const alc_cipher_mode_t cMode, const Uint8* iv)
     : m_mode{ cMode }
     , m_iv{ iv }
-{}
+{
+}
 
 /* xts */
 AlcpCipherBase::AlcpCipherBase(const alc_cipher_mode_t cMode,
@@ -58,6 +59,13 @@ AlcpCipherBase::~AlcpCipherBase()
             free(m_handle->ch_context);
         }
         delete m_handle;
+    }
+    if (m_handle_dup != nullptr) {
+        alcp_cipher_finish(m_handle_dup);
+        if (m_handle_dup->ch_context != NULL) {
+            free(m_handle_dup->ch_context);
+        }
+        delete m_handle_dup;
     }
 }
 
@@ -184,6 +192,31 @@ dec_out:
 bool
 AlcpCipherBase::reset()
 {
+    return true;
+}
+
+bool
+AlcpCipherBase::context_copy()
+{
+    alc_error_t err;
+
+    if (m_handle_dup != nullptr) {
+        alcp_cipher_finish(m_handle_dup);
+        free(m_handle_dup->ch_context);
+        delete m_handle_dup;
+        m_handle_dup = nullptr;
+    }
+    m_handle_dup             = new alc_cipher_handle_t;
+    m_handle_dup->ch_context = malloc(alcp_cipher_context_size());
+
+    err = alcp_cipher_context_copy(m_handle, m_handle_dup);
+    if (alcp_is_error(err)) {
+        std::cout << "Error code in alcp_cipher_context_copy:" << err
+                  << std::endl;
+        return false;
+    }
+
+    std::cout << "Context copy successful." << std::endl;
     return true;
 }
 

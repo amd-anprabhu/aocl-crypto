@@ -874,7 +874,8 @@ RunCipherKatTest(CipherTestingCore& testingCore,
                  encDec_t           encDec,
                  std::string        encDecStr,
                  alc_cipher_mode_t  mode,
-                 int                keySize)
+                 int                keySize,
+                 bool               CtxCopy)
 {
     // FIXME: isxts and isgcm unused
     bool                 ret = false;
@@ -918,11 +919,21 @@ RunCipherKatTest(CipherTestingCore& testingCore,
             data.m_out = &(actual_output[0]);
         data.m_outl = expected_output.size();
 
-        ret = testingCore.getCipherHandler()->testingEncrypt(
-            data, csv->getVect("KEY"));
-        if (!ret) {
-            std::cout << "ERROR: Enc" << std::endl;
-            EXPECT_TRUE(ret);
+        /* Context copy test, only for generic ciphers */
+        if (CtxCopy) {
+            ret = testingCore.getCipherHandler()->testingEncryptCtxCopy(
+                data, csv->getVect("KEY"));
+            if (!ret) {
+                std::cout << "ERROR: CtxCopy encrypt" << std::endl;
+                EXPECT_TRUE(ret);
+            }
+        } else {
+            ret = testingCore.getCipherHandler()->testingEncrypt(
+                data, csv->getVect("KEY"));
+            if (!ret) {
+                std::cout << "ERROR: testing encrypt" << std::endl;
+                EXPECT_TRUE(ret);
+            }
         }
         if (verbose > 1) {
             auto key = csv->getVect("KEY");
@@ -942,8 +953,21 @@ RunCipherKatTest(CipherTestingCore& testingCore,
             data.m_out = &(actual_output[0]);
         data.m_outl = data.m_inl;
 
-        ret = testingCore.getCipherHandler()->testingDecrypt(
-            data, csv->getVect("KEY"));
+        if (CtxCopy) {
+            ret = testingCore.getCipherHandler()->testingDecryptCtxCopy(
+                data, csv->getVect("KEY"));
+            if (!ret) {
+                std::cout << "ERROR: CtxCopy decrypt" << std::endl;
+                EXPECT_TRUE(ret);
+            }
+        } else {
+            ret = testingCore.getCipherHandler()->testingDecrypt(
+                data, csv->getVect("KEY"));
+            if (!ret) {
+                std::cout << "ERROR: testing decrypt" << std::endl;
+                EXPECT_TRUE(ret);
+            }
+        }
         if (!ret) {
             std::cout << "ERROR: Dec" << std::endl;
             EXPECT_TRUE(ret);
@@ -1112,7 +1136,10 @@ RunCipherAeadKATTest(CipherAeadTestingCore& testingCore,
  * @param mode Aode of encryption/Decryption (CTR,CFB,OFB,CBC,XTS)
  */
 void
-CipherKatTest(int keySize, encDec_t encDec, alc_cipher_mode_t mode)
+CipherKatTest(int               keySize,
+              encDec_t          encDec,
+              alc_cipher_mode_t mode,
+              bool              CtxCopy)
 {
     size_t            key_size = keySize;
     const std::string cModeStr = GetModeSTR(mode);
@@ -1137,8 +1164,8 @@ CipherKatTest(int keySize, encDec_t encDec, alc_cipher_mode_t mode)
             continue;
         }
 
-        retval =
-            RunCipherKatTest(testing_core, encDec, encDecStr, mode, keySize);
+        retval = RunCipherKatTest(
+            testing_core, encDec, encDecStr, mode, keySize, CtxCopy);
 
         EXPECT_TRUE(retval);
     }

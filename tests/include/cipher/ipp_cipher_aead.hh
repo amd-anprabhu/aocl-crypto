@@ -119,5 +119,8 @@ class IPPCipherAeadBase : public CipherAeadBase
     bool decrypt(/*const Uint8* ciphertxt, size_t len, Uint8* plaintxt*/);
     bool decrypt(alcp_dc_ex_t& data);
     bool reset();
+    /* FIXME: not implemented as of now, cross tests are not designed for Cipher
+     * Context copy*/
+    bool context_copy();
 };
 } // namespace alcp::testing

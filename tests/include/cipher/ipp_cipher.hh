@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -129,5 +129,6 @@ class IPPCipherBase : public CipherBase
     bool decrypt(const Uint8* ciphertxt, size_t len, Uint8* plaintxt);
     bool decrypt(alcp_dc_ex_t& data);
     bool reset();
+    bool context_copy();
 };
 } // namespace alcp::testing

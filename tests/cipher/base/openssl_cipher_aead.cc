@@ -97,7 +97,8 @@ OpenSSLCipherAeadBase::OpenSSLCipherAeadBase(const alc_cipher_mode_t cMode,
                                              const Uint8*            iv)
     : m_mode{ cMode }
     , m_iv{ iv }
-{}
+{
+}
 OpenSSLCipherAeadBase::OpenSSLCipherAeadBase(const alc_cipher_mode_t cMode,
                                              const Uint8*            iv,
                                              const Uint32            cIvLen,
@@ -769,6 +770,12 @@ OpenSSLCipherAeadBase::decrypt(alcp_dc_ex_t& data_in)
 
 bool
 OpenSSLCipherAeadBase::reset()
+{
+    return true;
+}
+
+bool
+OpenSSLCipherAeadBase::context_copy()
 {
     return true;
 }

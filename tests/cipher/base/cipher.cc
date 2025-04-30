@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -114,6 +114,53 @@ CheckCipherIsAEAD(alc_cipher_mode_t mode)
 CipherTesting::CipherTesting(CipherBase* impl)
 {
     setcb(impl);
+}
+
+bool
+CipherTesting::testingEncryptCtxCopy(alcp_dc_ex_t&            data,
+                                     const std::vector<Uint8> key)
+{
+    if (cb != nullptr) {
+        if (cb->init(data.m_iv,
+                     data.m_ivl,
+                     &(key[0]),
+                     key.size() * 8,
+                     data.m_tkey,
+                     data.m_block_size)) {
+            cb->context_copy();
+            /* now the dup context will be used in the encrypt */
+            return cb->encrypt(data);
+        } else {
+            std::cout << "Test: Cipher: Context copy Encrypt: Failure in Init"
+                      << std::endl;
+        }
+    } else {
+        std::cout << "base.hh: CipherTesting: Implementation missing!"
+                  << std::endl;
+    }
+    return false;
+}
+
+bool
+CipherTesting::testingDecryptCtxCopy(alcp_dc_ex_t&            data,
+                                     const std::vector<Uint8> key)
+{
+    if (cb != nullptr) {
+        if (cb->init(data.m_iv,
+                     data.m_ivl,
+                     &(key[0]),
+                     key.size() * 8,
+                     data.m_tkey,
+                     data.m_block_size)) {
+            cb->context_copy();
+            /* now the dup context will be used in the encrypt */
+            return cb->decrypt(data);
+        }
+    } else {
+        std::cout << "base.hh: CipherTesting: Implementation missing!"
+                  << std::endl;
+    }
+    return false;
 }
 
 bool

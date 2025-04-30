@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -115,6 +115,7 @@ class CipherBase
     virtual bool encrypt(alcp_dc_ex_t& data)                  = 0;
     virtual bool decrypt(alcp_dc_ex_t& data)                  = 0;
     virtual bool reset()                                      = 0;
+    virtual bool context_copy()                               = 0;
     virtual ~CipherBase()                                     = default;
 };
 
@@ -144,6 +145,42 @@ class CipherTesting
      * @return false
      */
     bool testingEncrypt(alcp_dc_ex_t& data, const std::vector<Uint8> key);
+
+    /**
+     * @brief Tests the encryption operation with context copying capability.
+     *
+     * This function tests the cipher's ability to encrypt data while also
+     * verifying that the cipher context can be correctly copied mid-operation.
+     * Context copying is important for applications that need to save and
+     * restore cipher state during processing, such as in streaming or
+     * concurrent operations.
+     *
+     * @param data - Structure containing input/output buffers, IVs, and other
+     *              cipher-specific parameters required for encryption
+     * @param key - Key used for encryption, provided as a vector of bytes
+     * @return true - If encryption with context copying succeeds
+     * @return false - If encryption or context copying fails
+     */
+    bool testingEncryptCtxCopy(alcp_dc_ex_t&            data,
+                               const std::vector<Uint8> key);
+
+    /**
+     * @brief Tests the decryption operation with context copying capability.
+     *
+     * This function tests the cipher's ability to decrypt data while also
+     * verifying that the cipher context can be correctly copied mid-operation.
+     * Context copying is important for applications that need to save and
+     * restore cipher state during processing, such as in streaming or
+     * concurrent operations.
+     *
+     * @param data - Structure containing input/output buffers, IVs, tags, and
+     * other cipher-specific parameters required for decryption
+     * @param key - Key used for decryption, provided as a vector of bytes
+     * @return true - If decryption with context copying succeeds
+     * @return false - If decryption or context copying fails
+     */
+    bool testingDecryptCtxCopy(alcp_dc_ex_t&            data,
+                               const std::vector<Uint8> key);
 
     /**
      * @brief Decrypts data and puts in data.out, expects data.out to already

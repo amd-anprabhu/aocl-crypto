@@ -35,7 +35,8 @@ AlcpCipherAeadBase::AlcpCipherAeadBase(const alc_cipher_mode_t cMode,
                                        const Uint8*            iv)
     : m_mode{ cMode }
     , m_iv{ iv }
-{}
+{
+}
 
 AlcpCipherAeadBase::AlcpCipherAeadBase(const alc_cipher_mode_t cMode,
                                        const Uint8*            iv,
@@ -43,7 +44,8 @@ AlcpCipherAeadBase::AlcpCipherAeadBase(const alc_cipher_mode_t cMode,
     : m_mode{ cMode }
     , m_iv{ iv }
     , m_pState{ pCipherState }
-{}
+{
+}
 
 AlcpCipherAeadBase::AlcpCipherAeadBase(const alc_cipher_mode_t cMode,
                                        const Uint8*            iv,
@@ -483,6 +485,12 @@ AlcpCipherAeadBase::alcpSIVModeToFuncCall(alcp_dc_ex_t& aead_data)
 
 bool
 AlcpCipherAeadBase::reset()
+{
+    return true;
+}
+
+bool
+AlcpCipherAeadBase::context_copy()
 {
     return true;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -142,6 +142,8 @@ OpenSSLCipherBase::~OpenSSLCipherBase()
     // Destroy call contexts
     EVP_CIPHER_CTX_free(m_ctx_enc);
     EVP_CIPHER_CTX_free(m_ctx_dec);
+    EVP_CIPHER_CTX_free(m_ctx_enc_dup);
+    EVP_CIPHER_CTX_free(m_ctx_dec_dup);
     EVP_CIPHER_free(m_cipher);
 #ifdef USE_PROVIDER
     if (m_alcp_provider != nullptr) {
@@ -334,6 +336,35 @@ OpenSSLCipherBase::decrypt(alcp_dc_ex_t& data)
 bool
 OpenSSLCipherBase::reset()
 {
+    return true;
+}
+
+bool
+OpenSSLCipherBase::context_copy()
+{
+    /* use EVP_CIPHER_CTX_copy function here */
+    EVP_CIPHER_CTX_free(m_ctx_enc_dup);
+    m_ctx_enc_dup = EVP_CIPHER_CTX_new();
+    if (m_ctx_enc_dup == NULL) {
+        m_ctx_enc_dup = nullptr;
+        handleErrors();
+        return false;
+    }
+    if (1 != EVP_CIPHER_CTX_copy(m_ctx_enc_dup, m_ctx_enc)) {
+        handleErrors();
+        return false;
+    }
+    EVP_CIPHER_CTX_free(m_ctx_dec_dup);
+    m_ctx_dec_dup = EVP_CIPHER_CTX_new();
+    if (m_ctx_dec_dup == NULL) {
+        m_ctx_dec_dup = nullptr;
+        handleErrors();
+        return false;
+    }
+    if (1 != EVP_CIPHER_CTX_copy(m_ctx_dec_dup, m_ctx_dec)) {
+        handleErrors();
+        return false;
+    }
     return true;
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -49,7 +49,8 @@ typedef struct _alc_cipher_info
 class AlcpCipherBase : public CipherBase
 {
   private:
-    alc_cipher_handle_p m_handle = nullptr;
+    alc_cipher_handle_p m_handle     = nullptr;
+    alc_cipher_handle_p m_handle_dup = nullptr;
     alc_cipher_mode_t   m_mode{};
     const Uint8*        m_iv{};
     Uint8               m_key[64]{};
@@ -120,6 +121,7 @@ class AlcpCipherBase : public CipherBase
     bool encrypt(alcp_dc_ex_t& data);
     bool decrypt(alcp_dc_ex_t& data);
     bool reset();
+    bool context_copy();
 };
 
 } // namespace alcp::testing
