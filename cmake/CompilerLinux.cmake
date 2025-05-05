@@ -261,7 +261,7 @@ function(alcp_add_coverage_flags)
         target_link_options(alcp_static PUBLIC ${ALCP_LFLAGS_COV_GCC})
     elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         # check if lcov is installed
-        find_program(LLVM_COV llvm-cov-14)
+        find_program(LLVM_COV llvm-cov)
         if (NOT LLVM_COV)
             message(FATAL_ERROR "llvm-cov installation not found, coverage build with AOCC/Clang will not work!")
         endif()
