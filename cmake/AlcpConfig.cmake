@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+# Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -58,15 +58,16 @@ FUNCTION(GEN_CONF)
 
     # Set lib name
     # TODO (Need to find a way to get the bin name from cmake)
+    string(TOUPPER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_UPPER)
     IF(ALCP_BUILD_OS_LINUX)
-        IF(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "DEBUG")
+        if(BUILD_TYPE_UPPER STREQUAL "DEBUG")
             SET(ALCP_LIB_OUTPUT_FILE_NAME_STRING "${ALCP_BINARY_DIR}/libalcp_DEBUG.so")
         ELSE()
             SET(ALCP_LIB_OUTPUT_FILE_NAME_STRING "${ALCP_BINARY_DIR}/libalcp.so")
         ENDIF()
     ENDIF(ALCP_BUILD_OS_LINUX)
     IF(ALCP_BUILD_OS_WINDOWS)
-        IF(CMAKE_BUILD_TYPE STREQUAL "Debug" OR "DEBUG")
+        IF(BUILD_TYPE_UPPER STREQUAL "DEBUG")
             SET(ALCP_LIB_OUTPUT_FILE_NAME_STRING "${ALCP_BINARY_DIR}/libalcp_DEBUG.dll")
         ELSE()
             SET(ALCP_LIB_OUTPUT_FILE_NAME_STRING "${ALCP_BINARY_DIR}/libalcp.dll")
