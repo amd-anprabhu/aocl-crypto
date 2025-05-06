@@ -478,8 +478,7 @@ ALCP_prov_cipher_generic_block_update(void*        vctx,
     }
     if (nextblocks > 0) {
         if (!cipherctx->enc && cipherctx->pad && nextblocks == inl) {
-            // if (!assert(inl >= blksz)) {
-            if (inl >= blksz) {
+            if (!(inl >= blksz)) {
                 ERR_raise(ERR_LIB_PROV, PROV_R_OUTPUT_BUFFER_TOO_SMALL);
                 return 0;
             }
