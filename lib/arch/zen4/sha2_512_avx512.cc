@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -377,6 +377,32 @@ namespace alcp::digest { namespace zen4 {
             _mm256_add_epi64(hash_256_1, _mm256_set_epi64x(h, g, f, e));
     }
 
+    /* ShaRoundScalar is same as ShaRound but explicitly uses inline assembly to
+     * prevent the compiler from generating vectorized operations for the SHA
+     * round calculation. */
+    static inline void ShaRoundScalar(Uint64  a,
+                                      Uint64  b,
+                                      Uint64  c,
+                                      Uint64& d,
+                                      Uint64  e,
+                                      Uint64  f,
+                                      Uint64  g,
+                                      Uint64& h,
+                                      Uint64  x)
+    {
+        Uint64 s0 = 0, s1 = 0, maj = 0, ch = 0;
+        maj      = (a & ((b ^ c))) + (b & c);
+        ch       = (e & f) + (~e & g);
+        s0       = RotateRight(a, 28) ^ RotateRight(a, 34) ^ RotateRight(a, 39);
+        s1       = RotateRight(e, 14) ^ RotateRight(e, 18) ^ RotateRight(e, 41);
+        Uint64 t = x + h + s1 + ch;
+        h        = t + s0 + maj;
+        /* FIXME: Inline assembly is used here as a workaround to ensure scalar
+         * operations are generated instead of vectorized operations for sha
+         * round calculation. */
+        asm("addq %1, %0" : "+r"(d) : "r"(t)); // d += t;
+    }
+
     static inline void process_buffer_avx(Uint64       state[8],
                                           const Uint8* data,
                                           Uint32       length)
@@ -457,8 +483,8 @@ namespace alcp::digest { namespace zen4 {
                     _mm_loadu_si128(
                         (const __m128i*)(&cRoundConstants[k512_idx])));
 
-                ShaRound(a, b, c, d, e, f, g, h, message_sch[pos]);
-                ShaRound(h, a, b, c, d, e, f, g, message_sch[pos + 1]);
+                ShaRoundScalar(a, b, c, d, e, f, g, h, message_sch[pos]);
+                ShaRoundScalar(h, a, b, c, d, e, f, g, message_sch[pos + 1]);
 
                 t = h;
                 h = f;
@@ -475,22 +501,22 @@ namespace alcp::digest { namespace zen4 {
             }
         }
         // do 16 of them
-        ShaRound(a, b, c, d, e, f, g, h, message_sch[0]);
-        ShaRound(h, a, b, c, d, e, f, g, message_sch[1]);
-        ShaRound(g, h, a, b, c, d, e, f, message_sch[2]);
-        ShaRound(f, g, h, a, b, c, d, e, message_sch[3]);
-        ShaRound(e, f, g, h, a, b, c, d, message_sch[4]);
-        ShaRound(d, e, f, g, h, a, b, c, message_sch[5]);
-        ShaRound(c, d, e, f, g, h, a, b, message_sch[6]);
-        ShaRound(b, c, d, e, f, g, h, a, message_sch[7]);
-        ShaRound(a, b, c, d, e, f, g, h, message_sch[8]);
-        ShaRound(h, a, b, c, d, e, f, g, message_sch[9]);
-        ShaRound(g, h, a, b, c, d, e, f, message_sch[10]);
-        ShaRound(f, g, h, a, b, c, d, e, message_sch[11]);
-        ShaRound(e, f, g, h, a, b, c, d, message_sch[12]);
-        ShaRound(d, e, f, g, h, a, b, c, message_sch[13]);
-        ShaRound(c, d, e, f, g, h, a, b, message_sch[14]);
-        ShaRound(b, c, d, e, f, g, h, a, message_sch[15]);
+        ShaRoundScalar(a, b, c, d, e, f, g, h, message_sch[0]);
+        ShaRoundScalar(h, a, b, c, d, e, f, g, message_sch[1]);
+        ShaRoundScalar(g, h, a, b, c, d, e, f, message_sch[2]);
+        ShaRoundScalar(f, g, h, a, b, c, d, e, message_sch[3]);
+        ShaRoundScalar(e, f, g, h, a, b, c, d, message_sch[4]);
+        ShaRoundScalar(d, e, f, g, h, a, b, c, message_sch[5]);
+        ShaRoundScalar(c, d, e, f, g, h, a, b, message_sch[6]);
+        ShaRoundScalar(b, c, d, e, f, g, h, a, message_sch[7]);
+        ShaRoundScalar(a, b, c, d, e, f, g, h, message_sch[8]);
+        ShaRoundScalar(h, a, b, c, d, e, f, g, message_sch[9]);
+        ShaRoundScalar(g, h, a, b, c, d, e, f, message_sch[10]);
+        ShaRoundScalar(f, g, h, a, b, c, d, e, message_sch[11]);
+        ShaRoundScalar(e, f, g, h, a, b, c, d, message_sch[12]);
+        ShaRoundScalar(d, e, f, g, h, a, b, c, message_sch[13]);
+        ShaRoundScalar(c, d, e, f, g, h, a, b, message_sch[14]);
+        ShaRoundScalar(b, c, d, e, f, g, h, a, message_sch[15]);
         // accumulate the state
         state[0] += a;
         state[1] += b;
