@@ -521,19 +521,44 @@ CipherCrossTest(int               keySize,
                     PrintCipherTestData(key, data_ext, mode);
                 }
             } else {
+                /* Do an encrypt and then call decrypt */
+                ret = alcpTC->getCipherHandler()->testingEncrypt(data_alc, key);
+                if (!ret) {
+                    std::cout << "ERROR: Enc: Main lib" << std::endl;
+                    FAIL();
+                }
+                ret = extTC->getCipherHandler()->testingEncrypt(data_ext, key);
+                if (!ret) {
+                    std::cout << "ERROR: Enc: ext lib" << std::endl;
+                    FAIL();
+                }
+                ASSERT_TRUE(ArraysMatch(out_ct_alc, out_ct_ext));
+
+                /* now decrypt, use the CT created after encryption, pass it on
+                 * to decrypt as input */
                 ret = alcpTC->getCipherHandler()->testingDecrypt(data_alc, key);
                 if (!ret) {
                     std::cout << "ERROR: Dec: main lib" << std::endl;
                     FAIL();
                 }
-
                 ret = extTC->getCipherHandler()->testingDecrypt(data_ext, key);
                 if (!ret) {
                     std::cout << "ERROR: Dec: ext lib" << std::endl;
                     FAIL();
                 }
+                /* we need to compare the decrypted output with the reference
+                 * plaintext*/
+                std::vector<Uint8> out_ = std::vector<Uint8>(
+                    data_alc.m_out, data_alc.m_out + data_alc.m_outl);
+                out_pt     = std::vector<Uint8>(data_ext.m_out,
+                                            data_ext.m_out + data_ext.m_outl);
+                out_ct_ext = std::vector<Uint8>(
+                    data_ext.m_out, data_ext.m_out + data_ext.m_outl);
 
-                ASSERT_TRUE(ArraysMatch(out_ct_alc, out_ct_ext));
+                // Check if the external library's output matches the plaintext
+                ASSERT_TRUE(ArraysMatch(out_ct_ext, out_pt));
+                // Check if the main library's output matches the plaintext
+                ASSERT_TRUE(ArraysMatch(out_ct_alc, out_pt));
 
                 if (verbose > 1) {
                     PrintCipherTestData(key, data_alc, mode);
