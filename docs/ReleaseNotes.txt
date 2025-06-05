@@ -1,5 +1,5 @@
 (C) 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
-AOCL Cryptography - Release Notes - AOCL version 5.0.1
+AOCL Cryptography - Release Notes - AOCL version 5.1.1
 ------------------------------------------------------
 AOCL Crypto Contents
 --------------------
@@ -16,7 +16,7 @@ implementations of different cryptographic algorithms which are given below:
 -- Chacha20Poly1305 routines.
 
 
-Highlights of AOCL Crypto version 5.0.1
+Highlights of AOCL Crypto version 5.1.1
 ---------------------------------------------------------------------------
 - Performance improvements in SHA3.
 - Performance improvements in AES-GCM for real-world benchmarks (WRK, ApacheBench, etc).
