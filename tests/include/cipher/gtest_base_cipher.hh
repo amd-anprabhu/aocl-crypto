@@ -483,21 +483,34 @@ CipherCrossTest(int               keySize,
             }
             data_alc.m_inl = data_ext.m_inl = pt.size() - 1;
 
+            data_alc.m_outl = data_ext.m_outl = data_alc.m_inl;
+/* for CBC mode, let same buffers be used for both input and output if
+ * CBC_INPLACE_BUFFER is defined
+ */
+#ifdef CBC_INPLACE_BUFFER
+            if (modeStr.compare("CBC") == 0) {
+                data_alc.m_out = data_ext.m_out = &(pt[1]);
+            } else {
+                data_alc.m_out = &(out_ct_alc[0]);
+                data_ext.m_out = &(out_ct_ext[0]);
+            }
+#else
+            data_alc.m_out = &(out_ct_alc[0]);
+            data_ext.m_out = &(out_ct_ext[0]);
+#endif
+
             // ALC/Main Lib Data
-            data_alc.m_iv   = &(iv[0]);
-            data_alc.m_ivl  = iv.size();
-            data_alc.m_out  = &(out_ct_alc[0]);
-            data_alc.m_outl = data_alc.m_inl;
+            data_alc.m_iv  = &(iv[0]);
+            data_alc.m_ivl = iv.size();
             if (isxts) {
                 data_alc.m_tkey  = &(tkey[0]);
                 data_alc.m_tkeyl = tkeyl;
             }
 
             // External Lib Data
-            data_ext.m_iv   = &(iv[0]);
-            data_ext.m_ivl  = iv.size();
-            data_ext.m_out  = &(out_ct_ext[0]);
-            data_ext.m_outl = data_alc.m_inl;
+            data_ext.m_iv  = &(iv[0]);
+            data_ext.m_ivl = iv.size();
+
             if (isxts) {
                 data_ext.m_tkey       = &(tkey[0]);
                 data_ext.m_tkeyl      = tkeyl;
@@ -571,8 +584,8 @@ CipherCrossTest(int               keySize,
 
 // FIXME: In future we need a direct path to each aead modes
 /**
- * @brief funtion to avoid repeated code in every cross test, can only be used
- * for AES-CTR,AES-CBC,AES-OFB,AES-CFB
+ * @brief funtion to avoid repeated code in every cross test, can only be
+ * used for AES-CTR,AES-CBC,AES-OFB,AES-CFB
  *
  * @param keySize keysize in bits(128,192 or 256)
  * @param encDec (encryption or Decryption)
@@ -695,7 +708,8 @@ CipherAeadCrossTest(int               keySize,
         size = (1048576 / 2);
     }
 
-    /* generate these only once and use it in the loop below, chunk by chunk */
+    /* generate these only once and use it in the loop below, chunk by chunk
+     */
     std::vector<Uint8> msg_full  = rb.genRandomBytes(MAX_LOOP * size);
     std::vector<Uint8> key_full  = rb.genRandomBytes(key_size);
     std::vector<Uint8> iv_full   = rb.genRandomBytes(IVL_MAX);
