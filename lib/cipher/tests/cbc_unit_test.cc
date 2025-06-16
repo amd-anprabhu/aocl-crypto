@@ -191,6 +191,11 @@ TEST(CBC, ContextCopyEncryption)
     // Copy the context
     auto alcpCipher2_cpy = new CipherFactory<iCipher>;
     auto cbc_copy        = alcpCipher2_cpy->create("aes-cbc-128");
+    if (cbc_copy == nullptr) {
+        delete alcpCipher;
+        delete alcpCipher2_cpy;
+        FAIL();
+    }
     cbc->CopyCtx(cbc, cbc_copy);
 
     cbc_copy->encrypt(&plainText[0], &output[0], plainText.size());
@@ -217,6 +222,11 @@ TEST(CBC, ContextCopyDecryption)
     // Copy the context
     auto alcpCipher2_cpy = new CipherFactory<iCipher>;
     auto cbc_copy        = alcpCipher2_cpy->create("aes-cbc-128");
+    if (cbc_copy == nullptr) {
+        delete alcpCipher;
+        delete alcpCipher2_cpy;
+        FAIL();
+    }
     cbc->CopyCtx(cbc, cbc_copy);
 
     cbc_copy->decrypt(&cipherText[0], &output[0], cipherText.size());
@@ -509,6 +519,7 @@ TEST(CBC, RandomEncryptDecryptTest)
             cbc->decrypt(
                 &cipher_text_vect[0], &plainTextOut[0], plainTextVect.size());
 
+            delete alcpCipher;
 #ifdef DEBUG
 
             if (plainTextVect != plainTextOut) {
@@ -531,7 +542,6 @@ TEST(CBC, RandomEncryptDecryptTest)
 
             ASSERT_EQ(plainTextVect, plainTextOut);
 
-            delete alcpCipher;
 #ifdef DEBUG
             auto ret = std::mismatch(plainTextVect.begin(),
                                      plainTextVect.end(),
