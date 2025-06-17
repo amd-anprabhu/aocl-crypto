@@ -314,28 +314,13 @@ AlcpCipherAeadBase::alcpGCMModeToFuncCall(alcp_dc_ex_t& aead_data)
             printf("Decrypt Error\n");
             return false;
         }
-
-        if (m_mode == ALC_AES_MODE_GCM) {
-
-            // Tag verification done in getTag api for gcm, other aead modes to
-            // be made similar to gcm. Encrypt tag is shared has input to
-            // decrypt
-            err = alcp_cipher_aead_get_tag(
-                m_handle, aead_data.m_tag, aead_data.m_tagl);
-            if (alcp_is_error(err)) {
-                printf("TAG Error\n");
-                return false;
-            }
-
-        } else {
-            // pass expected for gcm decrypt, get_tag api return error if tag is
-            // not matched
-            err = alcp_cipher_aead_get_tag(
-                m_handle, aead_data.m_tag, aead_data.m_tagl);
-            if (alcp_is_error(err)) {
-                printf("TAG Error\n");
-                return false;
-            }
+        // pass expected for gcm decrypt, get_tag api return error if tag is
+        // not matched
+        err = alcp_cipher_aead_get_tag(
+            m_handle, aead_data.m_tag, aead_data.m_tagl);
+        if (alcp_is_error(err)) {
+            printf("TAG Error\n");
+            return false;
         }
     }
     return true;

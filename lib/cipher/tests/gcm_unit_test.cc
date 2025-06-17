@@ -414,16 +414,11 @@ TEST_P(GCM_KAT, Decrypt)
     }
     EXPECT_EQ(m_err, ALC_ERROR_NONE);
 
-    // If there is tag, try to get the tag.
     std::vector<Uint8> out_tag(m_tag.size(), 0);
     if (!m_tag.empty()) {
         m_err = pGcmObj->getTag(&(out_tag.at(0)), m_tag.size());
-        if (m_test_name.at(0) == 'P') {
-            EXPECT_EQ(out_tag, m_tag);
-        } else {
-            EXPECT_NE(out_tag, m_tag);
-        }
-        EXPECT_EQ(m_err, ALC_ERROR_NONE);
+        /* tag check is done internally, only check the error code here */
+        EXPECT_EQ(m_err, ALC_ERROR_TAG_MISMATCH);
     }
 }
 
@@ -627,8 +622,8 @@ TEST(GCM, DecryptUpdateSingle)
     EXPECT_EQ(out, ptext);
 
     err = aead->getTag(getPtr(tag_out), 16);
-
-    EXPECT_EQ(tag_out, tag);
+    /* tag check is done internally */
+    EXPECT_EQ(err, ALC_ERROR_TAG_MISMATCH);
 
     delete alcpCipher;
 }
@@ -684,8 +679,8 @@ TEST(GCM, DecryptUpdateMultiple)
     EXPECT_EQ(out, ptext);
 
     err = aead->getTag(getPtr(tag_out), 16);
-
-    EXPECT_EQ(tag_out, tag);
+    /* tag check is done internally */
+    EXPECT_EQ(err, ALC_ERROR_TAG_MISMATCH);
 
     delete alcpCipher;
 }

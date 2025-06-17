@@ -75,7 +75,10 @@ BenchCipherExperimental(benchmark::State&            state,
     }
 
     // Cleanup
-    no_err &= iTestCipher->finalize(&dataFinalize);
+    // FIXME: this needs fixes. If encrypt, after update test interface call,
+    // we should save the tag and use it in finalize, else the get tag call in
+    // finalize will fail.
+    no_err = iTestCipher->finalize(&dataFinalize);
     // FIXME: 'finalize' does not need to be benched after multi-decrypt
     // operations on a single encrypted buffer.
     //  It errors out due to tag mismatches in case of openssl.Add error check

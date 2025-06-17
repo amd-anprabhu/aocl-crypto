@@ -113,8 +113,7 @@ GcmAuth::setAad(const Uint8* pInput, Uint64 aadLen)
     return err;
 }
 
-// Internal tag matching is disable for ipp compat support
-#define INTERNAL_TAG_MATCH 0
+#define INTERNAL_TAG_MATCH 1
 
 alc_error_t
 GcmAuth::getTag(Uint8* ptag, Uint64 tagLen)
@@ -148,13 +147,16 @@ GcmAuth::getTag(Uint8* ptag, Uint64 tagLen)
                            m_gcm_ctx.m_hash_subKey_128,
                            m_gcm_ctx.m_reverse_mask_128,
                            ptag);
+    if (err != ALC_ERROR_NONE) {
+        printf("\n Error: getTag failed");
+        return err;
+    }
 
 #if INTERNAL_TAG_MATCH
     // During decrypt, tag generated should be compared with
     // input Tag.
     if (!m_isEnc_aes) {
         if (utils::CompareConstTime(ptag, tagInput, tagLen) == 0) {
-            // printf("\n Error: Tag mismatch");
             // clear data
             memset(ptag, 0, tagLen);
             memset(tagInput, 0, tagLen);

@@ -110,15 +110,12 @@ AlcpGcmCipher<encryptor>::finalize(alc_test_finalize_data_p data)
     err = alcp_cipher_aead_get_tag(
         &m_handle, p_gcm_finalize_data->m_tag, p_gcm_finalize_data->m_tag_len);
     if (alcp_is_error(err)) {
-        printf(
-            "Error: unable getting tag, possible tag mismatch if decrypt \n");
+        printf("Error: alcp_cipher_aead_get_tag,possible tag mismatch if "
+               "decrypting\n");
+        alcp_cipher_aead_finish(&m_handle);
         return false;
     }
     alcp_cipher_aead_finish(&m_handle);
-    if (m_handle.ch_context != nullptr) {
-        free(m_handle.ch_context);
-        m_handle.ch_context = nullptr;
-    }
     return true;
 };
 

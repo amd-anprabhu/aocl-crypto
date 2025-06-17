@@ -201,14 +201,16 @@ alcp_cipher_aead_set_aad(const alc_cipher_handle_p pCipherHandle,
  * @brief AEAD get a copy of Tag generated.
  * @parblock <br> &nbsp;
  * <b>This AEAD API can be called after @ref alcp_cipher_aead_request and
- * before @ref alcp_cipher_aead_finish </b>
+ * before @ref alcp_cipher_aead_finish. During encrypt, this API copies the
+ * generated tag to the provided buffer, and during decryption, it retrieves the
+ * internally calculated tag and compares it with the provided buffer.</b>
  * @endparblock
  * @param[in] pCipherHandle Session handle for encrypt/decrypt operation
  * @param[out] pOutput  Byte addressable memory to write tag into
  * @param[in] tagLen    Length of Tag in bytes
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE then an error has occurred and handle will be invalid
- * for future operations
+ * @return   &nbsp; Returns ALC_ERROR_NONE on success, ALC_ERROR_TAG_MISMATCH if
+ * the tag generated during encryption does not match the tag provided during
+ * decryption, or other error codes if an error has occurred.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_cipher_aead_get_tag(const alc_cipher_handle_p pCipherHandle,
