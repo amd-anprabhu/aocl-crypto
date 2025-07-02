@@ -130,5 +130,8 @@ class IPPCipherBase : public CipherBase
     bool decrypt(alcp_dc_ex_t& data);
     bool reset();
     bool context_copy();
+    bool flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len);
+    bool dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len);
+    bool multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint8 ** pIv, Uint64 ivLen, Uint64 numBuffers);
 };
 } // namespace alcp::testing

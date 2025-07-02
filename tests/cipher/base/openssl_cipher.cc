@@ -368,4 +368,25 @@ OpenSSLCipherBase::context_copy()
     return true;
 }
 
+bool
+OpenSSLCipherBase::flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len)
+{
+    // Default implementation - return success
+    return true;
+}
+
+bool
+OpenSSLCipherBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len)
+{
+    // Default implementation - return success
+    return true;
+}
+
+bool
+OpenSSLCipherBase::multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint8 ** pIv, Uint64 ivLen, Uint64 numBuffers)
+{
+    // Default implementation - return success
+    return true;
+
+} 
 } // namespace alcp::testing

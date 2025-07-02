@@ -220,4 +220,46 @@ AlcpCipherBase::context_copy()
     return true;
 }
 
+bool
+AlcpCipherBase::flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len)
+{
+    // use alcp_flush to flush to plaintext buffer
+    alc_error_t err;
+    err = alcp_flush(m_handle, pPlainText, numBuffers, len);
+    if (alcp_is_error(err)) {
+        std::cout << "Error code in alcp_cipher_flush:" << err << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool
+AlcpCipherBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len)
+{
+    // use alcp_dequeue to dequeue from ciphertext buffer
+    alc_error_t err;
+    err = alcp_dequeue(m_handle, pCipherText, numBuffers, len);
+    if (alcp_is_error(err)) {
+        std::cout << "Error code in alcp_cipher_dequeue:" << err << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool
+AlcpCipherBase::multibufferInit(const Uint8*  pKey,
+                                Uint64        keyLen,
+                                const Uint8** pIv,
+                                Uint64        ivLen,
+                                Uint64        numBuffers)
+{
+    alc_error_t err;
+    err = alcp_multibuffer_init(m_handle, pKey, keyLen, pIv, ivLen, numBuffers);
+    if (alcp_is_error(err)) {
+        std::cout << "Error code in alcp_cipher_multibuffer_init:" << err
+                  << std::endl;
+        return false;
+    }
+    return true;
+}
 } // namespace alcp::testing

@@ -1,4 +1,4 @@
- # Copyright (C) 2021-2024, Advanced Micro Devices. All rights reserved.
+ # Copyright (C) 2021-2025, Advanced Micro Devices. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions are met:
@@ -40,6 +40,9 @@ ADD_C_EXAMPLE(aes-siv aes-siv.c)
 ADD_C_EXAMPLE(chacha20 chacha20.c)
 
 ADD_C_EXAMPLE(aes-speed-cipher aes-speed-cipher.c)
+
+#FIXME: this fails on non-avx512
+#ADD_C_EXAMPLE(aes-cbc-multibuffer aes-cbc-multibuffer.c)
 
 ADD_C_EXAMPLE(aes-speed-gcm aes-speed-gcm.c)
 

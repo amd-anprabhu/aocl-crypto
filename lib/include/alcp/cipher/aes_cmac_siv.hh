@@ -44,9 +44,8 @@
 using Cmac = alcp::mac::Cmac;
 #define SIZE_CMAC 128 / 8
 namespace alcp::cipher {
-
+// cpuid namespace
 using utils::CpuId;
-
 class ALCP_API_EXPORT Siv
     : public Aes
     , public virtual iCipher
@@ -137,6 +136,18 @@ class SivT
     alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
     {
         return ALC_ERROR_NOT_SUPPORTED;
+    }
+    alc_error_t flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len) override
+    {
+        return ctrobj->flush(pPlainText, numBuffers, len);
+    }
+
+    alc_error_t dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len) override
+    {
+        return ctrobj->dequeue(pCipherText, numBuffers, len);
+    }
+    alc_error_t multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint8 ** pIv, Uint64 ivLen, Uint64 numBuffers) override {
+        return ctrobj->multibufferInit(pKey, keyLen, pIv, ivLen, numBuffers);
     }
 };
 

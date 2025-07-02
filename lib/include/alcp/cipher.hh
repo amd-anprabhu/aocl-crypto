@@ -99,6 +99,9 @@ namespace alcp { namespace cipher {
         virtual alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) = 0;
 
         virtual alc_error_t finish(const void*) = 0;
+        virtual alc_error_t multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint8 ** pIv, Uint64 ivLen, Uint64 numBuffers) = 0;
+        virtual alc_error_t flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len) = 0;
+        virtual alc_error_t dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len) = 0;
     };
 
     // iCipher segments
@@ -157,6 +160,8 @@ namespace alcp { namespace cipher {
     {
       public:
         virtual ~iCipherAead() = default;
+        virtual alc_error_t flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len) override = 0;
+        virtual alc_error_t dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len) override = 0;
     };
 
     /* Cipher Factory for different Aead and non-Aead modes */

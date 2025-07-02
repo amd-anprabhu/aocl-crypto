@@ -77,6 +77,8 @@ class Aes : public Rijndael
     Uint32                             m_ivState_aes                = 0;
     Uint32                             m_isEnc_aes                  = ALCP_ENC;
     Uint64                             m_dataLen                    = 0;
+    const Uint8**                      m_pData_aes                  = nullptr;
+    Uint8**                            m_pIvs_aes                   = nullptr;
 
     // Data Size Limits
     Uint32 m_ivLen_max = MAX_CIPHER_IV_SIZE;
@@ -130,6 +132,12 @@ class Aes : public Rijndael
         m_cipher_key_data.m_enc_key = getEncryptKeys();
         m_cipher_key_data.m_dec_key = getDecryptKeys();
         m_nrounds                   = getRounds();
+    }
+
+    virtual alc_error_t flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len) { return ALC_ERROR_NOT_SUPPORTED; }
+    virtual alc_error_t dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len) { return ALC_ERROR_NOT_SUPPORTED; }
+    virtual alc_error_t multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint8 ** pIv, Uint64 ivLen, Uint64 numBuffers)  {
+        return ALC_ERROR_NOT_SUPPORTED;
     }
 
   protected:

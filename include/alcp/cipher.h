@@ -160,6 +160,13 @@ alcp_cipher_init(const alc_cipher_handle_p pCipherHandle,
                  const Uint8*              pIv,
                  Uint64                    ivLen);
 
+ALCP_API_EXPORT alc_error_t
+alcp_multibuffer_init(const alc_cipher_handle_p pCipherHandle,
+                      const Uint8*              pKey,
+                      Uint64                    keyLen,
+                      const Uint8**             pIv,
+                      Uint64                    ivLen,
+                      Uint64                    numBuffers);
 /**
  * @brief    Encrypt plain text and write it to cipher text with provided
  * handle.
@@ -245,6 +252,38 @@ ALCP_API_EXPORT alc_error_t
 alcp_cipher_context_copy(const alc_cipher_handle_p src,
                          alc_cipher_handle_p       dst);
 
+/**
+ * @brief Flush the cipher context
+ *
+ * @param[in] pCipherHandle Session handle for cipher operation
+ * @param[in] pPlainText Pointer to plain text
+ * @param[in] numBuffers Number of buffers
+ * @param[in] len Length of each buffer
+ * @return Error code:
+ *         - ALC_ERROR_NONE          Success
+ */
+ALCP_API_EXPORT alc_error_t
+alcp_flush(const alc_cipher_handle_p pCipherHandle,
+           const Uint8**             pPlainText,
+           Uint64                    numBuffers,
+           Uint64                    len);
+
+/**
+ * @brief Dequeue the cipher context
+ *
+ * @param[in] pCipherHandle Session handle for cipher operation
+ * @param[in] pCipherText Pointer to cipher text
+ * @param[in] numBuffers Number of buffers
+ * @param[in] len Length of each buffer
+ * @return Error code:
+ *         - ALC_ERROR_NONE          Success
+ *         - ALC_ERROR_BAD_STATE     Either src or dst is in an invalid state
+ */
+ALCP_API_EXPORT alc_error_t
+alcp_dequeue(const alc_cipher_handle_p pCipherHandle,
+             Uint8**                   pCipherText,
+             Uint64                    numBuffers,
+             Uint64                    len);
 EXTERN_C_END
 
 #endif /* _ALCP_CIPHER_H_ */

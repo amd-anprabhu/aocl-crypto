@@ -32,12 +32,129 @@
 #include "alcp/cipher/cipher_wrapper.hh"
 
 #include "alcp/utils/cpuid.hh"
+#include <stdexcept>
 
 using alcp::utils::CpuId;
 
 namespace alcp::cipher {
 
 // WIP
+
+template<alcp::cipher::CipherMode       mode,
+         alcp::cipher::CipherKeyLen     keyLenBits,
+         alcp::utils::CpuCipherFeatures arch>
+alc_error_t
+AesGenericCiphersT<mode, keyLenBits, arch>::multibufferInit(const Uint8* pKey,
+                                                            Uint64       keyLen,
+                                                            const Uint8** pIv,
+                                                            Uint64        ivLen,
+                                                            Uint64 numBuffers)
+{
+    // Store buffer count for destructor
+    m_numBuffers = numBuffers;
+
+    m_pIvs_aes = new Uint8*[numBuffers];
+    if (m_pIvs_aes == nullptr) {
+        return ALC_ERROR_NO_MEMORY;
+    }
+
+    for (Uint64 i = 0; i < numBuffers; ++i) {
+        Aes::init(pKey, keyLen, pIv[i], ivLen);
+        // allocate memory for each Iv
+        m_pIvs_aes[i] = new Uint8[ivLen];
+        if (m_pIvs_aes[i] == nullptr) {
+            // Clean up on failure
+            for (Uint64 j = 0; j < i; ++j) {
+                delete[] m_pIvs_aes[j];
+            }
+            delete[] m_pIvs_aes;
+            m_pIvs_aes = nullptr;
+            return ALC_ERROR_NO_MEMORY;
+        }
+        memcpy(m_pIvs_aes[i], m_pIv_aes, ivLen); // copy each IV
+    }
+    // REMOVED: delete[] m_pIv_aes; // INVALID: m_pIv_aes points to
+    // stack-allocated m_iv_aes
+    return ALC_ERROR_NONE;
+}
+// flush function to store the multibuffer data to the memory
+
+template<alcp::cipher::CipherMode       mode,
+         alcp::cipher::CipherKeyLen     keyLenBits,
+         alcp::utils::CpuCipherFeatures arch>
+alc_error_t
+AesGenericCiphersT<mode, keyLenBits, arch>::flush(const Uint8** pPlainText,
+                                                  Uint64        numBuffers,
+                                                  Uint64        len)
+{
+    alc_error_t err = ALC_ERROR_NONE;
+    if (pPlainText == nullptr) {
+        printf("\nError: Invalid input pointer\n");
+        return ALC_ERROR_INVALID_ARG;
+    }
+    m_pData_aes = pPlainText;
+    return err;
+}
+// Dequence the data
+template<alcp::cipher::CipherMode       mode,
+         alcp::cipher::CipherKeyLen     keyLenBits,
+         alcp::utils::CpuCipherFeatures arch>
+alc_error_t
+AesGenericCiphersT<mode, keyLenBits, arch>::dequeue(Uint8** pCipherText,
+                                                    Uint64  numBuffers,
+                                                    Uint64  len)
+{
+    alc_error_t err = ALC_ERROR_NONE;
+    m_isEnc_aes     = ALCP_ENC;
+    if (__builtin_expect(!(m_isKeySet_aes), 0)) {
+        printf("\nError: Key or Iv not set \n");
+        return ALC_ERROR_BAD_STATE;
+    }
+    if (__builtin_expect(m_ivLen_aes != 16, 0)) {
+        m_ivLen_aes = 16;
+    }
+
+    if (__builtin_expect(arch < CpuCipherFeatures::eVaes512, 0)) {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+
+    if constexpr (mode == CipherMode::eAesCBC) {
+        // Split up the number of buffers into power of 2
+        if (__builtin_expect(numBuffers >= 128, 0)) {
+            return ALC_ERROR_INVALID_ARG;
+        }
+        int processedBuffers = 0;
+        // Only bits 0 to 6 are needed since 2^7 = 128 which is the
+        // max currently supported
+        for (int i = 7; i >= 0; i--) {
+            if (numBuffers & (1ULL << i)) {
+                if (i == 0) {
+                    err = aesni::EncryptCbc(m_pData_aes[processedBuffers],
+                                            pCipherText[processedBuffers],
+                                            len,
+                                            m_cipher_key_data.m_enc_key,
+                                            getRounds(),
+                                            m_pIvs_aes[processedBuffers]);
+                    processedBuffers++;
+                } else {
+                    err = vaes512::EncryptCbc(&m_pData_aes[processedBuffers],
+                                              &pCipherText[processedBuffers],
+                                              len,
+                                              m_cipher_key_data.m_enc_key,
+                                              getRounds(),
+                                              (1ULL << i),
+                                              &m_pIvs_aes[processedBuffers]);
+                    processedBuffers += (1ULL << i);
+                }
+                if (err != ALC_ERROR_NONE) {
+                    return err;
+                }
+            }
+        }
+    }
+    return ALC_ERROR_NONE;
+}
+
 template<alcp::cipher::CipherMode       mode,
          alcp::cipher::CipherKeyLen     keyLenBits,
          alcp::utils::CpuCipherFeatures arch>

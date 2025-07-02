@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -31,7 +31,172 @@
 #include <immintrin.h>
 
 #include "alcp/error.h"
+/* Helper macros for AES operations using AVX512 instructions.
+ * These macros define how to apply the AES encryption steps for different
+ * numbers of buffers (1, 2, 4, 8, 16) using the AVX512 intrinsics.
+ */
 
+/* First round key addition */
+#define VAES512_AESENCFIRST_APPLY(key, var) var = _mm512_xor_si512(var, key);
+
+#define VAES512_AESENCFIRST_1(key, v1) VAES512_AESENCFIRST_APPLY(key, v1)
+
+#define VAES512_AESENCFIRST_2(key, v1, v2)                                     \
+    VAES512_AESENCFIRST_APPLY(key, v1);                                        \
+    VAES512_AESENCFIRST_APPLY(key, v2)
+
+#define VAES512_AESENCFIRST_4(key, v1, v2, v3, v4)                             \
+    VAES512_AESENCFIRST_2(key, v1, v2);                                        \
+    VAES512_AESENCFIRST_2(key, v3, v4)
+
+#define VAES512_AESENCFIRST_8(key, v1, v2, v3, v4, v5, v6, v7, v8)             \
+    VAES512_AESENCFIRST_4(key, v1, v2, v3, v4);                                \
+    VAES512_AESENCFIRST_4(key, v5, v6, v7, v8)
+
+#define VAES512_AESENCFIRST_16(key,                                            \
+                               v1,                                             \
+                               v2,                                             \
+                               v3,                                             \
+                               v4,                                             \
+                               v5,                                             \
+                               v6,                                             \
+                               v7,                                             \
+                               v8,                                             \
+                               v9,                                             \
+                               v10,                                            \
+                               v11,                                            \
+                               v12,                                            \
+                               v13,                                            \
+                               v14,                                            \
+                               v15,                                            \
+                               v16)                                            \
+    VAES512_AESENCFIRST_8(key, v1, v2, v3, v4, v5, v6, v7, v8);                \
+    VAES512_AESENCFIRST_8(key, v9, v10, v11, v12, v13, v14, v15, v16)
+
+/* AES encryption rounds */
+#define VAES512_AESENC_APPLY(key, var) var = _mm512_aesenc_epi128(var, key)
+
+#define VAES512_AESENC_1(key, v1) VAES512_AESENC_APPLY(key, v1)
+
+#define VAES512_AESENC_2(key, v1, v2)                                          \
+    VAES512_AESENC_APPLY(key, v1);                                             \
+    VAES512_AESENC_APPLY(key, v2)
+
+#define VAES512_AESENC_4(key, v1, v2, v3, v4)                                  \
+    VAES512_AESENC_2(key, v1, v2);                                             \
+    VAES512_AESENC_2(key, v3, v4)
+
+#define VAES512_AESENC_8(key, v1, v2, v3, v4, v5, v6, v7, v8)                  \
+    VAES512_AESENC_4(key, v1, v2, v3, v4);                                     \
+    VAES512_AESENC_4(key, v5, v6, v7, v8)
+
+#define VAES512_AESENC_16(key,                                                 \
+                          v1,                                                  \
+                          v2,                                                  \
+                          v3,                                                  \
+                          v4,                                                  \
+                          v5,                                                  \
+                          v6,                                                  \
+                          v7,                                                  \
+                          v8,                                                  \
+                          v9,                                                  \
+                          v10,                                                 \
+                          v11,                                                 \
+                          v12,                                                 \
+                          v13,                                                 \
+                          v14,                                                 \
+                          v15,                                                 \
+                          v16)                                                 \
+    VAES512_AESENC_8(key, v1, v2, v3, v4, v5, v6, v7, v8);                     \
+    VAES512_AESENC_8(key, v9, v10, v11, v12, v13, v14, v15, v16)
+
+/* AES last round */
+#define VAES512_AESENCLAST_APPLY(key, var)                                     \
+    var = _mm512_aesenclast_epi128(var, key)
+
+#define VAES512_AESENCLAST_1(key, v1) VAES512_AESENCLAST_APPLY(key, v1)
+
+#define VAES512_AESENCLAST_2(key, v1, v2)                                      \
+    VAES512_AESENCLAST_APPLY(key, v1);                                         \
+    VAES512_AESENCLAST_APPLY(key, v2)
+
+#define VAES512_AESENCLAST_4(key, v1, v2, v3, v4)                              \
+    VAES512_AESENCLAST_2(key, v1, v2);                                         \
+    VAES512_AESENCLAST_2(key, v3, v4)
+
+#define VAES512_AESENCLAST_8(key, v1, v2, v3, v4, v5, v6, v7, v8)              \
+    VAES512_AESENCLAST_4(key, v1, v2, v3, v4);                                 \
+    VAES512_AESENCLAST_4(key, v5, v6, v7, v8)
+
+#define VAES512_AESENCLAST_16(key,                                             \
+                              v1,                                              \
+                              v2,                                              \
+                              v3,                                              \
+                              v4,                                              \
+                              v5,                                              \
+                              v6,                                              \
+                              v7,                                              \
+                              v8,                                              \
+                              v9,                                              \
+                              v10,                                             \
+                              v11,                                             \
+                              v12,                                             \
+                              v13,                                             \
+                              v14,                                             \
+                              v15,                                             \
+                              v16)                                             \
+    VAES512_AESENCLAST_8(key, v1, v2, v3, v4, v5, v6, v7, v8);                 \
+    VAES512_AESENCLAST_8(key, v9, v10, v11, v12, v13, v14, v15, v16)
+
+/* ------------------------- For all buffer sizes-------------------------------*/
+/* AES encryption  for 128 key size */
+#define VAES512_AESENCRYPT_10(keys, buffer, ...)                               \
+    VAES512_AESENCFIRST_##buffer(keys.key_512_0, __VA_ARGS__);                 \
+    VAES512_AESENC_##buffer(keys.key_512_1, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_2, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_3, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_4, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_5, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_6, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_7, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_8, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_9, __VA_ARGS__);                      \
+    VAES512_AESENCLAST_##buffer(keys.key_512_10, __VA_ARGS__)
+
+/* AES encryption for 196 key size */
+#define VAES512_AESENCRYPT_12(keys, buffer, ...)                               \
+    VAES512_AESENCFIRST_##buffer(keys.key_512_0, __VA_ARGS__);                 \
+    VAES512_AESENC_##buffer(keys.key_512_1, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_2, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_3, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_4, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_5, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_6, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_7, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_8, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_9, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_10, __VA_ARGS__);                     \
+    VAES512_AESENC_##buffer(keys.key_512_11, __VA_ARGS__);                     \
+    VAES512_AESENCLAST_##buffer(keys.key_512_12, __VA_ARGS__)
+
+/* AES encryption for 256 key size */
+#define VAES512_AESENCRYPT_14(keys, buffer, ...)                               \
+    VAES512_AESENCFIRST_##buffer(keys.key_512_0, __VA_ARGS__);                 \
+    VAES512_AESENC_##buffer(keys.key_512_1, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_2, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_3, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_4, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_5, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_6, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_7, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_8, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_9, __VA_ARGS__);                      \
+    VAES512_AESENC_##buffer(keys.key_512_10, __VA_ARGS__);                     \
+    VAES512_AESENC_##buffer(keys.key_512_11, __VA_ARGS__);                     \
+    VAES512_AESENC_##buffer(keys.key_512_12, __VA_ARGS__);                     \
+    VAES512_AESENC_##buffer(keys.key_512_13, __VA_ARGS__);                     \
+    VAES512_AESENCLAST_##buffer(keys.key_512_14, __VA_ARGS__)
+/* ------------------------- For all buffer sizes-------------------------------*/
 namespace alcp::cipher { namespace vaes512 {
 
     struct sKeys10Rounds
@@ -294,199 +459,141 @@ namespace alcp::cipher { namespace vaes512 {
         keys.data.keys14.key_512_14 = _mm512_setzero_si512();
     }
 
-    /*
-     * AesEncrypt
-     */
+    /* 16 x 512bit aesEnc */
+    static inline void AesEncryptNoLoad_16x512Rounds10(__m512i&     a,
+                                                       __m512i&     b,
+                                                       __m512i&     c,
+                                                       __m512i&     d,
+                                                       __m512i&     e,
+                                                       __m512i&     f,
+                                                       __m512i&     g,
+                                                       __m512i&     h,
+                                                       __m512i&     i,
+                                                       __m512i&     j,
+                                                       __m512i&     k,
+                                                       __m512i&     l,
+                                                       __m512i&     m,
+                                                       __m512i&     n,
+                                                       __m512i&     o,
+                                                       __m512i&     p,
+                                                       const sKeys& keys)
+    {
+        // clang-format off
+        VAES512_AESENCRYPT_10(keys.data.keys10, 16,
+                              a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p);
+        // clang-format on
+    }
+
+    static inline void AesEncryptNoLoad_16x512Rounds12(__m512i&     a,
+                                                       __m512i&     b,
+                                                       __m512i&     c,
+                                                       __m512i&     d,
+                                                       __m512i&     e,
+                                                       __m512i&     f,
+                                                       __m512i&     g,
+                                                       __m512i&     h,
+                                                       __m512i&     i,
+                                                       __m512i&     j,
+                                                       __m512i&     k,
+                                                       __m512i&     l,
+                                                       __m512i&     m,
+                                                       __m512i&     n,
+                                                       __m512i&     o,
+                                                       __m512i&     p,
+                                                       const sKeys& keys)
+    {
+        // clang-format off
+        VAES512_AESENCRYPT_12(keys.data.keys12, 16,
+                              a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p);
+        // clang-format on
+    }
+
+    static inline void AesEncryptNoLoad_16x512Rounds14(__m512i&     a,
+                                                       __m512i&     b,
+                                                       __m512i&     c,
+                                                       __m512i&     d,
+                                                       __m512i&     e,
+                                                       __m512i&     f,
+                                                       __m512i&     g,
+                                                       __m512i&     h,
+                                                       __m512i&     i,
+                                                       __m512i&     j,
+                                                       __m512i&     k,
+                                                       __m512i&     l,
+                                                       __m512i&     m,
+                                                       __m512i&     n,
+                                                       __m512i&     o,
+                                                       __m512i&     p,
+                                                       const sKeys& keys)
+    {
+        // clang-format off
+        VAES512_AESENCRYPT_14(keys.data.keys14, 16,
+                              a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p);
+        // clang-format on
+    }
+
+    /* 8 x 512bit aesEnc */
+    static inline void AesEncryptNoLoad_8x512Rounds10(__m512i&     a,
+                                                      __m512i&     b,
+                                                      __m512i&     c,
+                                                      __m512i&     d,
+                                                      __m512i&     e,
+                                                      __m512i&     f,
+                                                      __m512i&     g,
+                                                      __m512i&     h,
+                                                      const sKeys& keys)
+
+    {
+        VAES512_AESENCRYPT_10(keys.data.keys10, 8, a, b, c, d, e, f, g, h);
+    }
+
+    static inline void AesEncryptNoLoad_8x512Rounds12(__m512i&     a,
+                                                      __m512i&     b,
+                                                      __m512i&     c,
+                                                      __m512i&     d,
+                                                      __m512i&     e,
+                                                      __m512i&     f,
+                                                      __m512i&     g,
+                                                      __m512i&     h,
+                                                      const sKeys& keys)
+
+    {
+        VAES512_AESENCRYPT_12(keys.data.keys12, 8, a, b, c, d, e, f, g, h);
+    }
+
+    static inline void AesEncryptNoLoad_8x512Rounds14(__m512i&     a,
+                                                      __m512i&     b,
+                                                      __m512i&     c,
+                                                      __m512i&     d,
+                                                      __m512i&     e,
+                                                      __m512i&     f,
+                                                      __m512i&     g,
+                                                      __m512i&     h,
+                                                      const sKeys& keys)
+
+    {
+        VAES512_AESENCRYPT_14(keys.data.keys14, 8, a, b, c, d, e, f, g, h);
+    }
 
     /* 4 x 512bit aesEnc */
     static inline void AesEncryptNoLoad_4x512Rounds10(
         __m512i& a, __m512i& b, __m512i& c, __m512i& d, const sKeys& keys)
 
     {
-        a = _mm512_xor_si512(a, keys.data.keys10.key_512_0);
-        b = _mm512_xor_si512(b, keys.data.keys10.key_512_0);
-        c = _mm512_xor_si512(c, keys.data.keys10.key_512_0);
-        d = _mm512_xor_si512(d, keys.data.keys10.key_512_0);
-
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_1);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_1);
-        c = _mm512_aesenc_epi128(c, keys.data.keys10.key_512_1);
-        d = _mm512_aesenc_epi128(d, keys.data.keys10.key_512_1);
-
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_2);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_2);
-        c = _mm512_aesenc_epi128(c, keys.data.keys10.key_512_2);
-        d = _mm512_aesenc_epi128(d, keys.data.keys10.key_512_2);
-
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_3);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_3);
-        c = _mm512_aesenc_epi128(c, keys.data.keys10.key_512_3);
-        d = _mm512_aesenc_epi128(d, keys.data.keys10.key_512_3);
-
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_4);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_4);
-        c = _mm512_aesenc_epi128(c, keys.data.keys10.key_512_4);
-        d = _mm512_aesenc_epi128(d, keys.data.keys10.key_512_4);
-
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_5);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_5);
-        c = _mm512_aesenc_epi128(c, keys.data.keys10.key_512_5);
-        d = _mm512_aesenc_epi128(d, keys.data.keys10.key_512_5);
-
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_6);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_6);
-        c = _mm512_aesenc_epi128(c, keys.data.keys10.key_512_6);
-        d = _mm512_aesenc_epi128(d, keys.data.keys10.key_512_6);
-
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_7);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_7);
-        c = _mm512_aesenc_epi128(c, keys.data.keys10.key_512_7);
-        d = _mm512_aesenc_epi128(d, keys.data.keys10.key_512_7);
-
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_8);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_8);
-        c = _mm512_aesenc_epi128(c, keys.data.keys10.key_512_8);
-        d = _mm512_aesenc_epi128(d, keys.data.keys10.key_512_8);
-
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_9);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_9);
-        c = _mm512_aesenc_epi128(c, keys.data.keys10.key_512_9);
-        d = _mm512_aesenc_epi128(d, keys.data.keys10.key_512_9);
-
-        a = _mm512_aesenclast_epi128(a, keys.data.keys10.key_512_10);
-        b = _mm512_aesenclast_epi128(b, keys.data.keys10.key_512_10);
-        c = _mm512_aesenclast_epi128(c, keys.data.keys10.key_512_10);
-        d = _mm512_aesenclast_epi128(d, keys.data.keys10.key_512_10);
+        VAES512_AESENCRYPT_10(keys.data.keys10, 4, a, b, c, d);
     }
-
     static inline void AesEncryptNoLoad_4x512Rounds12(
         __m512i& a, __m512i& b, __m512i& c, __m512i& d, const sKeys& keys)
 
     {
-        a = _mm512_xor_si512(a, keys.data.keys12.key_512_0);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_1);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_2);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_3);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_4);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_5);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_6);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_7);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_8);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_9);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_10);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_11);
-        a = _mm512_aesenclast_epi128(a, keys.data.keys12.key_512_12);
-
-        b = _mm512_xor_si512(b, keys.data.keys12.key_512_0);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_1);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_2);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_3);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_4);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_5);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_6);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_7);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_8);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_9);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_10);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_11);
-        b = _mm512_aesenclast_epi128(b, keys.data.keys12.key_512_12);
-
-        c = _mm512_xor_si512(c, keys.data.keys12.key_512_0);
-        c = _mm512_aesenc_epi128(c, keys.data.keys12.key_512_1);
-        c = _mm512_aesenc_epi128(c, keys.data.keys12.key_512_2);
-        c = _mm512_aesenc_epi128(c, keys.data.keys12.key_512_3);
-        c = _mm512_aesenc_epi128(c, keys.data.keys12.key_512_4);
-        c = _mm512_aesenc_epi128(c, keys.data.keys12.key_512_5);
-        c = _mm512_aesenc_epi128(c, keys.data.keys12.key_512_6);
-        c = _mm512_aesenc_epi128(c, keys.data.keys12.key_512_7);
-        c = _mm512_aesenc_epi128(c, keys.data.keys12.key_512_8);
-        c = _mm512_aesenc_epi128(c, keys.data.keys12.key_512_9);
-        c = _mm512_aesenc_epi128(c, keys.data.keys12.key_512_10);
-        c = _mm512_aesenc_epi128(c, keys.data.keys12.key_512_11);
-        c = _mm512_aesenclast_epi128(c, keys.data.keys12.key_512_12);
-
-        d = _mm512_xor_si512(d, keys.data.keys12.key_512_0);
-        d = _mm512_aesenc_epi128(d, keys.data.keys12.key_512_1);
-        d = _mm512_aesenc_epi128(d, keys.data.keys12.key_512_2);
-        d = _mm512_aesenc_epi128(d, keys.data.keys12.key_512_3);
-        d = _mm512_aesenc_epi128(d, keys.data.keys12.key_512_4);
-        d = _mm512_aesenc_epi128(d, keys.data.keys12.key_512_5);
-        d = _mm512_aesenc_epi128(d, keys.data.keys12.key_512_6);
-        d = _mm512_aesenc_epi128(d, keys.data.keys12.key_512_7);
-        d = _mm512_aesenc_epi128(d, keys.data.keys12.key_512_8);
-        d = _mm512_aesenc_epi128(d, keys.data.keys12.key_512_9);
-        d = _mm512_aesenc_epi128(d, keys.data.keys12.key_512_10);
-        d = _mm512_aesenc_epi128(d, keys.data.keys12.key_512_11);
-        d = _mm512_aesenclast_epi128(d, keys.data.keys12.key_512_12);
+        VAES512_AESENCRYPT_12(keys.data.keys12, 4, a, b, c, d);
     }
 
     static inline void AesEncryptNoLoad_4x512Rounds14(
         __m512i& a, __m512i& b, __m512i& c, __m512i& d, const sKeys& keys)
 
     {
-        a = _mm512_xor_si512(a, keys.data.keys14.key_512_0);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_1);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_2);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_3);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_4);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_5);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_6);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_7);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_8);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_9);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_10);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_11);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_12);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_13);
-        a = _mm512_aesenclast_epi128(a, keys.data.keys14.key_512_14);
-
-        b = _mm512_xor_si512(b, keys.data.keys14.key_512_0);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_1);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_2);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_3);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_4);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_5);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_6);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_7);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_8);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_9);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_10);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_11);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_12);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_13);
-        b = _mm512_aesenclast_epi128(b, keys.data.keys14.key_512_14);
-
-        c = _mm512_xor_si512(c, keys.data.keys14.key_512_0);
-        c = _mm512_aesenc_epi128(c, keys.data.keys14.key_512_1);
-        c = _mm512_aesenc_epi128(c, keys.data.keys14.key_512_2);
-        c = _mm512_aesenc_epi128(c, keys.data.keys14.key_512_3);
-        c = _mm512_aesenc_epi128(c, keys.data.keys14.key_512_4);
-        c = _mm512_aesenc_epi128(c, keys.data.keys14.key_512_5);
-        c = _mm512_aesenc_epi128(c, keys.data.keys14.key_512_6);
-        c = _mm512_aesenc_epi128(c, keys.data.keys14.key_512_7);
-        c = _mm512_aesenc_epi128(c, keys.data.keys14.key_512_8);
-        c = _mm512_aesenc_epi128(c, keys.data.keys14.key_512_9);
-        c = _mm512_aesenc_epi128(c, keys.data.keys14.key_512_10);
-        c = _mm512_aesenc_epi128(c, keys.data.keys14.key_512_11);
-        c = _mm512_aesenc_epi128(c, keys.data.keys14.key_512_12);
-        c = _mm512_aesenc_epi128(c, keys.data.keys14.key_512_13);
-        c = _mm512_aesenclast_epi128(c, keys.data.keys14.key_512_14);
-
-        d = _mm512_xor_si512(d, keys.data.keys14.key_512_0);
-        d = _mm512_aesenc_epi128(d, keys.data.keys14.key_512_1);
-        d = _mm512_aesenc_epi128(d, keys.data.keys14.key_512_2);
-        d = _mm512_aesenc_epi128(d, keys.data.keys14.key_512_3);
-        d = _mm512_aesenc_epi128(d, keys.data.keys14.key_512_4);
-        d = _mm512_aesenc_epi128(d, keys.data.keys14.key_512_5);
-        d = _mm512_aesenc_epi128(d, keys.data.keys14.key_512_6);
-        d = _mm512_aesenc_epi128(d, keys.data.keys14.key_512_7);
-        d = _mm512_aesenc_epi128(d, keys.data.keys14.key_512_8);
-        d = _mm512_aesenc_epi128(d, keys.data.keys14.key_512_9);
-        d = _mm512_aesenc_epi128(d, keys.data.keys14.key_512_10);
-        d = _mm512_aesenc_epi128(d, keys.data.keys14.key_512_11);
-        d = _mm512_aesenc_epi128(d, keys.data.keys14.key_512_12);
-        d = _mm512_aesenc_epi128(d, keys.data.keys14.key_512_13);
-        d = _mm512_aesenclast_epi128(d, keys.data.keys14.key_512_14);
+        VAES512_AESENCRYPT_14(keys.data.keys14, 4, a, b, c, d);
     }
 
     /* 2 x 512bit aesEnc */
@@ -495,157 +602,40 @@ namespace alcp::cipher { namespace vaes512 {
                                                       const sKeys& keys)
 
     {
-        a = _mm512_xor_si512(a, keys.data.keys10.key_512_0);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_1);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_2);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_3);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_4);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_5);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_6);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_7);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_8);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_9);
-        a = _mm512_aesenclast_epi128(a, keys.data.keys10.key_512_10);
-
-        b = _mm512_xor_si512(b, keys.data.keys10.key_512_0);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_1);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_2);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_3);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_4);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_5);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_6);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_7);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_8);
-        b = _mm512_aesenc_epi128(b, keys.data.keys10.key_512_9);
-        b = _mm512_aesenclast_epi128(b, keys.data.keys10.key_512_10);
+        VAES512_AESENCRYPT_10(keys.data.keys10, 2, a, b);
     }
 
     static inline void AesEncryptNoLoad_2x512Rounds12(__m512i&     a,
                                                       __m512i&     b,
                                                       const sKeys& keys)
     {
-
-        a = _mm512_xor_si512(a, keys.data.keys12.key_512_0);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_1);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_2);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_3);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_4);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_5);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_6);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_7);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_8);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_9);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_10);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_11);
-        a = _mm512_aesenclast_epi128(a, keys.data.keys12.key_512_12);
-
-        b = _mm512_xor_si512(b, keys.data.keys12.key_512_0);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_1);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_2);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_3);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_4);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_5);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_6);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_7);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_8);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_9);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_10);
-        b = _mm512_aesenc_epi128(b, keys.data.keys12.key_512_11);
-        b = _mm512_aesenclast_epi128(b, keys.data.keys12.key_512_12);
+        VAES512_AESENCRYPT_12(keys.data.keys12, 2, a, b);
     }
 
     static inline void AesEncryptNoLoad_2x512Rounds14(__m512i&     a,
                                                       __m512i&     b,
                                                       const sKeys& keys)
     {
-
-        a = _mm512_xor_si512(a, keys.data.keys14.key_512_0);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_1);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_2);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_3);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_4);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_5);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_6);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_7);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_8);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_9);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_10);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_11);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_12);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_13);
-        a = _mm512_aesenclast_epi128(a, keys.data.keys14.key_512_14);
-
-        b = _mm512_xor_si512(b, keys.data.keys14.key_512_0);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_1);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_2);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_3);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_4);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_5);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_6);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_7);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_8);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_9);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_10);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_11);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_12);
-        b = _mm512_aesenc_epi128(b, keys.data.keys14.key_512_13);
-        b = _mm512_aesenclast_epi128(b, keys.data.keys14.key_512_14);
+        VAES512_AESENCRYPT_14(keys.data.keys14, 2, a, b);
     }
 
     /* 1 x 512bit aesEnc */
     static inline void AesEncryptNoLoad_1x512Rounds10(__m512i&     a,
                                                       const sKeys& keys)
     {
-        a = _mm512_xor_si512(a, keys.data.keys10.key_512_0);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_1);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_2);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_3);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_4);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_5);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_6);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_7);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_8);
-        a = _mm512_aesenc_epi128(a, keys.data.keys10.key_512_9);
-        a = _mm512_aesenclast_epi128(a, keys.data.keys10.key_512_10);
+        VAES512_AESENCRYPT_10(keys.data.keys10, 1, a);
     }
 
     static inline void AesEncryptNoLoad_1x512Rounds12(__m512i&     a,
                                                       const sKeys& keys)
     {
-        a = _mm512_xor_si512(a, keys.data.keys12.key_512_0);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_1);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_2);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_3);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_4);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_5);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_6);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_7);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_8);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_9);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_10);
-        a = _mm512_aesenc_epi128(a, keys.data.keys12.key_512_11);
-        a = _mm512_aesenclast_epi128(a, keys.data.keys12.key_512_12);
+        VAES512_AESENCRYPT_12(keys.data.keys12, 1, a);
     }
 
     static inline void AesEncryptNoLoad_1x512Rounds14(__m512i&     a,
                                                       const sKeys& keys)
     {
-
-        a = _mm512_xor_si512(a, keys.data.keys14.key_512_0);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_1);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_2);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_3);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_4);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_5);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_6);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_7);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_8);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_9);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_10);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_11);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_12);
-        a = _mm512_aesenc_epi128(a, keys.data.keys14.key_512_13);
-        a = _mm512_aesenclast_epi128(a, keys.data.keys14.key_512_14);
+        VAES512_AESENCRYPT_14(keys.data.keys14, 1, a);
     }
 
     /*

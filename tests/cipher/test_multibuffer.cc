@@ -1,0 +1,73 @@
+/*
+ * Copyright (C) 2025, Advanced Micro Devices. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ * without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ */
+
+#include <algorithm>
+#include <memory>
+#include <random>
+
+#include "rng_base.hh"
+#include <gtest/gtest.h>
+
+#include "alcp/cipher.hh"
+
+#ifndef _WIN32
+#include "alcp/cipher/cipher_wrapper.hh"
+#endif
+
+#include "alcp/types.hh"
+#include "cipher/gtest_base_cipher.hh"
+
+using alcp::cipher::CipherFactory;
+using alcp::cipher::iCipher;
+
+TEST(CipherMultiBufferCrossTest, CBC_128_Encrypt)
+{
+    if (useipp || oa_override)
+        GTEST_SKIP() << "This test is not yet implemented for IPP";
+
+    std::vector<int> Buffers = {
+        1, 4,
+        // 16,
+        // 21,
+        /* FIXME: enable this back */
+    };
+    for (const auto& numBuffers : Buffers)
+        CipherMultiBufferCrossTest(128, ENCRYPT, ALC_AES_MODE_CBC, numBuffers);
+}
+
+// TEST(CipherMultiBufferCrossTest, CBC_128_Decrypt)
+// {
+//     CipherMultiBufferCrossTest(128, DECRYPT, ALC_AES_MODE_CBC, 4);
+// }
+
+int
+main(int argc, char** argv)
+{
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}

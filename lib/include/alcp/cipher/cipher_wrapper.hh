@@ -201,6 +201,14 @@ namespace vaes512 {
                            const Uint8* pKey,
                            int          nRounds,
                            Uint8*       pIv);
+    alc_error_t EncryptCbc(const Uint8** pPlainText,
+                           Uint8**       pCipherText,
+                           Uint64        len,
+                           const Uint8*  pKey,
+                           int           nRounds,
+                           int           numBuffers,
+                           Uint8**       pIv);
+
 
     alc_error_t encryptGcm128(const Uint8*   pPlainText,
                               Uint8*         pCipherText,
@@ -327,6 +335,12 @@ namespace vaes {
                               int            nRounds,
                               alc_gcm_ctx_t* gcmCtx);
 
+    alc_error_t EncryptCbc(const Uint8* pPlainText,
+                           Uint8*       pCipherText,
+                           Uint64       len,
+                           const Uint8* pKey,
+                           int          nRounds,
+                           Uint8*       pIv);
     // ctr APIs for vaes
     void ctrInit(__m256i*     c1,
                  const Uint8* pIv,

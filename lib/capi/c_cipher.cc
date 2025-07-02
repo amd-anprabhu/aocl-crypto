@@ -153,6 +153,57 @@ alcp_cipher_encrypt(const alc_cipher_handle_p pCipherHandle,
 
     return err;
 }
+alc_error_t
+alcp_flush(const alc_cipher_handle_p pCipherHandle,
+           const Uint8**             pPlainText,
+           Uint64                    numBuffers,
+           Uint64                    len)
+{
+#ifdef ALCP_ENABLE_DEBUG_LOGGING
+    ALCP_DEBUG_LOG(LOG_DBG);
+#endif
+    alc_error_t err = ALC_ERROR_NONE;
+
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
+
+    auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
+    if (ctx->destructed == 1) {
+        return ALC_ERROR_BAD_STATE;
+    }
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+    auto i = static_cast<iCipher*>(ctx->m_cipher);
+    err    = i->flush(pPlainText, numBuffers, len);
+
+    return err;
+}
+
+alc_error_t
+alcp_dequeue(const alc_cipher_handle_p pCipherHandle,
+             Uint8**                   pCipherText,
+             Uint64                    numBuffers,
+             Uint64                    len)
+{
+#ifdef ALCP_ENABLE_DEBUG_LOGGING
+    ALCP_DEBUG_LOG(LOG_DBG);
+#endif
+    alc_error_t err = ALC_ERROR_NONE;
+
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherText, err);
+    ALCP_ZERO_LEN_ERR_RET(len, err);
+    auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
+    if (ctx->destructed == 1) {
+        return ALC_ERROR_BAD_STATE;
+    }
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+
+    auto i = static_cast<iCipher*>(ctx->m_cipher);
+    err    = i->dequeue(pCipherText, numBuffers, len);
+
+    return err;
+}
 
 alc_error_t
 alcp_cipher_decrypt(const alc_cipher_handle_p pCipherHandle,
@@ -180,6 +231,38 @@ alcp_cipher_decrypt(const alc_cipher_handle_p pCipherHandle,
     auto i = static_cast<iCipher*>(ctx->m_cipher);
     err    = i->decrypt(pCipherText, pPlainText, len);
 
+    return err;
+}
+alc_error_t
+alcp_multibuffer_init(const alc_cipher_handle_p pCipherHandle,
+                      const Uint8*              pKey,
+                      Uint64                    keyLen,
+                      const Uint8**             pIv,
+                      Uint64                    ivLen,
+                      Uint64                    numBuffers)
+{
+#ifdef ALCP_ENABLE_DEBUG_LOGGING
+    ALCP_DEBUG_LOG(LOG_DBG, "KeyLen %6ld,IVLen %6ld", keyLen, ivLen);
+#endif
+    alc_error_t err = ALC_ERROR_NONE;
+
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
+
+    auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
+    if (ctx->destructed == 1) {
+        return ALC_ERROR_BAD_STATE;
+    }
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+
+    auto i = static_cast<iCipher*>(ctx->m_cipher);
+
+    // init can be called to setKey or setIv or both
+    if ((pKey != NULL && keyLen != 0) || (pIv != NULL && ivLen != 0)) {
+        err = i->multibufferInit(pKey, keyLen, pIv, ivLen, numBuffers);
+    } else {
+        err = ALC_ERROR_INVALID_ARG;
+    }
     return err;
 }
 

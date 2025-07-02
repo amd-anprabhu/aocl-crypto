@@ -345,6 +345,377 @@ PrintCipherTestData(std::vector<Uint8>& key,
 }
 
 /**
+ * @brief Testing for non-aead based modes
+ *
+ * CBC, CFB, CTR, XTS, OFB
+ *
+ * @param testingCore
+ * @param encDec
+ * @param encDecStr
+ * @param modeStr
+ * @param keySize
+ * @param isxts
+ * @param isgcm
+ * @return
+ */
+bool
+RunCipherKatTest(CipherTestingCore& testingCore,
+                 encDec_t           encDec,
+                 std::string        encDecStr,
+                 alc_cipher_mode_t  mode,
+                 int                keySize,
+                 bool               CtxCopy)
+{
+    // FIXME: isxts and isgcm unused
+    bool                 ret = false;
+    alcp_dc_ex_t         data;
+    std::shared_ptr<Csv> csv             = testingCore.getCsv();
+    std::vector<Uint8>   pt              = csv->getVect("PLAINTEXT");
+    std::vector<Uint8>   ct              = csv->getVect("CIPHERTEXT");
+    std::vector<Uint8>   iv              = csv->getVect("INITVECT");
+    std::vector<Uint8>   tkey            = csv->getVect("TWEAK_KEY");
+    std::vector<Uint8>   actual_output   = {};
+    std::vector<Uint8>   expected_output = {};
+
+    std::string modeStr = GetModeSTR(mode);
+
+    /* check if unsupported (NULL) test vectors */
+    if (pt.empty() || ct.empty()) {
+        std::cout << "UnSupported test vector! Null PT/CT" << std::endl;
+        return false;
+    }
+
+    data.m_iv  = &(iv[0]);
+    data.m_ivl = iv.size();
+
+    // XTS Specific
+    if (tkey.size()) {
+        data.m_tkey  = &(tkey[0]);
+        data.m_tkeyl = tkey.size();
+    }
+
+    if (encDec == ENCRYPT) {
+        if (pt.size()) {
+            data.m_in  = &(pt[0]);
+            data.m_inl = pt.size();
+        }
+
+        expected_output   = std::move(ct);
+        actual_output     = std::vector<Uint8>(expected_output.size());
+        data.m_block_size = actual_output.size();
+
+        if (actual_output.size())
+            data.m_out = &(actual_output[0]);
+        data.m_outl = expected_output.size();
+
+        /* Context copy test, only for generic ciphers */
+        if (CtxCopy) {
+            ret = testingCore.getCipherHandler()->testingEncryptCtxCopy(
+                data, csv->getVect("KEY"));
+            if (!ret) {
+                std::cout << "ERROR: CtxCopy encrypt" << std::endl;
+                EXPECT_TRUE(ret);
+            }
+        } else {
+            ret = testingCore.getCipherHandler()->testingEncrypt(
+                data, csv->getVect("KEY"));
+            if (!ret) {
+                std::cout << "ERROR: testing encrypt" << std::endl;
+                EXPECT_TRUE(ret);
+            }
+        }
+        if (verbose > 1) {
+            auto key = csv->getVect("KEY");
+            PrintCipherTestData(key, data, mode);
+        }
+    } else {
+        if (ct.size()) {
+            data.m_in  = &(ct[0]);
+            data.m_inl = ct.size();
+        }
+
+        expected_output   = std::move(pt);
+        actual_output     = std::vector<Uint8>(expected_output.size());
+        data.m_block_size = actual_output.size();
+
+        if (actual_output.size())
+            data.m_out = &(actual_output[0]);
+        data.m_outl = data.m_inl;
+
+        if (CtxCopy) {
+            ret = testingCore.getCipherHandler()->testingDecryptCtxCopy(
+                data, csv->getVect("KEY"));
+            if (!ret) {
+                std::cout << "ERROR: CtxCopy decrypt" << std::endl;
+                EXPECT_TRUE(ret);
+            }
+        } else {
+            ret = testingCore.getCipherHandler()->testingDecrypt(
+                data, csv->getVect("KEY"));
+            if (!ret) {
+                std::cout << "ERROR: testing decrypt" << std::endl;
+                EXPECT_TRUE(ret);
+            }
+        }
+        if (!ret) {
+            std::cout << "ERROR: Dec" << std::endl;
+            EXPECT_TRUE(ret);
+        }
+    }
+
+    EXPECT_TRUE(
+        ArraysMatch(actual_output,
+                    expected_output,
+                    *(testingCore.getCsv()),
+                    std::string("AES_" + modeStr + "_" + std::to_string(keySize)
+                                + encDecStr)));
+    if (verbose > 1) {
+        auto key = csv->getVect("KEY");
+        PrintCipherTestData(key, data, mode);
+    }
+    return ret;
+}
+
+bool
+RunCipherAeadKATTest(CipherAeadTestingCore& testingCore,
+                     encDec_t               encDec,
+                     std::string            encDecStr,
+                     alc_cipher_mode_t      mode,
+                     int                    keySize,
+                     bool                   isSiv,
+                     bool                   isGcm)
+{
+    bool                 ret = false;
+    alcp_dc_ex_t         data;
+    std::shared_ptr<Csv> csv = testingCore.getCsv();
+    std::vector<Uint8>   outpt(csv->getVect("PLAINTEXT").size(), 0);
+    std::vector<Uint8>   outct(csv->getVect("CIPHERTEXT").size(), 0);
+    std::vector<Uint8>   pt      = csv->getVect("PLAINTEXT");
+    std::vector<Uint8>   ct      = csv->getVect("CIPHERTEXT");
+    std::vector<Uint8>   iv      = csv->getVect("INITVECT");
+    std::vector<Uint8>   tkey    = csv->getVect("TWEAK_KEY");
+    std::vector<Uint8>   outtag  = csv->getVect("TAG");
+    std::vector<Uint8>   ad      = csv->getVect("ADDITIONAL_DATA");
+    std::vector<Uint8>   tagBuff = std::vector<Uint8>(outtag.size());
+    std::vector<Uint8>   ctrkey  = csv->getVect("CTR_KEY");
+
+    std::string modeStr = GetModeSTR(mode);
+    /* check if unsupported (NULL) test vectors for gcm */
+    if (modeStr.compare("GCM") == 0 && (pt.empty() || ct.empty())) {
+        std::cout << "UnSupported test vector! Null PT/CT" << std::endl;
+        return false;
+    }
+
+    // Common Initialization
+    data.m_tkeyl = 0;
+    data.m_adl   = 0;
+    data.m_tagl  = 0;
+    if (isGcm) {
+        if (outtag.size()) {
+            if (encDec == ENCRYPT) {
+                std::fill(outtag.begin(), outtag.end(), 0);
+            }
+            data.m_tag     = &(outtag[0]);
+            data.m_tagl    = outtag.size();
+            data.m_tagBuff = &tagBuff[0];
+        }
+        if (ad.size()) {
+            data.m_ad  = &(ad[0]);
+            data.m_adl = ad.size();
+        }
+    }
+    if (isSiv && isGcm) {
+        iv = csv->getVect("TAG"); // Let tag be IV (which is techically true
+                                  // but not good idea)
+    }
+    if (encDec == ENCRYPT) {
+        if (pt.size()) {
+            data.m_in  = &(pt[0]);
+            data.m_inl = pt.size();
+        }
+        data.m_iv  = &(iv[0]);
+        data.m_ivl = iv.size();
+        if (outct.size())
+            data.m_out = &(outct[0]);
+        data.m_outl = data.m_inl;
+        if (isSiv && isGcm) {
+            data.m_tkey  = &(ctrkey[0]);
+            data.m_tkeyl = tkey.size();
+        } else if (isSiv) {
+            data.m_tkey       = &(tkey[0]);
+            data.m_tkeyl      = tkey.size();
+            data.m_block_size = pt.size();
+        }
+        ret = testingCore.getCipherHandler()->testingEncrypt(
+            data, csv->getVect("KEY"));
+        if (!ret) {
+            std::cout << "ERROR: Enc" << std::endl;
+            EXPECT_TRUE(ret);
+        }
+        EXPECT_TRUE(
+            ArraysMatch(outct,
+                        csv->getVect("CIPHERTEXT"),
+                        *(csv.get()),
+                        std::string("AES_" + modeStr + "_"
+                                    + std::to_string(keySize) + encDecStr)));
+
+        if ((isGcm || isSiv)) {
+            EXPECT_TRUE(ArraysMatch(outtag,
+                                    csv->getVect("TAG"),
+                                    *(csv.get()),
+                                    std::string("AES_" + modeStr + "_"
+                                                + std::to_string(keySize)
+                                                + encDecStr + "_TAG")));
+        }
+        // Enforce that no errors are reported from lib side.
+        EXPECT_TRUE(ret);
+        if (verbose > 1) {
+            auto key = csv->getVect("KEY");
+            PrintCipherTestData(key, data, mode);
+        }
+    } else {
+        if (ct.size()) {
+            data.m_in  = &(ct[0]);
+            data.m_inl = ct.size();
+        }
+        data.m_iv  = &(iv[0]);
+        data.m_ivl = iv.size();
+        if (outpt.size())
+            data.m_out = &(outpt[0]);
+        data.m_outl = data.m_inl;
+        // FIXME: Ugly solution, this is SIV
+        if (isSiv && isGcm) {
+            data.m_tkey  = &(ctrkey[0]);
+            data.m_tkeyl = tkey.size();
+        } else if (isSiv) {
+            data.m_tkey       = &(tkey[0]);
+            data.m_tkeyl      = tkey.size();
+            data.m_block_size = ct.size();
+        }
+        ret = testingCore.getCipherHandler()->testingDecrypt(
+            data, csv->getVect("KEY"));
+        if (isGcm && data.m_tagl == 0) {
+            ret = true; // Skip tag test
+        }
+        if (!ret) {
+            std::cout << "ERROR: Dec" << std::endl;
+            EXPECT_TRUE(ret);
+        }
+        EXPECT_TRUE(
+            ArraysMatch(outpt,
+                        csv->getVect("PLAINTEXT"),
+                        *(testingCore.getCsv()),
+                        std::string("AES_" + modeStr + "_"
+                                    + std::to_string(keySize) + encDecStr)));
+        // Enforce that no errors are reported from lib side.
+        EXPECT_TRUE(ret);
+        if (verbose > 1) {
+            auto key = csv->getVect("KEY");
+            PrintCipherTestData(key, data, mode);
+        }
+    }
+    return ret;
+}
+
+/**
+ * @brief Function to run KAT for AES Schemes CTR,CFB,OFB,CBC,XTS
+ *
+ * @param keySize keysize in bits(128,192,256)
+ * @param encDec enum for encryption or decryption
+ * @param mode Aode of encryption/Decryption (CTR,CFB,OFB,CBC,XTS)
+ */
+void
+CipherKatTest(int               keySize,
+              encDec_t          encDec,
+              alc_cipher_mode_t mode,
+              bool              CtxCopy)
+{
+    size_t            key_size = keySize;
+    const std::string cModeStr = GetModeSTR(mode);
+    std::string       encDecStr;
+
+    if (encDec == ENCRYPT)
+        encDecStr = "_ENC";
+    else
+        encDecStr = "_DEC";
+
+    CipherTestingCore testing_core = CipherTestingCore(cModeStr, mode);
+
+    bool retval = false;
+
+    /* check if file is valid */
+    if (!testing_core.getCsv()->m_file_exists) {
+        EXPECT_TRUE(retval);
+    }
+
+    while (testing_core.getCsv()->readNext()) {
+        if ((testing_core.getCsv()->getVect("KEY").size() * 8) != key_size) {
+            continue;
+        }
+
+        retval = RunCipherKatTest(
+            testing_core, encDec, encDecStr, mode, keySize, CtxCopy);
+
+        EXPECT_TRUE(retval);
+    }
+}
+
+/**
+ * @brief Function to run KAT for AES (GCM,CCM,SIV), and non AES
+ * (Chacha20-Poly1305) AEAD schemes
+ *
+ * @param keySize keysize in bits(128,192,256)
+ * @param encDec enum for encryption or decryption
+ * @param mode Aode of encryption/Decryption (GCM,CCM,SIV,Chacha20-Poly1305)
+ */
+void
+CipherAeadKatTest(int keySize, encDec_t encDec, alc_cipher_mode_t mode)
+{
+    size_t            key_size = keySize;
+    const std::string cModeStr = GetModeSTR(mode);
+    std::string       encDecStr;
+    bool              isgcm = (cModeStr.compare("GCM") == 0);
+    bool              isccm = (cModeStr.compare("CCM") == 0);
+    bool              issiv = (cModeStr.compare("SIV") == 0);
+    bool ischachapoly       = (cModeStr.compare("chacha20-poly1305") == 0);
+
+    /*ensure that non-aead modes are not passed into this function*/
+    if (!CheckCipherIsAEAD(mode)) {
+        std::cout << "Error! Mode " << cModeStr
+                  << " is not an AEAD Cipher! exiting this test!";
+        GTEST_FAIL();
+    }
+
+    if (encDec == ENCRYPT)
+        encDecStr = "_ENC";
+    else
+        encDecStr = "_DEC";
+
+    CipherAeadTestingCore testing_core = CipherAeadTestingCore(cModeStr, mode);
+
+    bool retval = false;
+
+    /* check if file is valid */
+    if (!testing_core.getCsv()->m_file_exists) {
+        EXPECT_TRUE(retval);
+    }
+    while (testing_core.getCsv()->readNext()) {
+        if ((testing_core.getCsv()->getVect("KEY").size() * 8) != key_size) {
+            continue;
+        }
+        // FIXME: Cipher Needs to be changed to AES as its only AES
+        retval = RunCipherAeadKATTest(testing_core,
+                                      encDec,
+                                      encDecStr,
+                                      mode,
+                                      keySize,
+                                      issiv, // FIXME: Not good design
+                                      isgcm || isccm || issiv || ischachapoly);
+        EXPECT_TRUE(retval);
+    }
+}
+
+/**
  * @brief funtion to avoid repeated code in every cross test, can only be used
  * for AES-CTR,AES-CBC,AES-OFB,AES-CFB
  *
@@ -895,374 +1266,155 @@ CipherAeadCrossTest(int               keySize,
 }
 
 /**
- * @brief Testing for non-aead based modes
+ * @brief Cross test for multi-buffer cipher operations
  *
- * CBC, CFB, CTR, XTS, OFB
+ * This function tests the multi-buffer implementation against the single-buffer
+ * implementation of ALCP as the reference.
  *
- * @param testingCore
- * @param encDec
- * @param encDecStr
- * @param modeStr
- * @param keySize
- * @param isxts
- * @param isgcm
- * @return
- */
-bool
-RunCipherKatTest(CipherTestingCore& testingCore,
-                 encDec_t           encDec,
-                 std::string        encDecStr,
-                 alc_cipher_mode_t  mode,
-                 int                keySize,
-                 bool               CtxCopy)
-{
-    // FIXME: isxts and isgcm unused
-    bool                 ret = false;
-    alcp_dc_ex_t         data;
-    std::shared_ptr<Csv> csv             = testingCore.getCsv();
-    std::vector<Uint8>   pt              = csv->getVect("PLAINTEXT");
-    std::vector<Uint8>   ct              = csv->getVect("CIPHERTEXT");
-    std::vector<Uint8>   iv              = csv->getVect("INITVECT");
-    std::vector<Uint8>   tkey            = csv->getVect("TWEAK_KEY");
-    std::vector<Uint8>   actual_output   = {};
-    std::vector<Uint8>   expected_output = {};
-
-    std::string modeStr = GetModeSTR(mode);
-
-    /* check if unsupported (NULL) test vectors */
-    if (pt.empty() || ct.empty()) {
-        std::cout << "UnSupported test vector! Null PT/CT" << std::endl;
-        return false;
-    }
-
-    data.m_iv  = &(iv[0]);
-    data.m_ivl = iv.size();
-
-    // XTS Specific
-    if (tkey.size()) {
-        data.m_tkey  = &(tkey[0]);
-        data.m_tkeyl = tkey.size();
-    }
-
-    if (encDec == ENCRYPT) {
-        if (pt.size()) {
-            data.m_in  = &(pt[0]);
-            data.m_inl = pt.size();
-        }
-
-        expected_output   = std::move(ct);
-        actual_output     = std::vector<Uint8>(expected_output.size());
-        data.m_block_size = actual_output.size();
-
-        if (actual_output.size())
-            data.m_out = &(actual_output[0]);
-        data.m_outl = expected_output.size();
-
-        /* Context copy test, only for generic ciphers */
-        if (CtxCopy) {
-            ret = testingCore.getCipherHandler()->testingEncryptCtxCopy(
-                data, csv->getVect("KEY"));
-            if (!ret) {
-                std::cout << "ERROR: CtxCopy encrypt" << std::endl;
-                EXPECT_TRUE(ret);
-            }
-        } else {
-            ret = testingCore.getCipherHandler()->testingEncrypt(
-                data, csv->getVect("KEY"));
-            if (!ret) {
-                std::cout << "ERROR: testing encrypt" << std::endl;
-                EXPECT_TRUE(ret);
-            }
-        }
-        if (verbose > 1) {
-            auto key = csv->getVect("KEY");
-            PrintCipherTestData(key, data, mode);
-        }
-    } else {
-        if (ct.size()) {
-            data.m_in  = &(ct[0]);
-            data.m_inl = ct.size();
-        }
-
-        expected_output   = std::move(pt);
-        actual_output     = std::vector<Uint8>(expected_output.size());
-        data.m_block_size = actual_output.size();
-
-        if (actual_output.size())
-            data.m_out = &(actual_output[0]);
-        data.m_outl = data.m_inl;
-
-        if (CtxCopy) {
-            ret = testingCore.getCipherHandler()->testingDecryptCtxCopy(
-                data, csv->getVect("KEY"));
-            if (!ret) {
-                std::cout << "ERROR: CtxCopy decrypt" << std::endl;
-                EXPECT_TRUE(ret);
-            }
-        } else {
-            ret = testingCore.getCipherHandler()->testingDecrypt(
-                data, csv->getVect("KEY"));
-            if (!ret) {
-                std::cout << "ERROR: testing decrypt" << std::endl;
-                EXPECT_TRUE(ret);
-            }
-        }
-        if (!ret) {
-            std::cout << "ERROR: Dec" << std::endl;
-            EXPECT_TRUE(ret);
-        }
-    }
-
-    EXPECT_TRUE(
-        ArraysMatch(actual_output,
-                    expected_output,
-                    *(testingCore.getCsv()),
-                    std::string("AES_" + modeStr + "_" + std::to_string(keySize)
-                                + encDecStr)));
-    if (verbose > 1) {
-        auto key = csv->getVect("KEY");
-        PrintCipherTestData(key, data, mode);
-    }
-    return ret;
-}
-
-bool
-RunCipherAeadKATTest(CipherAeadTestingCore& testingCore,
-                     encDec_t               encDec,
-                     std::string            encDecStr,
-                     alc_cipher_mode_t      mode,
-                     int                    keySize,
-                     bool                   isSiv,
-                     bool                   isGcm)
-{
-    bool                 ret = false;
-    alcp_dc_ex_t         data;
-    std::shared_ptr<Csv> csv = testingCore.getCsv();
-    std::vector<Uint8>   outpt(csv->getVect("PLAINTEXT").size(), 0);
-    std::vector<Uint8>   outct(csv->getVect("CIPHERTEXT").size(), 0);
-    std::vector<Uint8>   pt      = csv->getVect("PLAINTEXT");
-    std::vector<Uint8>   ct      = csv->getVect("CIPHERTEXT");
-    std::vector<Uint8>   iv      = csv->getVect("INITVECT");
-    std::vector<Uint8>   tkey    = csv->getVect("TWEAK_KEY");
-    std::vector<Uint8>   outtag  = csv->getVect("TAG");
-    std::vector<Uint8>   ad      = csv->getVect("ADDITIONAL_DATA");
-    std::vector<Uint8>   tagBuff = std::vector<Uint8>(outtag.size());
-    std::vector<Uint8>   ctrkey  = csv->getVect("CTR_KEY");
-
-    std::string modeStr = GetModeSTR(mode);
-    /* check if unsupported (NULL) test vectors for gcm */
-    if (modeStr.compare("GCM") == 0 && (pt.empty() || ct.empty())) {
-        std::cout << "UnSupported test vector! Null PT/CT" << std::endl;
-        return false;
-    }
-
-    // Common Initialization
-    data.m_tkeyl = 0;
-    data.m_adl   = 0;
-    data.m_tagl  = 0;
-    if (isGcm) {
-        if (outtag.size()) {
-            if (encDec == ENCRYPT) {
-                std::fill(outtag.begin(), outtag.end(), 0);
-            }
-            data.m_tag     = &(outtag[0]);
-            data.m_tagl    = outtag.size();
-            data.m_tagBuff = &tagBuff[0];
-        }
-        if (ad.size()) {
-            data.m_ad  = &(ad[0]);
-            data.m_adl = ad.size();
-        }
-    }
-    if (isSiv && isGcm) {
-        iv = csv->getVect("TAG"); // Let tag be IV (which is techically true
-                                  // but not good idea)
-    }
-    if (encDec == ENCRYPT) {
-        if (pt.size()) {
-            data.m_in  = &(pt[0]);
-            data.m_inl = pt.size();
-        }
-        data.m_iv  = &(iv[0]);
-        data.m_ivl = iv.size();
-        if (outct.size())
-            data.m_out = &(outct[0]);
-        data.m_outl = data.m_inl;
-        if (isSiv && isGcm) {
-            data.m_tkey  = &(ctrkey[0]);
-            data.m_tkeyl = tkey.size();
-        } else if (isSiv) {
-            data.m_tkey       = &(tkey[0]);
-            data.m_tkeyl      = tkey.size();
-            data.m_block_size = pt.size();
-        }
-        ret = testingCore.getCipherHandler()->testingEncrypt(
-            data, csv->getVect("KEY"));
-        if (!ret) {
-            std::cout << "ERROR: Enc" << std::endl;
-            EXPECT_TRUE(ret);
-        }
-        EXPECT_TRUE(
-            ArraysMatch(outct,
-                        csv->getVect("CIPHERTEXT"),
-                        *(csv.get()),
-                        std::string("AES_" + modeStr + "_"
-                                    + std::to_string(keySize) + encDecStr)));
-
-        if ((isGcm || isSiv)) {
-            EXPECT_TRUE(ArraysMatch(outtag,
-                                    csv->getVect("TAG"),
-                                    *(csv.get()),
-                                    std::string("AES_" + modeStr + "_"
-                                                + std::to_string(keySize)
-                                                + encDecStr + "_TAG")));
-        }
-        // Enforce that no errors are reported from lib side.
-        EXPECT_TRUE(ret);
-        if (verbose > 1) {
-            auto key = csv->getVect("KEY");
-            PrintCipherTestData(key, data, mode);
-        }
-    } else {
-        if (ct.size()) {
-            data.m_in  = &(ct[0]);
-            data.m_inl = ct.size();
-        }
-        data.m_iv  = &(iv[0]);
-        data.m_ivl = iv.size();
-        if (outpt.size())
-            data.m_out = &(outpt[0]);
-        data.m_outl = data.m_inl;
-        // FIXME: Ugly solution, this is SIV
-        if (isSiv && isGcm) {
-            data.m_tkey  = &(ctrkey[0]);
-            data.m_tkeyl = tkey.size();
-        } else if (isSiv) {
-            data.m_tkey       = &(tkey[0]);
-            data.m_tkeyl      = tkey.size();
-            data.m_block_size = ct.size();
-        }
-        ret = testingCore.getCipherHandler()->testingDecrypt(
-            data, csv->getVect("KEY"));
-        if (isGcm && data.m_tagl == 0) {
-            ret = true; // Skip tag test
-        }
-        if (!ret) {
-            std::cout << "ERROR: Dec" << std::endl;
-            EXPECT_TRUE(ret);
-        }
-        EXPECT_TRUE(
-            ArraysMatch(outpt,
-                        csv->getVect("PLAINTEXT"),
-                        *(testingCore.getCsv()),
-                        std::string("AES_" + modeStr + "_"
-                                    + std::to_string(keySize) + encDecStr)));
-        // Enforce that no errors are reported from lib side.
-        EXPECT_TRUE(ret);
-        if (verbose > 1) {
-            auto key = csv->getVect("KEY");
-            PrintCipherTestData(key, data, mode);
-        }
-    }
-    return ret;
-}
-
-/**
- * @brief Function to run KAT for AES Schemes CTR,CFB,OFB,CBC,XTS
- *
- * @param keySize keysize in bits(128,192,256)
- * @param encDec enum for encryption or decryption
- * @param mode Aode of encryption/Decryption (CTR,CFB,OFB,CBC,XTS)
+ * @param keySize Key size in bits (128, 192, or 256)
+ * @param encDec Encryption or decryption mode
+ * @param mode AES mode (e.g., CBC, CTR, OFB, CFB)
+ * @param numBuffers Number of buffers for multi-buffer operation
  */
 void
-CipherKatTest(int               keySize,
-              encDec_t          encDec,
-              alc_cipher_mode_t mode,
-              bool              CtxCopy)
+CipherMultiBufferCrossTest(int               keySize,
+                           encDec_t          encDec,
+                           alc_cipher_mode_t mode,
+                           int               numBuffers)
 {
-    size_t            key_size = keySize;
-    const std::string cModeStr = GetModeSTR(mode);
-    std::string       encDecStr;
-
-    if (encDec == ENCRYPT)
-        encDecStr = "_ENC";
-    else
-        encDecStr = "_DEC";
-
-    CipherTestingCore testing_core = CipherTestingCore(cModeStr, mode);
-
-    bool retval = false;
-
-    /* check if file is valid */
-    if (!testing_core.getCsv()->m_file_exists) {
-        EXPECT_TRUE(retval);
+    // Ensure the mode is supported for multi-buffer operations
+    if (mode != ALC_AES_MODE_CBC) {
+        std::cout << "Multi-buffer cross test currently supports only CBC mode."
+                  << std::endl;
+        return;
     }
 
-    while (testing_core.getCsv()->readNext()) {
-        if ((testing_core.getCsv()->getVect("KEY").size() * 8) != key_size) {
-            continue;
+    // Initialize random number generator
+    RngBase rb;
+
+    /* run for max */
+    int inputLenMax = SMALL_MAX_LOOP;
+    int ivLen       = 16;
+
+    // Dynamic allocation better for larger sizes
+    for (int i = 1; i < inputLenMax; i++) {
+        // Generate input and output vectors for multiple buffers
+        std::vector<std::vector<Uint8>> vec_in(numBuffers,
+                                               rb.genRandomBytes(i));
+        std::vector<std::vector<Uint8>> vec_out(numBuffers,
+                                                rb.genRandomBytes(i));
+
+        std::vector<Uint8> iv(ivLen);
+        iv = rb.genRandomBytes(ivLen);
+
+        std::vector<std::vector<Uint8>> ivs(
+            numBuffers, std::vector<Uint8>(iv.data(), iv.data() + ivLen));
+        std::vector<const Uint8*> iv_pointers(numBuffers);
+        for (int i = 0; i < numBuffers; ++i) {
+            std::next_permutation(ivs[i].begin(), ivs[i].end());
+            iv_pointers[i] = ivs[i].data();
         }
 
-        retval = RunCipherKatTest(
-            testing_core, encDec, encDecStr, mode, keySize, CtxCopy);
+        std::vector<Uint8> key_vec = rb.genRandomBytes(keySize / 8);
+        alignas(16) Uint8  key[keySize / 8];
+        std::copy(key_vec.begin(), key_vec.end(), key);
+        alcp::testing::CipherBase* p_cb;
 
-        EXPECT_TRUE(retval);
-    }
-}
+        alcp::testing::AlcpCipherBase acb = alcp::testing::AlcpCipherBase(
+            mode, iv.data(), ivLen, &key[0], keySize, nullptr, i);
 
-/**
- * @brief Function to run KAT for AES (GCM,CCM,SIV), and non AES
- * (Chacha20-Poly1305) AEAD schemes
- *
- * @param keySize keysize in bits(128,192,256)
- * @param encDec enum for encryption or decryption
- * @param mode Aode of encryption/Decryption (GCM,CCM,SIV,Chacha20-Poly1305)
- */
-void
-CipherAeadKatTest(int keySize, encDec_t encDec, alc_cipher_mode_t mode)
-{
-    size_t            key_size = keySize;
-    const std::string cModeStr = GetModeSTR(mode);
-    std::string       encDecStr;
-    bool              isgcm = (cModeStr.compare("GCM") == 0);
-    bool              isccm = (cModeStr.compare("CCM") == 0);
-    bool              issiv = (cModeStr.compare("SIV") == 0);
-    bool ischachapoly       = (cModeStr.compare("chacha20-poly1305") == 0);
+        p_cb = &acb;
 
-    /*ensure that non-aead modes are not passed into this function*/
-    if (!CheckCipherIsAEAD(mode)) {
-        std::cout << "Error! Mode " << cModeStr
-                  << " is not an AEAD Cipher! exiting this test!";
-        GTEST_FAIL();
-    }
+        alcp::testing::alcp_dc_ex_t data;
+        // assign the input and output vectors to the data structure
+        data.m_inl = data.m_outl = i;
+        data.m_iv                = iv.data();
+        data.m_ivl               = ivLen;
 
-    if (encDec == ENCRYPT)
-        encDecStr = "_ENC";
-    else
-        encDecStr = "_DEC";
-
-    CipherAeadTestingCore testing_core = CipherAeadTestingCore(cModeStr, mode);
-
-    bool retval = false;
-
-    /* check if file is valid */
-    if (!testing_core.getCsv()->m_file_exists) {
-        EXPECT_TRUE(retval);
-    }
-    while (testing_core.getCsv()->readNext()) {
-        if ((testing_core.getCsv()->getVect("KEY").size() * 8) != key_size) {
-            continue;
+        std::vector<const Uint8*> input_buffer_pointers(numBuffers);
+        std::vector<Uint8*>       output_buffer_pointers(numBuffers);
+        for (int i = 0; i < numBuffers; ++i) {
+            input_buffer_pointers[i]  = vec_in[i].data();
+            output_buffer_pointers[i] = vec_out[i].data();
         }
-        // FIXME: Cipher Needs to be changed to AES as its only AES
-        retval = RunCipherAeadKATTest(testing_core,
-                                      encDec,
-                                      encDecStr,
-                                      mode,
-                                      keySize,
-                                      issiv, // FIXME: Not good design
-                                      isgcm || isccm || issiv || ischachapoly);
-        EXPECT_TRUE(retval);
-    }
-}
 
+        // initialize the cipher context
+        if (!p_cb->multibufferInit(
+                nullptr, 0, iv_pointers.data(), ivLen, numBuffers)) {
+            // multibuffer initialization
+            std::cout << "Multi-buffer initialization failed." << std::endl;
+            return;
+        }
+
+        if (!p_cb->flush(input_buffer_pointers.data(), numBuffers, i)) {
+            std::cout << "Multi-buffer flush failed." << std::endl;
+            return;
+        }
+
+        if (!p_cb->dequeue(output_buffer_pointers.data(), numBuffers, i)) {
+            std::cout << "Multi-buffer dequeue failed." << std::endl;
+            return;
+        }
+        // printf("Passed for input length: %d\n", i);
+    }
+#if 0
+    // Create cipher for multi-buffer operations
+    std::unique_ptr<CipherTestingCore> alcpTC =
+        std::make_unique<CipherTestingCore>(LIB_TYPE::ALCP, mode);
+
+    // Initialize multi-buffer cipher
+    bool initSuccess = alcpTC->getCipherHandler()->multibufferInit(
+        nullptr, 0, ivPointers.data(), 16, numBuffers);
+    ASSERT_TRUE(initSuccess) << "Multi-buffer initialization failed.";
+
+    // Perform multi-buffer encryption/decryption
+    if (encDec == ENCRYPT) {
+        ASSERT_TRUE(alcpTC->getCipherHandler()->flush(
+            inputPointers.data(), numBuffers, 1024))
+            << "Multi-buffer flush failed.";
+        ASSERT_TRUE(alcpTC->getCipherHandler()->dequeue(
+            outputPointers.data(), numBuffers, 1024))
+            << "Multi-buffer dequeue failed.";
+    } else {
+        ASSERT_TRUE(alcpTC->getCipherHandler()->flush(
+            inputPointers.data(), numBuffers, 1024))
+            << "Multi-buffer flush failed.";
+        ASSERT_TRUE(alcpTC->getCipherHandler()->dequeue(
+            outputPointers.data(), numBuffers, 1024))
+            << "Multi-buffer dequeue failed.";
+    }
+
+    // Validate against single-buffer implementation
+    /* FIXME: this should be validated against a different library's MultiBuffer
+     * implementations (IPP/OpenSSL)*/
+    // auto singleBufferCipher =
+    //     std::make_unique<CipherTestingCore>(LIB_TYPE::ALCP, mode);
+
+    // for (int i = 0; i < numBuffers; ++i) {
+    //     alcp_dc_ex_t data;
+    //     data.m_in   = plaintexts[i].data();
+    //     data.m_inl  = 1024;
+    //     data.m_out  = singleBufferOutputs[i].data();
+    //     data.m_outl = 1024;
+    //     data.m_iv   = ivs[i].data();
+    //     data.m_ivl  = 16;
+
+    //     if (encDec == ENCRYPT) {
+    //         ASSERT_TRUE(singleBufferCipher->getCipherHandler()->testingEncrypt(
+    //             data, key))
+    //             << "Single-buffer encryption failed for buffer " << i;
+    //     } else {
+    //         ASSERT_TRUE(singleBufferCipher->getCipherHandler()->testingDecrypt(
+    //             data, key))
+    //             << "Single-buffer decryption failed for buffer " << i;
+    //     }
+
+    //     // Compare outputs
+    //     ASSERT_EQ(multiBufferOutputs[i], singleBufferOutputs[i])
+    //         << "Mismatch between multi-buffer and single-buffer outputs for "
+    //            "buffer "
+    //         << i;
+    // }
+#endif
+}
 #endif

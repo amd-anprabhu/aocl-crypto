@@ -70,6 +70,8 @@ namespace alcp::cipher {
         {                                                                      \
             return ALC_ERROR_NONE;                                             \
         };                                                                     \
+        alc_error_t flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len) override { return ALC_ERROR_NONE; } \
+        alc_error_t dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len) override { return ALC_ERROR_NONE; } \
     };
 
 // Macro to generate cipher authentication class

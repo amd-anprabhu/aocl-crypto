@@ -224,4 +224,49 @@ CipherAeadBase::isAead(const alc_cipher_mode_t& mode)
     }
 }
 
+bool
+CipherTesting::multibufferInit(const Uint8*  key,
+                               size_t        keySize,
+                               const Uint8** ivPointers,
+                               size_t        ivSize,
+                               int           numBuffers)
+{
+    if (cb != nullptr) {
+        return cb->multibufferInit(
+            key, keySize, ivPointers, ivSize, numBuffers);
+    } else {
+        std::cout << "base.hh: CipherTesting: Implementation missing for "
+                     "multibufferInit!"
+                  << std::endl;
+    }
+    return false;
+}
+
+bool
+CipherTesting::flush(const Uint8** inputPointers,
+                     int           numBuffers,
+                     int           bufferSize)
+{
+    if (cb != nullptr) {
+        return cb->flush(inputPointers, numBuffers, bufferSize);
+    } else {
+        std::cout << "base.hh: CipherTesting: Implementation missing for flush!"
+                  << std::endl;
+    }
+    return false;
+}
+
+bool
+CipherTesting::dequeue(Uint8** outputPointers, int numBuffers, int bufferSize)
+{
+    if (cb != nullptr) {
+        return cb->dequeue(outputPointers, numBuffers, bufferSize);
+    } else {
+        std::cout
+            << "base.hh: CipherTesting: Implementation missing for dequeue!"
+            << std::endl;
+    }
+    return false;
+}
+
 } // namespace alcp::testing

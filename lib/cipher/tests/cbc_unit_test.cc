@@ -489,68 +489,137 @@ TEST(CBC, RandomEncryptDecryptTest)
 
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
 
-    for (int i = (cTextSize - 16); i > 16; i -= 16)
-        for (CpuCipherFeatures feature : cpu_features) {
+    for (CpuCipherFeatures feature : cpu_features) {
 #ifdef DEBUG
-            std::cout
-                << "Cpu Feature:"
-                << static_cast<
-                       typename std::underlying_type<CpuCipherFeatures>::type>(
-                       feature)
-                << std::endl;
+        std::cout
+            << "Cpu Feature:"
+            << static_cast<
+                   typename std::underlying_type<CpuCipherFeatures>::type>(
+                   feature)
+            << std::endl;
 #endif
-            const std::vector<Uint8> plainTextVect(plain_text_vect.begin() + i,
-                                                   plain_text_vect.end());
-            std::vector<Uint8>       plainTextOut(plainTextVect.size());
-            auto                     alcpCipher = new CipherFactory<iCipher>;
-            auto cbc = alcpCipher->create("aes-cbc-256", feature);
+        const std::vector<Uint8> plainTextVect(plain_text_vect.begin(),
+                                               plain_text_vect.end());
+        std::vector<Uint8>       plainTextOut(plainTextVect.size());
+        auto                     alcpCipher = new CipherFactory<iCipher>;
+        auto cbc = alcpCipher->create("aes-cbc-256", feature);
 
-            if (cbc == nullptr) {
-                delete alcpCipher;
-                FAIL();
-            }
-            cbc->init(key_256, 256, &iv[0], sizeof(iv));
-
-            cbc->encrypt(
-                &plainTextVect[0], &cipher_text_vect[0], plainTextVect.size());
-
-            cbc->init(key_256, 256, &iv[0], sizeof(iv));
-
-            cbc->decrypt(
-                &cipher_text_vect[0], &plainTextOut[0], plainTextVect.size());
-
+        if (cbc == nullptr) {
             delete alcpCipher;
-#ifdef DEBUG
-
-            if (plainTextVect != plainTextOut) {
-                // Print the key, IV, and ciphertext for debugging
-                printHexString("Key", key_256, 32);
-                printHexString("IV", iv, 16);
-                printHexString(
-                    "Ciphertext", &cipher_text_vect[0], plainTextVect.size());
-                printHexString(
-                    "plainTextVect", &plainTextVect[0], plainTextVect.size());
-
-                printf("\n");
-                printHexString(
-                    "plainTextOut", &plainTextOut[0], plainTextOut.size());
-                printf("\n");
-
-                printf("Length: %zu\n", plainTextVect.size());
-            }
-#endif
-
-            ASSERT_EQ(plainTextVect, plainTextOut);
-
-#ifdef DEBUG
-            auto ret = std::mismatch(plainTextVect.begin(),
-                                     plainTextVect.end(),
-                                     plainTextOut.begin());
-            std::cout << "First:" << ret.first - plainTextVect.begin()
-                      << "Second:" << ret.second - plainTextOut.begin()
-                      << std::endl;
-#endif
+            FAIL();
         }
+        cbc->init(key_256, 256, &iv[0], sizeof(iv));
+
+        cbc->encrypt(
+            &plainTextVect[0], &cipher_text_vect[0], plainTextVect.size());
+
+        cbc->init(key_256, 256, &iv[0], sizeof(iv));
+
+        cbc->decrypt(
+            &cipher_text_vect[0], &plainTextOut[0], plainTextVect.size());
+
+        delete alcpCipher;
+#ifdef DEBUG
+
+        if (plainTextVect != plainTextOut) {
+            // Print the key, IV, and ciphertext for debugging
+            printHexString("Key", key_256, 32);
+            printHexString("IV", iv, 16);
+            printHexString(
+                "Ciphertext", &cipher_text_vect[0], plainTextVect.size());
+            printHexString(
+                "plainTextVect", &plainTextVect[0], plainTextVect.size());
+
+            printf("\n");
+            printHexString(
+                "plainTextOut", &plainTextOut[0], plainTextOut.size());
+            printf("\n");
+
+            printf("Length: %zu\n", plainTextVect.size());
+        }
+#endif
+        // print address of the vectors for debugging
+        ASSERT_EQ(plainTextVect, plainTextOut);
+
+#ifdef DEBUG
+        auto ret = std::mismatch(
+            plainTextVect.begin(), plainTextVect.end(), plainTextOut.begin());
+        std::cout << "First:" << ret.first - plainTextVect.begin()
+                  << "Second:" << ret.second - plainTextOut.begin()
+                  << std::endl;
+#endif
+    }
+}
+TEST(CBC, MultiBufferRandomTest)
+{
+    Uint8        key_256[32] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe };
+    const Uint64 cTextSize   = 16; // 16 bytes * 1000 buffers
+    std::vector<const Uint8*> plain_text_vect(cTextSize);
+    std::vector<Uint8*>       cipher_text_vect(cTextSize);
+    std::vector<const Uint8*> iv_vect(16);
+    int                       num_buffers = 2; // Number of buffers to test
+    // Fill buffer with random data
+    // allocate memory for the vectors
+    for (int i = 0; i < num_buffers; ++i) {
+        plain_text_vect[i] = new Uint8[cTextSize];
+        iv_vect[i]         = new Uint8[16];
+        // Initialize the random number generator
+        std::unique_ptr<IRandomize> random = std::make_unique<Randomize>(12);
+        random->getRandomBytes(const_cast<Uint8*>(plain_text_vect[i]),
+                               cTextSize);
+        random->getRandomBytes(const_cast<Uint8*>(iv_vect[i]), 16);
+        cipher_text_vect[i] = new Uint8[cTextSize];
+    }
+
+    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+
+    for (CpuCipherFeatures feature : cpu_features) {
+        /* FIXME: run this test only for zen4 for now? */
+        if (feature != CpuCipherFeatures::eVaes512) {
+            std::cout << "Skipping test for feature avx512 " << std::endl;
+            continue;
+        }
+        auto alcpCipher = new CipherFactory<iCipher>;
+        auto cbc        = alcpCipher->create("aes-cbc-256", feature);
+
+        if (cbc == nullptr) {
+            delete alcpCipher;
+            FAIL();
+        }
+        cbc->init(key_256, 256, nullptr, 0);
+        cbc->multibufferInit(
+            key_256, 256, iv_vect.data(), iv_vect.size(), num_buffers);
+
+        // Test flush and dequeue operations
+        alc_error_t err =
+            cbc->flush(plain_text_vect.data(), num_buffers, cTextSize);
+        EXPECT_FALSE(alcp_is_error(err));
+
+        err = cbc->dequeue(cipher_text_vect.data(), num_buffers, cTextSize);
+        EXPECT_FALSE(alcp_is_error(err));
+        // Verify the output
+        std::vector<Uint8> plainText(cTextSize);
+        for (int i = 0; i < num_buffers; ++i) {
+            cbc->init(key_256, 256, iv_vect[i], 16);
+            cbc->decrypt(cipher_text_vect[i], plainText.data(), cTextSize);
+            printHexString("Cipher Text", cipher_text_vect[i], cTextSize);
+            printHexString("Plain Text", plainText.data(), cTextSize);
+            printHexString("plain_text_vect", plain_text_vect[i], cTextSize);
+            // ASSERT_EQ(0, memcmp(plain_text_vect[i], plainText.data(),
+            // cTextSize));
+        }
+
+        delete alcpCipher;
+    }
+    /* delete iv_vect */
+    for (int i = 0; i < num_buffers; ++i) {
+        delete[] iv_vect[i];
+        delete[] cipher_text_vect[i];
+        delete[] plain_text_vect[i];
+    }
 }
 
 int

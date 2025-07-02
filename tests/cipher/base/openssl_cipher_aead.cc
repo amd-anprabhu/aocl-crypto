@@ -780,4 +780,24 @@ OpenSSLCipherAeadBase::context_copy()
     return true;
 }
 
+bool
+OpenSSLCipherAeadBase::flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len)
+{
+    // Default implementation - return success
+    return true;
+}
+
+bool
+OpenSSLCipherAeadBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len)
+{
+    // Default implementation - return success
+    return true;
+}
+bool
+OpenSSLCipherAeadBase::multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint8 ** pIv, Uint64 ivLen, Uint64 numBuffers)
+{
+    // Default implementation - return success
+    return true;
+
+} // namespace alcp::testing
 } // namespace alcp::testing

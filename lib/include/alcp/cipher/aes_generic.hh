@@ -73,7 +73,22 @@ class AesGenericCiphersT
         : AesGenericInit((static_cast<Uint32>(keyLenBits)) / 8, mode)
     {
     }
-    ~AesGenericCiphersT() = default;
+    ~AesGenericCiphersT()
+    {
+        if (m_pIvs_aes != nullptr) {
+            // Clean up individual IV buffers
+            // Note: We need to store numBuffers or find another way to know the
+            // count For now, we'll need to add a member variable to track this
+            for (Uint64 i = 0; i < m_numBuffers; ++i) {
+                delete[] m_pIvs_aes[i];
+            }
+            delete[] m_pIvs_aes;
+            m_pIvs_aes = nullptr;
+        }
+    }
+
+  private:
+    Uint64 m_numBuffers = 0; // Add this to track buffer count
 
   public:
     alc_error_t encrypt(const Uint8* pPlainText,
@@ -84,6 +99,17 @@ class AesGenericCiphersT
                         Uint64       len) override;
     alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override;
     alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
+    alc_error_t flush(const Uint8** pPlainText,
+                      Uint64        numBuffers,
+                      Uint64        len) override;
+    alc_error_t dequeue(Uint8** pCipherText,
+                        Uint64  numBuffers,
+                        Uint64  len) override;
+    alc_error_t multibufferInit(const Uint8*  pKey,
+                                Uint64        keyLen,
+                                const Uint8** pIv,
+                                Uint64        ivLen,
+                                Uint64        numBuffers) override;
 };
 
 } // namespace alcp::cipher
