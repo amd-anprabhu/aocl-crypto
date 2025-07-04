@@ -29,9 +29,9 @@
 #include "benchmarks_cipher.hh"
 #include "cipher/cipher.hh"
 #include "gbench_base.hh"
-#include <iostream>
 #include <memory>
 #include <vector>
+#include <iostream>
 
 #define MAX_BLOCK_SIZE 32768
 #define MAX_KEY_SIZE   256
@@ -253,31 +253,27 @@ CipherBench(benchmark::State& state,
 /* Multibuffer Benchmarks */
 int
 CipherMultibufferBench(benchmark::State& state,
-                       Uint64            blockSize,
-                       encrypt_t         enc,
-                       alc_cipher_mode_t alcpMode,
-                       size_t            keylen,
-                       Uint64            numBuffers)
+                      Uint64            blockSize,
+                      encrypt_t         enc,
+                      alc_cipher_mode_t alcpMode,
+                      size_t            keylen,
+                      Uint64            numBuffers)
 {
     // Dynamic allocation better for larger sizes
-    std::vector<std::vector<Uint8>> vec_in(numBuffers,
-                                           std::vector<Uint8>(blockSize, 0x01));
-    std::vector<std::vector<Uint8>> vec_out(
-        numBuffers, std::vector<Uint8>(blockSize, 0x21));
-    alignas(16)
-        Uint8 iv[16] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                         0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F };
-    std::vector<std::vector<Uint8>> ivs(numBuffers,
-                                        std::vector<Uint8>(iv, iv + 16));
-    std::vector<const Uint8*>       iv_pointers(numBuffers);
-    for (Uint64 i = 0; i < numBuffers; ++i) {
+    std::vector<std::vector<Uint8>> vec_in(numBuffers, std::vector<Uint8>(blockSize, 0x01));
+    std::vector<std::vector<Uint8>> vec_out(numBuffers, std::vector<Uint8>(blockSize, 0x21));
+    alignas(16) Uint8              iv[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                             0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+    std::vector<std::vector<Uint8>> ivs(numBuffers, std::vector<Uint8>(iv, iv + 16));
+    std::vector<const Uint8*> iv_pointers(numBuffers);
+    for( Uint64 i = 0; i < numBuffers; ++i) {
         std::next_permutation(ivs[i].begin(), ivs[i].end());
         iv_pointers[i] = ivs[i].data();
     }
     std::unique_ptr<Uint8[]> tag_buffer = std::make_unique<Uint8[]>(16);
 
-    alignas(16) Uint8          key[MAX_KEY_SIZE / 8]  = {};
-    alignas(16) Uint8          tkey[MAX_KEY_SIZE / 8] = {};
+    alignas(16) Uint8              key[MAX_KEY_SIZE / 8]  = {};
+    alignas(16) Uint8              tkey[MAX_KEY_SIZE / 8] = {};
     alcp::testing::CipherBase* p_cb;
 
     alcp::testing::AlcpCipherBase acb = alcp::testing::AlcpCipherBase(
@@ -315,26 +311,23 @@ CipherMultibufferBench(benchmark::State& state,
     }
 
     // initialize the cipher context
-    if (!p_cb->multibufferInit(
-            nullptr, 0, iv_pointers.data(), 16, numBuffers)) {
-        // multibuffer initialization
+    if (!p_cb->multibufferInit(nullptr, 0, iv_pointers.data(), 16, numBuffers)) {
+    // multibuffer initialization
         state.SkipWithError("BENCH_INIT_FAILURE");
     }
     for (auto _ : state) {
-        if (!p_cb->flush(input_buffer_pointers.data(), numBuffers, blockSize)) {
-            state.SkipWithError("BENCH_FLUSH_FAILURE");
-        }
-
-        if (!p_cb->dequeue(
-                output_buffer_pointers.data(), numBuffers, blockSize)) {
-            state.SkipWithError("BENCH_DEQUEUE_FAILURE");
-        }
+      if (!p_cb->flush(input_buffer_pointers.data(), numBuffers, blockSize)) {
+        state.SkipWithError("BENCH_FLUSH_FAILURE");
+      }
+      
+      if (!p_cb->dequeue(output_buffer_pointers.data(), numBuffers, blockSize)) {
+        state.SkipWithError("BENCH_DEQUEUE_FAILURE");
+      }
     }
-    state.counters["Speed(Bytes/s)"] =
-        benchmark::Counter(state.iterations() * blockSize * numBuffers,
-                           benchmark::Counter::kIsRate);
+    state.counters["Speed(Bytes/s)"] = benchmark::Counter(
+        state.iterations() * blockSize * numBuffers, benchmark::Counter::kIsRate);
     state.counters["BlockSize(Bytes)"] = blockSize;
-    state.counters["NumBuffers"]       = numBuffers;
+    state.counters["NumBuffers"] = numBuffers;
 
     return 0;
 }
@@ -343,23 +336,42 @@ CipherMultibufferBench(benchmark::State& state,
 static void
 BENCH_AES_MULTIBUFFER_CBC_128(benchmark::State& state)
 {
-    benchmark::DoNotOptimize(CipherMultibufferBench(
-        state, state.range(0), ENCRYPT, ALC_AES_MODE_CBC, 128, state.range(1)));
+    benchmark::DoNotOptimize(
+        CipherMultibufferBench(state, state.range(0), ENCRYPT, ALC_AES_MODE_CBC, 128, state.range(1)));
 }
 static void
 BENCH_AES_MULTIBUFFER_CBC_192(benchmark::State& state)
 {
-    benchmark::DoNotOptimize(CipherMultibufferBench(
-        state, state.range(0), ENCRYPT, ALC_AES_MODE_CBC, 192, state.range(1)));
+    benchmark::DoNotOptimize(
+        CipherMultibufferBench(state, state.range(0), ENCRYPT, ALC_AES_MODE_CBC, 192, state.range(1)));
 }
 
 static void
 BENCH_AES_MULTIBUFFER_CBC_256(benchmark::State& state)
 {
-    benchmark::DoNotOptimize(CipherMultibufferBench(
-        state, state.range(0), ENCRYPT, ALC_AES_MODE_CBC, 256, state.range(1)));
+    benchmark::DoNotOptimize(
+        CipherMultibufferBench(state, state.range(0), ENCRYPT, ALC_AES_MODE_CBC, 256, state.range(1)));
 }
 
+static void
+BENCH_AES_MULTIBUFFER_CFB_128(benchmark::State& state)
+{
+    benchmark::DoNotOptimize(
+        CipherMultibufferBench(state, state.range(0), ENCRYPT, ALC_AES_MODE_CFB , 128, state.range(1)));
+}
+static void
+BENCH_AES_MULTIBUFFER_CFB_192(benchmark::State& state)
+{
+    benchmark::DoNotOptimize(
+        CipherMultibufferBench(state, state.range(0), ENCRYPT, ALC_AES_MODE_CFB, 192, state.range(1)));
+}
+
+static void
+BENCH_AES_MULTIBUFFER_CFB_256(benchmark::State& state)
+{
+    benchmark::DoNotOptimize(
+        CipherMultibufferBench(state, state.range(0), ENCRYPT, ALC_AES_MODE_CFB, 256, state.range(1)));
+}
 // 128 bit key size
 
 /**
@@ -769,7 +781,7 @@ AddBenchmarks()
     }
 
     /* Define number of buffers to test */
-    std::vector<Int64> num_buffers = { 4, 8, 16, 32, 64 };
+    std::vector<Int64> num_buffers = { 4, 8, 16, 32,64 };
 
     /* IPPCP doesnt have Chacha20 stream cipher variant yet */
     if (!useipp) {
@@ -782,12 +794,12 @@ AddBenchmarks()
     }
 
     /* Multibuffer benchmarks */
-    BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_128)
-        ->ArgsProduct({ blocksizes, num_buffers });
-    BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_192)
-        ->ArgsProduct({ blocksizes, num_buffers });
-    BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_256)
-        ->ArgsProduct({ blocksizes, num_buffers });
+    BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_128)->ArgsProduct({ blocksizes, num_buffers });
+    BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_192)->ArgsProduct({ blocksizes, num_buffers });
+    BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_256)->ArgsProduct({ blocksizes, num_buffers });
+    BENCHMARK(BENCH_AES_MULTIBUFFER_CFB_128)->ArgsProduct({ blocksizes, num_buffers });
+    BENCHMARK(BENCH_AES_MULTIBUFFER_CFB_192)->ArgsProduct({ blocksizes, num_buffers });
+    BENCHMARK(BENCH_AES_MULTIBUFFER_CFB_256)->ArgsProduct({ blocksizes, num_buffers });
 
     BENCHMARK(BENCH_AES_ENCRYPT_CBC_128)->ArgsProduct({ blocksizes });
     BENCHMARK(BENCH_AES_ENCRYPT_CTR_128)->ArgsProduct({ blocksizes });

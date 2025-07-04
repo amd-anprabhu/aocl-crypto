@@ -169,9 +169,8 @@ namespace alcp { namespace cipher {
     class ALCP_API_EXPORT CipherFactory
     {
       private:
-        CpuCipherFeatures m_arch =
-            CpuCipherFeatures::eVaes512; // default zen4 arch
         CpuCipherFeatures   m_currentArch  = getCpuCipherFeature();
+        CpuCipherFeatures m_arch = m_currentArch; // Default to detected arch to avoid wrong dispatch
         INTERFACE*          m_iCipher      = nullptr;
         cipherAlgoMapT      m_cipherMap    = {};
         alc_cipher_state_t* m_cipher_state = nullptr;

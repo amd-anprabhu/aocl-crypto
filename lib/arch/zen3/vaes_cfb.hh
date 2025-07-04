@@ -35,14 +35,14 @@
 
 namespace alcp::cipher::vaes {
 
-// CBC mode encryption function
+// CFB mode encryption function
 alc_error_t
-EncryptCbc(const Uint8** pPlainText,
+EncryptCfb(const Uint8** pPlainText,
            Uint8**       pCipherText,
            Uint64        len,
            const Uint8*  pKey,
            int           nRounds,
            int           num_buffers,
-           Uint8**       pIv)
+           Uint8**       pIv);
 
 }

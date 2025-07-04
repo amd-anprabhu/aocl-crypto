@@ -46,41 +46,34 @@ using namespace alcp;
 using namespace alcp::base;
 using namespace alcp::cipher;
 
-// CBC mode encryption: Ciphertext = Plaintext ⊕ Encrypt(IV)
-// IV Update: Next_IV = Ciphertext
+// CFB Encryption: Ciphertext = Plaintext ⊕ Encrypt(IV)
+// IV Update: Next_IV = Ciphertext (feedback from ciphertext)
 namespace alcp::cipher::vaes512 {
 
-/* @brief   Helper function to pack 4 lanes of __m128i data into a single
- *          __m512i register with XOR operation against the IVs.
+/* @brief   Helper function to pack 4 lanes of IV data into a single __m512i
+ * register for CFB mode encryption.
  *
- * @param   p_in_block  Pointer to an array of 4 pointers to __m128i data
- *          blocks.
  * @param   iv_block    Pointer to an array of 4 __m128i IVs.
- * @return  A __m512i register containing the packed data.
+ * @return  A __m512i register containing the packed IV data.
  */
 
 static inline __m512i
 pack_lanes_to_zmm(const __m128i** p_in_block, const __m128i* iv_block)
 {
-    __m128i data0 = _mm_xor_si128(_mm_loadu_si128(p_in_block[0]), iv_block[0]);
-    __m128i data1 = _mm_xor_si128(_mm_loadu_si128(p_in_block[1]), iv_block[1]);
-    __m128i data2 = _mm_xor_si128(_mm_loadu_si128(p_in_block[2]), iv_block[2]);
-    __m128i data3 = _mm_xor_si128(_mm_loadu_si128(p_in_block[3]), iv_block[3]);
-
-    __m512i zmm_val = _mm512_castsi128_si512(data0);
-    zmm_val         = _mm512_inserti32x4(zmm_val, data1, 1);
-    zmm_val         = _mm512_inserti32x4(zmm_val, data2, 2);
-    zmm_val         = _mm512_inserti32x4(zmm_val, data3, 3);
+    __m512i zmm_val = _mm512_castsi128_si512(iv_block[0]);
+    zmm_val         = _mm512_inserti32x4(zmm_val, iv_block[1], 1);
+    zmm_val         = _mm512_inserti32x4(zmm_val, iv_block[2], 2);
+    zmm_val         = _mm512_inserti32x4(zmm_val, iv_block[3], 3);
     return zmm_val;
 }
 
 /* @brief   Unpacks a __m512i register into 4 lanes of __m128i data and updates
- *          the output pointers and IVs.
+ * the output pointers and IVs for CFB mode.
  *
- * @param   zmm_val     The __m512i register containing the packed data.
+ * @param   zmm_val     The __m512i register containing the encrypted IV data.
  * @param   p_out_block Pointer to an array of 4 pointers to __m128i output
- *          blocks.
- * @param   iv_block    Pointer to an array of 4 __m128i IVs.
+ * blocks.
+ * @param   iv_block    Pointer to an array of 4 __m128i IVs to be updated.
  * @param   p_in_block  Pointer to an array of 4 const __m128i input blocks.
  */
 
@@ -90,10 +83,20 @@ unpack_zmm_to_lanes_and_update(const __m512i&  zmm_val,
                                __m128i*        iv_block,
                                const __m128i** p_in_block)
 {
-    const __m128i ctext_lane0 = _mm512_extracti32x4_epi32(zmm_val, 0);
-    const __m128i ctext_lane1 = _mm512_extracti32x4_epi32(zmm_val, 1);
-    const __m128i ctext_lane2 = _mm512_extracti32x4_epi32(zmm_val, 2);
-    const __m128i ctext_lane3 = _mm512_extracti32x4_epi32(zmm_val, 3);
+    __m128i encrypted_iv0 = _mm512_extracti32x4_epi32(zmm_val, 0);
+    __m128i encrypted_iv1 = _mm512_extracti32x4_epi32(zmm_val, 1);
+    __m128i encrypted_iv2 = _mm512_extracti32x4_epi32(zmm_val, 2);
+    __m128i encrypted_iv3 = _mm512_extracti32x4_epi32(zmm_val, 3);
+
+    // XOR the encrypted IV with plaintext to get ciphertext
+    __m128i ctext_lane0 =
+        _mm_xor_si128(encrypted_iv0, _mm_loadu_si128(p_in_block[0]));
+    __m128i ctext_lane1 =
+        _mm_xor_si128(encrypted_iv1, _mm_loadu_si128(p_in_block[1]));
+    __m128i ctext_lane2 =
+        _mm_xor_si128(encrypted_iv2, _mm_loadu_si128(p_in_block[2]));
+    __m128i ctext_lane3 =
+        _mm_xor_si128(encrypted_iv3, _mm_loadu_si128(p_in_block[3]));
 
     _mm_storeu_si128(p_out_block[0], ctext_lane0);
     _mm_storeu_si128(p_out_block[1], ctext_lane1);
@@ -116,7 +119,7 @@ unpack_zmm_to_lanes_and_update(const __m512i&  zmm_val,
     (p_out_block[3])++;
 }
 
-/* @brief Encrypts data in CBC mode using AES with AVX512 instructions.
+/* @brief Encrypts data in CFB mode using AES with AVX512 instructions.
  *
  * @param   pPlainText   Pointer to an array of pointers to plaintext
  * buffers.
@@ -129,13 +132,13 @@ unpack_zmm_to_lanes_and_update(const __m512i&  zmm_val,
  * 64).
  * @param   pIv          Pointer to an array of pointers to IV buffers.
  * @return  ALC_ERROR_NONE on success, or an error code on failure.
- * Note: The function assumes that the input buffers are properly
- * aligned and sized. It also assumes that the input plaintext length is
- * a multiple of the block size (16 bytes). The function will process
- * multiple buffers in parallel using AVX512 instructions.
+ * Note: The function assumes that the input buffers are properly aligned and
+ * sized. It also assumes that the input plaintext length is a multiple of the
+ * block size (16 bytes). The function will process multiple buffers in parallel
+ * using AVX512 instructions.
  */
 alc_error_t
-EncryptCbc(const Uint8** pPlainText,
+EncryptCfb(const Uint8** pPlainText,
            Uint8**       pCipherText,
            Uint64        len,
            const Uint8*  pKey,

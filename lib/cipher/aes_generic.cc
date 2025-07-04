@@ -117,39 +117,96 @@ AesGenericCiphersT<mode, keyLenBits, arch>::dequeue(Uint8** pCipherText,
     if (__builtin_expect(arch < CpuCipherFeatures::eVaes512, 0)) {
         return ALC_ERROR_NOT_SUPPORTED;
     }
+    using EncryptWrapper = std::function<alc_error_t(
+        int bufferIdx, int i, size_t numBuffers)>;
 
-    if constexpr (mode == CipherMode::eAesCBC) {
-        // Split up the number of buffers into power of 2
-        if (__builtin_expect(numBuffers >= 128, 0)) {
-            return ALC_ERROR_INVALID_ARG;
-        }
-        int processedBuffers = 0;
-        // Only bits 0 to 6 are needed since 2^7 = 128 which is the
-        // max currently supported
-        for (int i = 7; i >= 0; i--) {
-            if (numBuffers & (1ULL << i)) {
-                if (i == 0) {
-                    err = aesni::EncryptCbc(m_pData_aes[processedBuffers],
-                                            pCipherText[processedBuffers],
-                                            len,
-                                            m_cipher_key_data.m_enc_key,
-                                            getRounds(),
-                                            m_pIvs_aes[processedBuffers]);
-                    processedBuffers++;
-                } else {
-                    err = vaes512::EncryptCbc(&m_pData_aes[processedBuffers],
-                                              &pCipherText[processedBuffers],
-                                              len,
-                                              m_cipher_key_data.m_enc_key,
-                                              getRounds(),
-                                              (1ULL << i),
-                                              &m_pIvs_aes[processedBuffers]);
-                    processedBuffers += (1ULL << i);
-                }
-                if (err != ALC_ERROR_NONE) {
-                    return err;
-                }
+    EncryptWrapper encryptWrapper[3];
+
+    if (mode == CipherMode::eAesCBC) {
+        encryptWrapper[0] = [&](int bufferIdx, int i, size_t numBuffers) {
+            return aesni::EncryptCbc(m_pData_aes[bufferIdx],
+                                     pCipherText[bufferIdx],
+                                     len,
+                                     m_cipher_key_data.m_enc_key,
+                                     getRounds(),
+                                     m_pIvs_aes[bufferIdx]);
+        };
+
+        encryptWrapper[1] = [&](int bufferIdx, int i, size_t numBuffers) {
+            return vaes::EncryptCbc(&m_pData_aes[bufferIdx],
+                                    &pCipherText[bufferIdx],
+                                    len,
+                                    m_cipher_key_data.m_enc_key,
+                                    getRounds(),
+                                    numBuffers,
+                                    &m_pIvs_aes[bufferIdx]);
+        };
+
+        encryptWrapper[2] = [&](int bufferIdx, int i, size_t numBuffers) {
+            return vaes512::EncryptCbc(&m_pData_aes[bufferIdx],
+                                       &pCipherText[bufferIdx],
+                                       len,
+                                       m_cipher_key_data.m_enc_key,
+                                       getRounds(),
+                                       numBuffers,
+                                       &m_pIvs_aes[bufferIdx]);
+        };
+    } else if (mode == CipherMode::eAesCFB) {
+        encryptWrapper[0] = [&](int bufferIdx, int i, size_t numBuffers) {
+            return aesni::EncryptCfb(m_pData_aes[bufferIdx],
+                                     pCipherText[bufferIdx],
+                                     len,
+                                     m_cipher_key_data.m_enc_key,
+                                     getRounds(),
+                                     m_pIvs_aes[bufferIdx]);
+        };
+
+        encryptWrapper[1] = [&](int bufferIdx, int i, size_t numBuffers) {
+            return vaes::EncryptCfb(&m_pData_aes[bufferIdx],
+                                    &pCipherText[bufferIdx],
+                                    len,
+                                    m_cipher_key_data.m_enc_key,
+                                    getRounds(),
+                                    numBuffers,
+                                    &m_pIvs_aes[bufferIdx]);
+        };
+
+        encryptWrapper[2] = [&](int bufferIdx, int i, size_t numBuffers) {
+            return vaes512::EncryptCfb(&m_pData_aes[bufferIdx],
+                                       &pCipherText[bufferIdx],
+                                       len,
+                                       m_cipher_key_data.m_enc_key,
+                                       getRounds(),
+                                       numBuffers,
+                                       &m_pIvs_aes[bufferIdx]);
+        };
+    } else {
+
+        return ALC_ERROR_NOT_SUPPORTED; // Unsupported mode
+    }
+
+    // Split up the number of buffers into power of 2
+    if (__builtin_expect(numBuffers >= 128, 0)) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    int processedBuffers = 0;
+    for (int i = 7; i >= 0; i--) {
+        if (numBuffers & (1ULL << i)) {
+            size_t      bufferCount = (1ULL << i);
+
+            if (i == 0) {
+                err = encryptWrapper[0](processedBuffers, i, bufferCount);
+            } else if (i == 1) {
+                err = encryptWrapper[1](processedBuffers, i, bufferCount);
+            } else {
+                err = encryptWrapper[2](processedBuffers, i, bufferCount);
             }
+
+            if (err != ALC_ERROR_NONE) {
+                return err;
+            }
+
+            processedBuffers += bufferCount;
         }
     }
     return ALC_ERROR_NONE;
@@ -330,7 +387,8 @@ AesGenericCiphersT<mode, keyLenBits, arch>::CopyCtx(const iCipher* pSrc,
         if (dst->m_pIv_aes != nullptr) {
             memcpy(dst->m_pIv_aes, src->m_pIv_aes, src->m_ivLen_aes);
         } else {
-            return ALC_ERROR_BAD_STATE; // Destination IV buffer not allocated
+            return ALC_ERROR_BAD_STATE; // Destination IV buffer not
+                                        // allocated
         }
     }
 
