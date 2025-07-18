@@ -113,6 +113,10 @@ Digest_KAT(alc_digest_mode_t mode, bool ctx_copy, bool test_squeeze)
         SHA3_SHAKE_Len_Str = (mode == ALC_SHAKE_128) ? "128" : "256";
         TestDataFile       = "dataset_" + GetDigestStr(mode) + "_SHAKE_"
                        + SHA3_SHAKE_Len_Str + ".csv";
+    } else if (mode == ALC_MD5) {
+        TestDataFile = "dataset_MD5.csv";
+    } else if (mode == ALC_SHA1) {
+        TestDataFile = "dataset_SHA1.csv";
     }
     /* for normal SHA2, SHA3 (224,256,384,512 bit) */
     else {

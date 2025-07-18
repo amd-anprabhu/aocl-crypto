@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -35,6 +35,17 @@
 #include "digest/alc_digest.hh"
 #include "digest/digest.hh"
 #include "digest/gtest_base_digest.hh"
+
+/* MD5 tests */
+TEST(DIGEST_MD5, KAT_128)
+{
+    Digest_KAT(ALC_MD5, false, false);
+}
+/* SHA1 tests */
+TEST(DIGEST_SHA1, KAT_160)
+{
+    Digest_KAT(ALC_SHA1, false, false);
+}
 
 TEST(DIGEST_SHA3, KAT_SHAKE128_CTX_COPY)
 {

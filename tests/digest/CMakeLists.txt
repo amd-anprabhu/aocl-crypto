@@ -1,4 +1,4 @@
- # Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ # Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions are met:
@@ -67,6 +67,8 @@ FUNCTION(TEST_DATA_LINK SHA_ALG)
 
 ENDFUNCTION(TEST_DATA_LINK SHA_ALG)
 
+TEST_DATA_LINK(MD5)
+TEST_DATA_LINK(SHA1)
 TEST_DATA_LINK(SHA_224)
 TEST_DATA_LINK(SHA_256)
 TEST_DATA_LINK(SHA_384)

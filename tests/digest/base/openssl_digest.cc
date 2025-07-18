@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -57,6 +57,9 @@ OpenSSLDigestBase::init()
     m_handle = EVP_MD_CTX_new();
 
     switch (m_mode) {
+        case ALC_MD5:
+            m_md_type = EVP_md5();
+            break;
         case ALC_SHA1:
             m_md_type = EVP_sha1();
             break;
