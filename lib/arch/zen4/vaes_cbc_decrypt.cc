@@ -166,9 +166,11 @@ alc_error_t inline DecryptCbc(const Uint8* pCipherText, // ptr to ciphertext
                 // Load the next IV from the ciphertext buffer before writing
                 // the plaintext to the output buffer to ensure IV is not
                 // corrupted when buffers are inplace.
-                if (blocks >= 4) { // Load next IV only if there is some
-                                   // ciphertext left to be decrypted.
+                if (blocks >= 4) { // Load next IV only if there are at least 4 blocks
                     b1 = _mm512_loadu_si512(pb_128);
+                } else if (blocks > 0 || res != 0) {
+                    // For remaining blocks < 4, load only what we need
+                    b1 = alcp_loadu_128((__m512i*)pb_128);
                 }
 #endif
                 // Store decrypted blocks.
@@ -219,6 +221,10 @@ alc_error_t inline DecryptCbc(const Uint8* pCipherText, // ptr to ciphertext
             auto p_out_128 = reinterpret_cast<__m128i*>(pOut_512);
             // Loop on a block/bytes
             len = (blocks * Rijndael::cBlockSize) + res;
+#ifdef AES_CBC_INPLACE_BUFFER
+            // Check if buffers are actually inplace (same memory location)
+            bool is_inplace = (pCipherText == pPlainText);
+#endif
             while (len) {
                 // Create mask to load bytes
                 // FIXME: Convert this to a equation
@@ -228,8 +234,26 @@ alc_error_t inline DecryptCbc(const Uint8* pCipherText, // ptr to ciphertext
                 a1 = _mm512_setzero_si512();
                 a1 = _mm512_mask_loadu_epi8(a1, mask, pa_128);
 
+#ifdef AES_CBC_INPLACE_BUFFER
+                // In inplace mode, save the IV for the next block before overwriting current block
+                __m512i next_iv;
+                bool has_next = (len - current_factor) > 0;
+                if (is_inplace && has_next) {
+                    // Load the current ciphertext block as IV for next iteration
+                    next_iv = alcp_loadu_128((__m512i*)pa_128);
+                }
+#endif
+
                 if (isIvUsed) {
+#ifdef AES_CBC_INPLACE_BUFFER
+                    if (!is_inplace) {
+                        // Non-inplace case: load IV from pb_128
+                        b1 = alcp_loadu_128((__m512i*)(pb_128));
+                    }
+                    // In inplace case, b1 is already set from previous iteration or pre-loaded
+#else
                     b1 = alcp_loadu_128((__m512i*)(pb_128));
+#endif
                 }
                 pb_128 += 1;
                 isIvUsed = 1;
@@ -239,6 +263,13 @@ alc_error_t inline DecryptCbc(const Uint8* pCipherText, // ptr to ciphertext
                 a1 = alcp_xor(a1, b1);
                 // Store decrypted block.
                 _mm512_mask_storeu_epi8((__m512i*)p_out_128, mask, a1);
+
+#ifdef AES_CBC_INPLACE_BUFFER
+                // Update IV for next iteration in inplace mode
+                if (is_inplace && has_next) {
+                    b1 = next_iv;
+                }
+#endif
 
                 pa_128++;
                 p_out_128++;

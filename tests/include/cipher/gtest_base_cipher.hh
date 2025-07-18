@@ -860,7 +860,8 @@ CipherCrossTest(int               keySize,
  */
 #ifdef CBC_INPLACE_BUFFER
             if (modeStr.compare("CBC") == 0) {
-                data_alc.m_out = data_ext.m_out = &(pt[1]);
+                data_alc.m_out = data_alc.m_in;
+                data_ext.m_out = &(out_ct_ext[0]);
             } else {
                 data_alc.m_out = &(out_ct_alc[0]);
                 data_ext.m_out = &(out_ct_ext[0]);
@@ -889,34 +890,38 @@ CipherCrossTest(int               keySize,
             }
 
             if (encDec == ENCRYPT) {
-                ret = alcpTC->getCipherHandler()->testingEncrypt(data_alc, key);
-                if (!ret) {
-                    std::cout << "ERROR: Enc: Main lib" << std::endl;
-                    FAIL();
-                }
+                // The order of these calls are important in case of inplace buffer. 
+                //Hence first external library calls are placed followed by ALCP library calls
                 ret = extTC->getCipherHandler()->testingEncrypt(data_ext, key);
                 if (!ret) {
                     std::cout << "ERROR: Enc: ext lib" << std::endl;
                     FAIL();
                 }
-                ASSERT_TRUE(ArraysMatch(out_ct_alc, out_ct_ext));
+
+                ret = alcpTC->getCipherHandler()->testingEncrypt(data_alc, key);
+                if (!ret) {
+                    std::cout << "ERROR: Enc: ext lib" << std::endl;
+                    FAIL();
+                }
+                ASSERT_TRUE(ArraysMatch(data_alc.m_out, data_ext.m_out,
+                                        data_alc.m_outl, data_ext.m_outl));
                 if (verbose > 1) {
                     PrintCipherTestData(key, data_alc, mode);
                     PrintCipherTestData(key, data_ext, mode);
                 }
             } else {
                 /* Do an encrypt and then call decrypt */
-                ret = alcpTC->getCipherHandler()->testingEncrypt(data_alc, key);
-                if (!ret) {
-                    std::cout << "ERROR: Enc: Main lib" << std::endl;
-                    FAIL();
-                }
                 ret = extTC->getCipherHandler()->testingEncrypt(data_ext, key);
                 if (!ret) {
                     std::cout << "ERROR: Enc: ext lib" << std::endl;
                     FAIL();
                 }
-                ASSERT_TRUE(ArraysMatch(out_ct_alc, out_ct_ext));
+                ret = alcpTC->getCipherHandler()->testingEncrypt(data_alc, key);
+                if (!ret) {
+                    std::cout << "ERROR: Enc: Main lib" << std::endl;
+                    FAIL();
+                }
+                ASSERT_TRUE(ArraysMatch(data_alc.m_out, data_ext.m_out,data_alc.m_outl,data_ext.m_outl));
 
                 /* now decrypt, use the CT created after encryption, pass it on
                  * to decrypt as input */
@@ -942,7 +947,8 @@ CipherCrossTest(int               keySize,
                 // Check if the external library's output matches the plaintext
                 ASSERT_TRUE(ArraysMatch(out_ct_ext, out_pt));
                 // Check if the main library's output matches the plaintext
-                ASSERT_TRUE(ArraysMatch(out_ct_alc, out_pt));
+                ASSERT_TRUE(ArraysMatch(data_alc.m_in, data_ext.m_in,
+                                        data_alc.m_inl, data_ext.m_outl));
 
                 if (verbose > 1) {
                     PrintCipherTestData(key, data_alc, mode);

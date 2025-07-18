@@ -52,7 +52,7 @@ GetModeSTR(alc_cipher_mode_t mode);
 // alcp_data_cipher_ex_t
 struct alcp_dc_ex_t
 {
-    const Uint8* m_in;
+     Uint8* m_in;
     Uint64       m_inl;
     Uint8*       m_out;
     Uint64       m_outl;

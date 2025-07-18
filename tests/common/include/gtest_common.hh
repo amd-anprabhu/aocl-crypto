@@ -146,6 +146,7 @@ ArraysMatch(const std::vector<Uint8>& actual,
     return ::testing::AssertionSuccess();
 }
 
+
 enum class LIB_TYPE
 {
     OPENSSL = 0,
@@ -249,4 +250,40 @@ getPtr(std::vector<T>& vect)
     } else {
         return &vect[0];
     }
+}
+
+/**
+ * @brief Check if 2 binary arrays (given as pointers) are equal.
+ *
+ * @param actual      Pointer to the output obtained from the algorithm.
+ * @param expected    Pointer to the expected output.
+ * @param actual_len  Length of the actual array.
+ * @param expected_len Length of the expected array.
+ * @return ::testing::AssertionResult
+ */
+::testing::AssertionResult
+ArraysMatch( Uint8* actual,  Uint8* expected,
+            size_t actual_len, size_t expected_len)
+{
+    if (actual_len != expected_len) {
+        return ::testing::AssertionFailure() << "Size mismatch! actual_len: " 
+                                            << actual_len << ", expected_len: " 
+                                            << expected_len;
+    }
+    
+    for (size_t i = 0; i < actual_len; i++) {
+        if (expected[i] != actual[i]) {
+            std::string actual_error = parseBytesToHexStr(&actual[i], 1);
+            std::string expected_error = parseBytesToHexStr(&expected[i], 1);
+            return ::testing::AssertionFailure()<< "Does not match,"
+                   << "actual[" << i << "] ("
+                   << "0x" << actual_error << ") != expected[" << i << "]("
+                   << "0x" << expected_error << ")"
+                   << " actual_len: " << actual_len
+                   << " expected_len: " << expected_len;
+        }
+
+    }
+    return ::testing::AssertionSuccess()
+           << "Size: " << actual_len << " Success";
 }
