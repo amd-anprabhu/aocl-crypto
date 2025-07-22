@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -177,9 +177,9 @@ alcp_prov_shake_digest_final(void*          vctx,
     }
 
 #if (OPENSSL_API_LEVEL >= 30300)                                                 
-    #define Digest_Sqeeze { OSSL_FUNC_DIGEST_SQUEEZE, (fptr_t)alcp_prov_shake_squeeze },
+    #define Digest_Squeeze { OSSL_FUNC_DIGEST_SQUEEZE, (fptr_t)alcp_prov_shake_squeeze },
 #else
-    #define Digest_Sqeeze
+    #define Digest_Squeeze
 #endif 
 
 
@@ -194,7 +194,7 @@ alcp_prov_shake_digest_final(void*          vctx,
           (fptr_t)alcp_prov_shake_settable_ctx_params },                       \
     { OSSL_FUNC_DIGEST_SET_CTX_PARAMS,                                         \
           (fptr_t)alcp_prov_shake_set_ctx_params },                            \
-      Digest_Sqeeze                                                            \
+      Digest_Squeeze                                                            \
     { 0, NULL }                                                                \
     }
 
