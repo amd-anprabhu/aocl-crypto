@@ -215,8 +215,6 @@ AlcpCipherBase::context_copy()
                   << std::endl;
         return false;
     }
-
-    std::cout << "Context copy successful." << std::endl;
     return true;
 }
 
