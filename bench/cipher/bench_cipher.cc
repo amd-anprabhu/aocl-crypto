@@ -798,22 +798,21 @@ AddBenchmarks()
             ->ArgsProduct({ blocksizes });
         BENCHMARK(BENCH_CHACHA20_POLY1305_DECRYPT_256)
             ->ArgsProduct({ blocksizes });
+
+        /* IPPCP Multibuffer benchmarks are not yet enabled */
+        BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_128)
+            ->ArgsProduct({ blocksizes, num_buffers });
+        BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_192)
+            ->ArgsProduct({ blocksizes, num_buffers });
+        BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_256)
+            ->ArgsProduct({ blocksizes, num_buffers });
+        BENCHMARK(BENCH_AES_MULTIBUFFER_CFB_128)
+            ->ArgsProduct({ blocksizes, num_buffers });
+        BENCHMARK(BENCH_AES_MULTIBUFFER_CFB_192)
+            ->ArgsProduct({ blocksizes, num_buffers });
+        BENCHMARK(BENCH_AES_MULTIBUFFER_CFB_256)
+            ->ArgsProduct({ blocksizes, num_buffers });
     }
-
-    /* Multibuffer benchmarks */
-    BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_128)
-        ->ArgsProduct({ blocksizes, std::move(num_buffers) });
-    BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_192)
-        ->ArgsProduct({ blocksizes, std::move(num_buffers) });
-    BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_256)
-        ->ArgsProduct({ blocksizes, std::move(num_buffers) });
-    BENCHMARK(BENCH_AES_MULTIBUFFER_CFB_128)
-        ->ArgsProduct({ blocksizes, std::move(num_buffers) });
-    BENCHMARK(BENCH_AES_MULTIBUFFER_CFB_192)
-        ->ArgsProduct({ blocksizes, std::move(num_buffers) });
-    BENCHMARK(BENCH_AES_MULTIBUFFER_CFB_256)
-        ->ArgsProduct({ blocksizes, std::move(num_buffers) });
-
     BENCHMARK(BENCH_AES_ENCRYPT_CBC_128)->ArgsProduct({ blocksizes });
     BENCHMARK(BENCH_AES_ENCRYPT_CTR_128)->ArgsProduct({ blocksizes });
     BENCHMARK(BENCH_AES_ENCRYPT_OFB_128)->ArgsProduct({ blocksizes });
