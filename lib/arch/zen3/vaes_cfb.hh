@@ -28,8 +28,9 @@
 
 #pragma once
 
+#include "alcp/error.h"
 #include "alcp/types.hh"
-#include "vaes_avx256_core.hh"
+// #include "vaes_avx256_core.hh"
 #include <immintrin.h>
 #include <memory>
 
@@ -45,4 +46,4 @@ EncryptCfb(const Uint8** pPlainText,
            int           num_buffers,
            Uint8**       pIv);
 
-}
+} // namespace alcp::cipher::vaes

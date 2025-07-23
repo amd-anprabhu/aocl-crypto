@@ -26,10 +26,10 @@
  *
  */
 
+#include "vaes_cfb.hh"
 #include "alcp/cipher/aes.hh"
 #include "alcp/types.hh"
 #include "vaes.hh"
-#include "vaes_cfb.hh"
 #include "vaes_avx256_core.hh"
 #include <complex.h>
 #include <cstdint>
@@ -77,7 +77,7 @@ EncryptCfb(const Uint8** pPlainText,
     __m128i**               p_out_128   = p_out_128_storage.get();
     __m128i*                current_ivs = current_ivs_storage.get();
     auto                    pkey128 = reinterpret_cast<const __m128i*>(pKey);
-    alignas(64) vaes::sKeys keys_ymm;
+    alignas(64) vaes::sKeys keys_ymm{};
 
     for (int i = 0; i < num_buffers; i++) {
         p_in_128[i]  = reinterpret_cast<const __m128i*>(pPlainText[i]);

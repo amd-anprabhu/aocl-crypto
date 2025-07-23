@@ -69,20 +69,21 @@ EncryptCbc(const Uint8** pPlainText,
     }
 
     // Use dynamic allocation to avoid template attribute warnings
-    auto p_in_128_storage       = std::make_unique<const __m128i*[]>(num_buffers);
-    auto p_out_128_storage      = std::make_unique<__m128i*[]>(num_buffers);
-    auto current_ivs_storage    = std::make_unique<__m128i[]>(num_buffers);
-    const __m128i** p_in_128    = p_in_128_storage.get();
-    __m128i**       p_out_128   = p_out_128_storage.get();
-    __m128i*        current_ivs = current_ivs_storage.get();
+    auto p_in_128_storage    = std::make_unique<const __m128i*[]>(num_buffers);
+    auto p_out_128_storage   = std::make_unique<__m128i*[]>(num_buffers);
+    auto current_ivs_storage = std::make_unique<__m128i[]>(num_buffers);
+    const __m128i**         p_in_128    = p_in_128_storage.get();
+    __m128i**               p_out_128   = p_out_128_storage.get();
+    __m128i*                current_ivs = current_ivs_storage.get();
     auto                    pkey128 = reinterpret_cast<const __m128i*>(pKey);
-    alignas(64) vaes::sKeys keys_ymm;
+    alignas(64) vaes::sKeys keys_ymm{};
 
     for (int i = 0; i < num_buffers; i++) {
         p_in_128[i]  = reinterpret_cast<const __m128i*>(pPlainText[i]);
         p_out_128[i] = reinterpret_cast<__m128i*>(pCipherText[i]);
         //clang-format off
-        current_ivs[i] =_mm_loadu_si128(reinterpret_cast<const __m128i*>(pIv[i]));
+        current_ivs[i] =
+            _mm_loadu_si128(reinterpret_cast<const __m128i*>(pIv[i]));
         // clang-format on
     }
     switch (nRounds) {
@@ -132,12 +133,11 @@ EncryptCbc(const Uint8** pPlainText,
     // Update final IVs in the caller's pIv array if AES_MULTI_UPDATE is
     // defined
 #ifdef AES_MULTI_UPDATE
-            for (int i = 0; i < num_buffers; i++) {
-                // Store the last ciphertext block (now in current_ivs[i]) back
-                // to pIv[i]
-                _mm_storeu_si128(reinterpret_cast<__m128i*>(pIv[i]),
-                                 current_ivs[i]);
-            }
+    for (int i = 0; i < num_buffers; i++) {
+        // Store the last ciphertext block (now in current_ivs[i]) back
+        // to pIv[i]
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(pIv[i]), current_ivs[i]);
+    }
 #endif
     return err;
 }
