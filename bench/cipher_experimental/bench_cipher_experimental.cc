@@ -130,16 +130,16 @@ BenchGcmCipherExperimental(benchmark::State&            state,
     dataFinalize.verified       = false;
     if constexpr (encryptor == false) { // Decrypt
         // Create a vaid data for decryption (mainly tag and ct)
-        std::unique_ptr<ITestCipher> iTestCipher =
+        std::unique_ptr<ITestCipher> encryptCipher =
             std::make_unique<AlcpGcmCipher<true>>();
         bool no_err = true;
-        no_err &= iTestCipher->init(&dataInit);
+        no_err &= encryptCipher->init(&dataInit);
         if (no_err == false) {
             state.SkipWithError("MicroBench: Initialization failed for decrypt "
                                 "ct,tag generation using encrypt");
             return -1;
         }
-        no_err &= iTestCipher->update(&dataUpdate);
+        no_err &= encryptCipher->update(&dataUpdate);
         if (no_err == false) {
             state.SkipWithError("MicroBench: Update failed for decrypt "
                                 "ct,tag generation using encrypt");
@@ -148,7 +148,7 @@ BenchGcmCipherExperimental(benchmark::State&            state,
         // After encrypting, to decrypt output becomes input
         dataUpdate.m_input  = output_text;
         dataUpdate.m_output = input_text;
-        no_err &= iTestCipher->finalize(&dataFinalize);
+        no_err &= encryptCipher->finalize(&dataFinalize);
         if (no_err == false) {
             state.SkipWithError("MicroBench: Finalize failed for decrypt "
                                 "ct,tag generation using encrypt");
