@@ -102,7 +102,7 @@ built or running.
     - CMake (3.26 or later)
     - GCC (11.0 or later)
     - Git (2.30.2 or later)
-    - OpenSSL ( 3.0.8 or later )
+    - OpenSSL ( 3.1.3 or later )
     - Make ( 4.0 or later )
     - 7zip ( 15.0 or later )
   - Optional Dependancies
