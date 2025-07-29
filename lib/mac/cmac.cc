@@ -100,15 +100,15 @@ Cmac::update(const Uint8* pMsgBuf, Uint64 size)
         return err;
     }
 
-    int n_blocks = 0;
+    Uint64 n_blocks = 0;
     // Variable to keep track of the number of bytes not processed in this
     // update which needs to be copied to the internal buffer
-    int unprocessed_bytes_left = 0;
+    Uint64 unprocessed_bytes_left = 0;
     /* For processing, it is assumed storage buffer is always complete. So
     copy data from pMsgBuf buffer to internal storage buffer until it
     is complete */
 
-    int b = cAESBlockSize - (m_buff_offset);
+    Uint64 b = cAESBlockSize - (m_buff_offset);
     if (b > 0) {
         utils::CopyBlock<Uint64>(m_buff + m_buff_offset, pMsgBuf, b);
         m_buff_offset += b;
@@ -121,7 +121,7 @@ Cmac::update(const Uint8* pMsgBuf, Uint64 size)
     /*This is just a modulus operation. This is done to see how many bytes we
     wont be able to process becauase
     it has to be a multiple of block size to be processed.*/
-    int ptxt_bytes_rem     = size - b;
+    Uint64 ptxt_bytes_rem  = size - b;
     n_blocks               = ((ptxt_bytes_rem) / cAESBlockSize);
     unprocessed_bytes_left = ((ptxt_bytes_rem)-cAESBlockSize * (n_blocks));
 
@@ -135,8 +135,12 @@ Cmac::update(const Uint8* pMsgBuf, Uint64 size)
     }
 
     if (has_avx2_aesni) {
-        avx2::update(
-            pMsgBuf, m_buff, m_encrypt_keys, m_pBuffEnc, m_nrounds, n_blocks);
+        avx2::update(pMsgBuf,
+                     m_buff,
+                     m_encrypt_keys,
+                     m_pBuffEnc,
+                     m_nrounds,
+                     static_cast<Uint32>(n_blocks));
     } else {
         // Using a separate pointer for pMsgBuf pointer operations so
         // original pMsgBuf pointer is unmodified
@@ -144,7 +148,7 @@ Cmac::update(const Uint8* pMsgBuf, Uint64 size)
         // Reference Algorithm for AES CMAC block processing
         alcp::cipher::xor_a_b(m_pBuffEnc, m_buff, m_pBuffEnc, cAESBlockSize);
         encryptBlock(m_buffEnc, m_encrypt_keys, m_nrounds);
-        for (int i = 0; i < n_blocks; i++) {
+        for (Uint64 i = 0; i < n_blocks; i++) {
             alcp::cipher::xor_a_b(
                 m_pBuffEnc, p_plaintext, m_pBuffEnc, cAESBlockSize);
             encryptBlock(m_buffEnc, m_encrypt_keys, m_nrounds);

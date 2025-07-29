@@ -86,17 +86,17 @@ BigNumToBignum(const BigNum& customBN)
     if (!bn) {
         return nullptr;
     }
-    int byteIndex = 0 ;
+    int byteIndex = 0;
     // Convert the BigNum array to a byte array
     unsigned char* bytes = new unsigned char[customBN.m_size * 8]();
     for (int i = customBN.m_size - 1; i >= 0; --i) {
-        for (int j = 7; j >=0; --j) {
-            bytes[byteIndex++] = (customBN.m_num[i] >> j*8) & 0xFF;
+        for (int j = 7; j >= 0; --j) {
+            bytes[byteIndex++] = (customBN.m_num[i] >> j * 8) & 0xFF;
         }
     }
 
     // Assign the byte array to the BIGNUM
-    BN_bin2bn(bytes, customBN.m_size*8, bn);
+    BN_bin2bn(bytes, customBN.m_size * 8, bn);
     delete[] bytes;
     return bn;
 }
@@ -115,7 +115,7 @@ BignumToBigNum(const BIGNUM* bn, BigNum& customBN)
     // Convert the bytes back to uint64_t array
     customBN.m_size = (numBytes + 7) / 8; // Calculate number of 64-bit words
     for (int i = customBN.m_size - 1; i >= 0; --i) {
-        customBN.m_num[i] = 0;  // Initialize the 64-bit word to 0
+        customBN.m_num[i] = 0; // Initialize the 64-bit word to 0
         for (int j = 7; j >= 0; --j) {
             int byteIndex = i * 8 + j;
             if (byteIndex < numBytes) {
