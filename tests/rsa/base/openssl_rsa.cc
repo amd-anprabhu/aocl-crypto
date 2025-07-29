@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -36,7 +36,13 @@
 
 namespace alcp::testing {
 
-OpenSSLRsaBase::OpenSSLRsaBase() {}
+OpenSSLRsaBase::OpenSSLRsaBase()
+{
+    m_libctx = OSSL_LIB_CTX_new();
+    if (m_libctx == nullptr) {
+        std::cout << "Failed to create OSSL_LIB_CTX" << std::endl;
+    }
+}
 
 OpenSSLRsaBase::~OpenSSLRsaBase()
 {
@@ -198,7 +204,14 @@ OpenSSLRsaBase::SetPublicKeyBigNum(const alcp_rsa_data_t& data)
         EVP_PKEY_CTX_free(m_rsa_handle_keyctx_pub);
         m_rsa_handle_keyctx_pub = nullptr;
     }
-    m_rsa_handle_keyctx_pub = EVP_PKEY_CTX_new_from_name(NULL, "RSA", NULL);
+    m_rsa_handle_keyctx_pub = EVP_PKEY_CTX_new_from_name(m_libctx, "RSA", NULL);
+
+    if (m_rsa_handle_keyctx_pub == nullptr) {
+        std::cout << __func__
+                  << ":EVP_PKEY_CTX_new_from_name returned null: Error:"
+                  << ERR_GET_REASON(ERR_get_error()) << std::endl;
+        return false;
+    }
 
     if (1 != EVP_PKEY_fromdata_init(m_rsa_handle_keyctx_pub)) {
         std::cout << __func__ << ":" << "EVP_PKEY_fromdata_init failed"
@@ -371,7 +384,7 @@ OpenSSLRsaBase::SetPrivateKeyBigNum(const alcp_rsa_data_t& data)
         EVP_PKEY_CTX_free(m_rsa_handle_keyctx_pvt);
         m_rsa_handle_keyctx_pvt = nullptr;
     }
-    m_rsa_handle_keyctx_pvt = EVP_PKEY_CTX_new_from_name(NULL, "RSA", NULL);
+    m_rsa_handle_keyctx_pvt = EVP_PKEY_CTX_new_from_name(m_libctx, "RSA", NULL);
     if (m_rsa_handle_keyctx_pvt == nullptr) {
         std::cout << __func__
                   << ":EVP_PKEY_CTX_new_from_name returned null: Error:"
