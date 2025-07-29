@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -199,7 +199,7 @@ DrbgCtrGenerate(const Uint8  pcAdditionalInput[],
                          temp_reg_value);
     }
 
-    if (cOutputLen - inc > 0) {
+    if (inc < cOutputLen) {
         IncrementValue(reg_value, cShuffleMask, cOneReg128);
         Uint8   output_block[16];
         __m128i temp_reg_value = reg_value;

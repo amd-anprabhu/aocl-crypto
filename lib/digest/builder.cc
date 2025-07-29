@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -114,6 +114,8 @@ static alc_error_t
 __build_with_copy_sha(Context& srcCtx, Context& destCtx)
 {
     alc_error_t err = ALC_ERROR_NONE;
+
+    ALCP_BAD_PTR_ERR_RET(srcCtx.m_digest, ALC_ERROR_INVALID_ARG);
 
     auto algo = new ALGONAME(*reinterpret_cast<ALGONAME*>(srcCtx.m_digest));
     destCtx.m_digest = static_cast<void*>(algo);

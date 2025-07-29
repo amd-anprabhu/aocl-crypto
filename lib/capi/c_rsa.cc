@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -619,6 +619,9 @@ alcp_rsa_get_key_size(const alc_rsa_handle_p pRsaHandle)
     if (pRsaHandle == nullptr) {
         return 0;
     }
+
+    /* check if pRsaHandle->context is nullptr */
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, ALC_ERROR_INVALID_ARG);
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
     ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
 
@@ -736,6 +739,11 @@ alcp_rsa_finish(const alc_rsa_handle_p pRsaHandle)
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
+
+    if (pRsaHandle == nullptr || pRsaHandle->context == nullptr) {
+        return;
+    }
+
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
     if (ctx->finish && ctx->m_rsa) {
         ctx->finish(ctx->m_rsa);

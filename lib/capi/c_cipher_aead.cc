@@ -330,8 +330,12 @@ alcp_cipher_aead_set_ccm_plaintext_length(
     ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
 
     auto ctx = static_cast<alcp::cipher::Context*>(pCipherHandle->ch_context);
-    auto i   = static_cast<iCipherAead*>(ctx->m_cipher);
-    err      = i->setPlainTextLength(plaintextLength);
+
+    /* check if ctx->m_cipher is not nullptr */
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+
+    auto i = static_cast<iCipherAead*>(ctx->m_cipher);
+    err    = i->setPlainTextLength(plaintextLength);
 
     return err;
 }

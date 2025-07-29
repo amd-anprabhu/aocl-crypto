@@ -35,7 +35,7 @@ namespace alcp::testing {
 Csv::Csv(String filename)
     : File(filename)
 {
-    m_filename    = filename;
+    m_filename    = std::move(filename);
     m_file_exists = checkFileExists();
     if (!m_file_exists) {
         utils::printErrors("File doesnt exist: " + m_filename);
@@ -61,7 +61,7 @@ Csv::parseCsv() const
         } else {
             found = m_line.substr(curr_pos, cPos - curr_pos);
         }
-        out.push_back(found);
+        out.push_back(std::move(found));
 
         if (cPos == -1) {
             break; // Terminating condition.. Line end

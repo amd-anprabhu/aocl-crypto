@@ -55,7 +55,7 @@ BigNum::BigNum(const BigNum& b)
 BigNum::BigNum(const BigNum&& b)
     : BigNum{}
 {
-    *this = b;
+    *this = std::move(b);
 }
 
 Int64

@@ -966,11 +966,11 @@ class XTS_KAT
         // Copy Values to class variables
         m_key        = key;
         m_key_size   = key.size();
-        m_tweak      = tweak_key;
-        m_iv         = iv;
-        m_plaintext  = plaintext;
-        m_ciphertext = ciphertext;
-        m_test_name  = test_name;
+        m_tweak      = std::move(tweak_key);
+        m_iv         = std::move(iv);
+        m_plaintext  = std::move(plaintext);
+        m_ciphertext = std::move(ciphertext);
+        m_test_name  = std::move(test_name);
 
         // Insert Tweak Key into key
         m_key.insert(m_key.end(), m_tweak.begin(), m_tweak.end());

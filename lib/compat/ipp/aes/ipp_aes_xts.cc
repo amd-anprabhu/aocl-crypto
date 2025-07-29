@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -97,6 +97,8 @@ alcp_initXTSDirect(alc_cipher_handle_t& handle,
     // xts init
     err = alcp_cipher_segment_init(&handle, pKey, key_size, pTweakPT, iv_len);
     if (alcp_is_error(err)) {
+        free(handle.ch_context);
+        handle.ch_context = nullptr;
         printf("Error: unable to init\n");
         return ippStsErr;
     }
@@ -133,6 +135,8 @@ ippsAESEncryptXTS_Direct(const Ipp8u* pSrc,
     err = alcp_cipher_segment_encrypt_xts(
         &handle, pSrc, pDst, encBitSize / 8, aesBlkNo);
     if (alcp_is_error(err)) {
+        free(handle.ch_context);
+        handle.ch_context = nullptr;
         printf("Error: unable encrypt \n");
         return ippStsErr;
     }
@@ -162,6 +166,8 @@ ippsAESDecryptXTS_Direct(const Ipp8u* pSrc,
     err = alcp_cipher_segment_decrypt_xts(
         &handle, pSrc, pDst, encBitSize / 8, aesBlkNo);
     if (alcp_is_error(err)) {
+        free(handle.ch_context);
+        handle.ch_context = nullptr;
         printf("Error: unable decrypt \n");
         return ippStsErr;
     }

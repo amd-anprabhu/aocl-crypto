@@ -244,12 +244,12 @@ class GCM_KAT
 
         // Copy Values to class variables
         m_key        = key;
-        m_nonce      = nonce;
-        m_aad        = aad;
-        m_plaintext  = plaintext;
-        m_ciphertext = ciphertext;
-        m_tag        = tag;
-        m_test_name  = test_name;
+        m_nonce      = std::move(nonce);
+        m_aad        = std::move(aad);
+        m_plaintext  = std::move(plaintext);
+        m_ciphertext = std::move(ciphertext);
+        m_tag        = std::move(tag);
+        m_test_name  = std::move(test_name);
 
         /* Initialization */
 

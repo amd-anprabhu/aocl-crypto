@@ -88,7 +88,7 @@ TEST_P(MD5_Sha1Test, digest_generation_test)
     std::stringstream ss;
 
     digest_obj->init();
-    auto plaintext_hex = parseHexStrToBin(plaintext);
+    auto plaintext_hex = parseHexStrToBin(std::move(plaintext));
     ASSERT_EQ(digest_obj->update(&plaintext_hex[0], plaintext_hex.size()),
               ALC_ERROR_NONE);
     ASSERT_EQ(digest_obj->finalize(hash.data(), digest_size), ALC_ERROR_NONE);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -102,7 +102,12 @@ alcp_rng_request(const alc_rng_info_p pRngInfo, alc_rng_handle_p pHandle)
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
     alc_error_t error = ALC_ERROR_NOT_SUPPORTED;
-    auto        ctx   = static_cast<alcp::rng::Context*>(pHandle->rh_context);
+
+    /* check if pHandle->rh_context is not nullptr */
+    ALCP_BAD_PTR_ERR_RET(pHandle, error);
+    ALCP_BAD_PTR_ERR_RET(pHandle->rh_context, error);
+
+    auto ctx = static_cast<alcp::rng::Context*>(pHandle->rh_context);
 
     new (ctx) alcp::rng::Context;
     /*
@@ -111,8 +116,8 @@ alcp_rng_request(const alc_rng_info_p pRngInfo, alc_rng_handle_p pHandle)
      */
 
     ALCP_BAD_PTR_ERR_RET(pRngInfo, error);
-    ALCP_BAD_PTR_ERR_RET(pHandle, error);
-    ALCP_BAD_PTR_ERR_RET(pHandle->rh_context, error);
+    // ALCP_BAD_PTR_ERR_RET(pHandle, error);
+    //  ALCP_BAD_PTR_ERR_RET(pHandle->rh_context, error);
 
     switch (pRngInfo->ri_type) {
         case ALC_RNG_TYPE_DISCRETE:
