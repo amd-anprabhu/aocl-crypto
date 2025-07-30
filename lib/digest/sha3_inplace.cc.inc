@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -45,18 +45,6 @@ ycord(int x, int y, int round)
     }
     return (x + 2 * y) % cDim;
 }
-
-__attribute__((
-    aligned(64))) static constexpr Uint64 cRoundConstants[cNumRounds] = {
-    0x0000000000000001, 0x0000000000008082, 0x800000000000808A,
-    0x8000000080008000, 0x000000000000808B, 0x0000000080000001,
-    0x8000000080008081, 0x8000000000008009, 0x000000000000008A,
-    0x0000000000000088, 0x0000000080008009, 0x000000008000000A,
-    0x000000008000808B, 0x800000000000008B, 0x8000000000008089,
-    0x8000000000008003, 0x8000000000008002, 0x8000000000000080,
-    0x000000000000800A, 0x800000008000000A, 0x8000000080008081,
-    0x8000000000008080, 0x0000000080000001, 0x8000000080008008
-};
 
 static inline void
 updateState(
@@ -212,7 +200,7 @@ fFunction(Uint64 state[cDim][cDim])
                     B);
 
         // A[0, 0] = A[0, 0] ⊕ RC[i]
-        state[0][0] ^= cRoundConstants[i];
+        state[0][0] ^= cRoundConstantsIota[i];
 
         // Rest of the 3 rounds are repitition
         // of the formualae of first round
@@ -309,7 +297,7 @@ fFunction(Uint64 state[cDim][cDim])
                     state[ycord(4, 4, 2)][4],
                     B);
 
-        state[0][0] ^= cRoundConstants[i + 1];
+        state[0][0] ^= cRoundConstantsIota[i + 1];
 
         // round 3
         updateInterState(C, D, state);
@@ -403,7 +391,7 @@ fFunction(Uint64 state[cDim][cDim])
                     state[ycord(4, 4, 3)][4],
                     B);
 
-        state[0][0] ^= cRoundConstants[i + 2];
+        state[0][0] ^= cRoundConstantsIota[i + 2];
 
         // Round 4
         updateInterState(C, D, state);
@@ -497,7 +485,7 @@ fFunction(Uint64 state[cDim][cDim])
                     state[ycord(4, 4, 4)][4],
                     B);
 
-        state[0][0] ^= cRoundConstants[i + 3];
+        state[0][0] ^= cRoundConstantsIota[i + 3];
     }
 }
 inline void
