@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -30,8 +30,12 @@
 #include "provider/alcp_provider.h"
 #include <openssl/core_names.h>
 #include <openssl/types.h>
+#include <string.h>
 
-static OSSL_FUNC_asym_cipher_newctx_fn         alcp_prov_rsa_new;
+// Define a generic function pointer type for dispatch functions
+// This avoids ISO C errors when casting function pointers to void*
+typedef void (*generic_dispatch_func)(void);
+
 static OSSL_FUNC_asym_cipher_encrypt_init_fn   alcp_prov_rsa_encrypt_init;
 static OSSL_FUNC_asym_cipher_encrypt_fn        alcp_prov_rsa_encrypt;
 static OSSL_FUNC_asym_cipher_decrypt_init_fn   alcp_prov_rsa_decrypt_init;
@@ -45,30 +49,49 @@ static OSSL_FUNC_asym_cipher_set_ctx_params_fn alcp_rsa_set_ctx_params;
 static OSSL_FUNC_asym_cipher_settable_ctx_params_fn
     alcp_rsa_settable_ctx_params;
 
-// Structures taken from OpenSSL to redirect unimplemented functions
-struct evp_asym_cipher_st
+static const OSSL_DISPATCH* get_default_asym_cipher_dispatch(void)
 {
-    int            name_id;
-    char*          type_name;
-    const char*    description;
-    OSSL_PROVIDER* prov;
-    int            refcnt;
-#if OPENSSL_API_LEVEL < 30200
-    void* lock;
-#endif
+    static const OSSL_DISPATCH* default_dispatch = NULL;
+    static int initialized = 0;
+    
+    if (!initialized) {
+        OSSL_PROVIDER* default_provider = OSSL_PROVIDER_load(NULL, "default");
+        if (default_provider) {
+            int no_cache = 0;
+            const OSSL_ALGORITHM* algorithms = OSSL_PROVIDER_query_operation(default_provider, OSSL_OP_ASYM_CIPHER, &no_cache);
+            if (algorithms) {
+                // Find the RSA algorithm in the algorithms array
+                for (int i = 0; algorithms[i].algorithm_names != NULL; i++) {
+                    if (strstr(algorithms[i].algorithm_names, "RSA") != NULL) {
+                        default_dispatch = algorithms[i].implementation;
+                        break;
+                    }
+                }
+            }
+            OSSL_PROVIDER_unload(default_provider);
+            initialized = 1;
+        } else {
+            printf("Failed to load default provider\n");
+        }
+    }
+    return default_dispatch;
+}
 
-    OSSL_FUNC_asym_cipher_newctx_fn*              newctx;
-    OSSL_FUNC_asym_cipher_encrypt_init_fn*        encrypt_init;
-    OSSL_FUNC_asym_cipher_encrypt_fn*             encrypt;
-    OSSL_FUNC_asym_cipher_decrypt_init_fn*        decrypt_init;
-    OSSL_FUNC_asym_cipher_decrypt_fn*             decrypt;
-    OSSL_FUNC_asym_cipher_freectx_fn*             freectx;
-    OSSL_FUNC_asym_cipher_dupctx_fn*              dupctx;
-    OSSL_FUNC_asym_cipher_get_ctx_params_fn*      get_ctx_params;
-    OSSL_FUNC_asym_cipher_gettable_ctx_params_fn* gettable_ctx_params;
-    OSSL_FUNC_asym_cipher_set_ctx_params_fn*      set_ctx_params;
-    OSSL_FUNC_asym_cipher_settable_ctx_params_fn* settable_ctx_params;
-} /* EVP_ASYM_CIPHER */;
+// functions taken from OpenSSL to redirect unimplemented functions
+static generic_dispatch_func get_dispatch_function(int func_id)
+{
+    const OSSL_DISPATCH* dispatch = get_default_asym_cipher_dispatch();
+    if (!dispatch) {
+        return NULL;
+    }
+    
+    for (int i = 0; dispatch[i].function_id != 0; i++) {
+        if (dispatch[i].function_id == func_id) {
+            return (generic_dispatch_func)dispatch[i].function;
+        }
+    }
+    return NULL;
+}
 
 typedef struct
 {
@@ -104,25 +127,6 @@ typedef struct
     alc_rsa_handle_t handle;
 } alc_prov_rsa_ctx;
 
-static inline EVP_ASYM_CIPHER
-get_default_rsa_cipher(void)
-{
-    static EVP_ASYM_CIPHER enc_static;
-    static int             initilazed = 0;
-    if (!initilazed) {
-        EVP_ASYM_CIPHER* enc = (EVP_ASYM_CIPHER*)EVP_ASYM_CIPHER_fetch(
-            NULL, "RSA", "provider=default");
-        if (enc) {
-            enc_static = *enc;
-            EVP_ASYM_CIPHER_free((EVP_ASYM_CIPHER*)enc);
-            initilazed = 1;
-        } else {
-            printf("EVP_SIGNATURE_fetch failed");
-        }
-    }
-    return enc_static;
-}
-
 static inline Uint32
 IsZero(Uint32 num)
 {
@@ -149,8 +153,7 @@ alcp_prov_rsa_new(void* provctx)
     alc_error_t err         = alcp_rsa_request(&(prsactx->handle));
 
     typedef void* (*fun_ptr)(void* provctx);
-    fun_ptr fun;
-    fun = get_default_rsa_cipher().newctx;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_ASYM_CIPHER_NEWCTX);
 
     if (fun) {
         prsactx->ossl_rsa_ctx = fun(provctx);
@@ -179,8 +182,7 @@ alcp_rsa_set_ctx_params(void* vprsactx, const OSSL_PARAM params[])
         return 1;
 
     typedef int (*fun_ptr)(void* provctx, const OSSL_PARAM params[]);
-    fun_ptr fun;
-    fun = get_default_rsa_cipher().set_ctx_params;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_ASYM_CIPHER_SET_CTX_PARAMS);
 
     int ret = 0;
     if (fun) {
@@ -229,8 +231,7 @@ alcp_prov_rsa_encrypt_init(void*            vprsactx,
 
     typedef int (*fun_ptr)(
         void* vprsactx, void* vrsa, const OSSL_PARAM params[]);
-    fun_ptr fun;
-    fun = get_default_rsa_cipher().encrypt_init;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_ASYM_CIPHER_ENCRYPT_INIT);
 
     if (!fun)
         return 0;
@@ -288,8 +289,7 @@ alcp_prov_rsa_decrypt_init(void*            vprsactx,
     prsactx->rsa_size = alcp_rsa_size(vrsa);
     typedef int (*fun_ptr)(
         void* vprsactx, void* vrsa, const OSSL_PARAM params[]);
-    fun_ptr fun;
-    fun = get_default_rsa_cipher().decrypt_init;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_ASYM_CIPHER_DECRYPT_INIT);
 
     if (!fun)
         return 0;
@@ -378,8 +378,7 @@ alcp_prov_rsa_encrypt(void*                vprsactx,
                                size_t               outsize,
                                const unsigned char* in,
                                size_t               inlen);
-        fun_ptr fun;
-        fun = get_default_rsa_cipher().encrypt;
+        fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_ASYM_CIPHER_ENCRYPT);
 
         if (!fun)
             return 0;
@@ -453,8 +452,7 @@ alcp_prov_rsa_decrypt(void*                vprsactx,
                                size_t               outsize,
                                const unsigned char* in,
                                size_t               inlen);
-        fun_ptr fun;
-        fun = get_default_rsa_cipher().decrypt;
+        fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_ASYM_CIPHER_DECRYPT);
 
         if (!fun)
             return 0;
@@ -506,8 +504,7 @@ alcp_prov_rsa_freectx(void* vprsactx)
     alc_prov_rsa_ctx* prsactx = (alc_prov_rsa_ctx*)vprsactx;
 
     typedef void (*fun_ptr)(void* vprsactx);
-    fun_ptr fun;
-    fun = get_default_rsa_cipher().freectx;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_ASYM_CIPHER_FREECTX);
 
     ENTER();
     if (fun)
@@ -533,9 +530,7 @@ alcp_prov_rsa_dupctx(void* vprsactx)
     dest_ctx->handle.context = OPENSSL_zalloc(size);
 
     typedef void* (*fun_ptr)(void* vprsactx);
-    fun_ptr fun;
-
-    fun = get_default_rsa_cipher().dupctx;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_ASYM_CIPHER_DUPCTX);
 
     if (fun)
         dest_ctx->ossl_rsa_ctx = fun(prsactx->ossl_rsa_ctx);
@@ -570,8 +565,7 @@ alcp_prov_rsa_get_ctx_params(void* vprsactx, OSSL_PARAM* params)
         return 0;
 
     typedef int (*fun_ptr)(void* vprsactx, OSSL_PARAM* params);
-    fun_ptr fun;
-    fun = get_default_rsa_cipher().get_ctx_params;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_ASYM_CIPHER_GET_CTX_PARAMS);
     if (!fun)
         return 0;
     EXIT();

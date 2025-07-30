@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,8 +26,6 @@
  *
  */
 
-#include "alcp/alcp.h"
-#include "alcp/rsa.h"
 #include "alcp_prov_rsa.h"
 #include "debug.h"
 #include "provider/alcp_provider.h"
@@ -35,50 +33,60 @@
 #include <openssl/macros.h>
 #include <openssl/rsa.h>
 #include <openssl/types.h>
+#include <string.h>
 
 #if OPENSSL_API_LEVEL >= 30100
 
 #define RSA_DEFAULT_DIGEST_NAME OSSL_DIGEST_NAME_SHA1
-// Structure taken from OpenSSL to support unimplemented functions
-struct evp_signature_st
+
+// Define a generic function pointer type for dispatch functions
+// This avoids ISO C errors when casting function pointers to void*
+typedef void (*generic_dispatch_func)(void);
+
+static const OSSL_DISPATCH* get_default_signature_dispatch(void)
 {
-    int            name_id;
-    char*          type_name;
-    const char*    description;
-    OSSL_PROVIDER* prov;
-    int            refcnt;
-#if OPENSSL_API_LEVEL < 30200
-    void* lock;
-#endif
+    static const OSSL_DISPATCH* default_dispatch = NULL;
+    static int initialized = 0;
+    
+    if (!initialized) {
+        OSSL_PROVIDER* default_provider = OSSL_PROVIDER_load(NULL, "default");
+        if (default_provider) {
+            int no_cache = 0;
+            const OSSL_ALGORITHM* algorithms = OSSL_PROVIDER_query_operation(default_provider, OSSL_OP_SIGNATURE, &no_cache);
+            if (algorithms) {
+                // Find the RSA algorithm in the algorithms array
+                for (int i = 0; algorithms[i].algorithm_names != NULL; i++) {
+                    if (strstr(algorithms[i].algorithm_names, "RSA") != NULL) {
+                        default_dispatch = algorithms[i].implementation;
+                        break;
+                    }
+                }
+            }
+            OSSL_PROVIDER_unload(default_provider);
+            initialized = 1;
+        } else {
+            printf("Failed to load default provider\n");
+        }
+    }
+    return default_dispatch;
+}
 
-    OSSL_FUNC_signature_newctx_fn*                 newctx;
-    OSSL_FUNC_signature_sign_init_fn*              sign_init;
-    OSSL_FUNC_signature_sign_fn*                   sign;
-    OSSL_FUNC_signature_verify_init_fn*            verify_init;
-    OSSL_FUNC_signature_verify_fn*                 verify;
-    OSSL_FUNC_signature_verify_recover_init_fn*    verify_recover_init;
-    OSSL_FUNC_signature_verify_recover_fn*         verify_recover;
-    OSSL_FUNC_signature_digest_sign_init_fn*       digest_sign_init;
-    OSSL_FUNC_signature_digest_sign_update_fn*     digest_sign_update;
-    OSSL_FUNC_signature_digest_sign_final_fn*      digest_sign_final;
-    OSSL_FUNC_signature_digest_sign_fn*            digest_sign;
-    OSSL_FUNC_signature_digest_verify_init_fn*     digest_verify_init;
-    OSSL_FUNC_signature_digest_verify_update_fn*   digest_verify_update;
-    OSSL_FUNC_signature_digest_verify_final_fn*    digest_verify_final;
-    OSSL_FUNC_signature_digest_verify_fn*          digest_verify;
-    OSSL_FUNC_signature_freectx_fn*                freectx;
-    OSSL_FUNC_signature_dupctx_fn*                 dupctx;
-    OSSL_FUNC_signature_get_ctx_params_fn*         get_ctx_params;
-    OSSL_FUNC_signature_gettable_ctx_params_fn*    gettable_ctx_params;
-    OSSL_FUNC_signature_set_ctx_params_fn*         set_ctx_params;
-    OSSL_FUNC_signature_settable_ctx_params_fn*    settable_ctx_params;
-    OSSL_FUNC_signature_get_ctx_md_params_fn*      get_ctx_md_params;
-    OSSL_FUNC_signature_gettable_ctx_md_params_fn* gettable_ctx_md_params;
-    OSSL_FUNC_signature_set_ctx_md_params_fn*      set_ctx_md_params;
-    OSSL_FUNC_signature_settable_ctx_md_params_fn* settable_ctx_md_params;
-} /* EVP_SIGNATURE */;
+// function taken from OpenSSL to support unimplemented functions
+static generic_dispatch_func get_dispatch_function(int func_id)
+{
+    const OSSL_DISPATCH* dispatch = get_default_signature_dispatch();
+    if (!dispatch) {
+        return NULL;
+    }
+    
+    for (int i = 0; dispatch[i].function_id != 0; i++) {
+        if (dispatch[i].function_id == func_id) {
+            return (generic_dispatch_func)dispatch[i].function;
+        }
+    }
+    return NULL;
+}
 
-// Structure taken from OpenSSL to support unimplemented functions
 typedef struct
 {
     OSSL_LIB_CTX* libctx;
@@ -132,25 +140,6 @@ typedef struct
 #define alcp_rsa_pss_restricted(prsactx)                                       \
     (prsactx->ossl_rsa_ctx->min_saltlen != -1)
 
-static inline EVP_SIGNATURE
-get_default_rsa_signature(void)
-{
-    static EVP_SIGNATURE signature_static;
-    static int           initilazed = 0;
-    if (!initilazed) {
-        EVP_SIGNATURE* signature = (EVP_SIGNATURE*)EVP_SIGNATURE_fetch(
-            NULL, "RSA", "provider=default");
-        if (signature) {
-            signature_static = *signature;
-            EVP_SIGNATURE_free((EVP_SIGNATURE*)signature);
-            initilazed = 1;
-        } else {
-            printf("EVP_SIGNATURE_fetch failed");
-        }
-    }
-    return signature_static;
-}
-
 static void*
 alcp_prov_rsa_new(void* provctx, const char* propq)
 {
@@ -166,8 +155,7 @@ alcp_prov_rsa_new(void* provctx, const char* propq)
     alc_error_t err         = alcp_rsa_request(&(prsactx->handle));
 
     typedef void* (*fun_ptr)(void* provctx, const char* propq);
-    fun_ptr fun;
-    fun = get_default_rsa_signature().newctx;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_NEWCTX);
 
     if (fun) {
         prsactx->ossl_rsa_ctx = fun(provctx, propq);
@@ -192,8 +180,7 @@ alcp_prov_rsa_set_ctx_params(void* vprsactx, const OSSL_PARAM params[])
     ENTER();
 
     typedef int (*fun_ptr)(void* provctx, const OSSL_PARAM params[]);
-    fun_ptr fun;
-    fun = get_default_rsa_signature().set_ctx_params;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS);
 
     int ret = 0;
     if (fun) {
@@ -251,9 +238,9 @@ alcp_rsa_signverify_init(void*            vprsactx,
         void* vprsactx, void* vrsa, const OSSL_PARAM params[]);
     fun_ptr fun;
     if (EVP_PKEY_OP_SIGN == operation) {
-        fun = get_default_rsa_signature().sign_init;
+        fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_SIGN_INIT);
     } else {
-        fun = get_default_rsa_signature().verify_init;
+        fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_VERIFY_INIT);
     }
     if (!fun)
         return 0;
@@ -337,9 +324,7 @@ alcp_prov_rsa_sign(void*                vprsactx,
                                size_t               sigsize,
                                const unsigned char* tbs,
                                size_t               tbslen);
-        fun_ptr fun;
-
-        fun = get_default_rsa_signature().sign;
+        fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_SIGN);
 
         if (!fun)
             return 0;
@@ -563,9 +548,7 @@ alcp_prov_rsa_verify(void*                vprsactx,
                                size_t               siglen,
                                const unsigned char* tbs,
                                size_t               tbslen);
-        fun_ptr fun;
-
-        fun = get_default_rsa_signature().verify;
+        fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_VERIFY);
 
         if (!fun)
             return 0;
@@ -643,10 +626,8 @@ alcp_prov_rsa_digest_sign_update(void*                vprsactx,
     alc_prov_rsa_ctx* prsactx = (alc_prov_rsa_ctx*)vprsactx;
     typedef int (*fun_ptr)(
         void* vprsactx, const unsigned char* data, size_t datalen);
-    fun_ptr fun;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_DIGEST_SIGN_UPDATE);
     ENTER();
-
-    fun = get_default_rsa_signature().digest_sign_update;
 
     if (!fun)
         return 0;
@@ -663,10 +644,8 @@ alcp_prov_rsa_digest_verify_update(void*                vprsactx,
 
     typedef int (*fun_ptr)(
         void* vprsactx, const unsigned char* data, size_t datalen);
-    fun_ptr fun;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_UPDATE);
     ENTER();
-    fun = get_default_rsa_signature().digest_verify_update;
-
     if (!fun)
         return 0;
     EXIT();
@@ -685,10 +664,8 @@ alcp_prov_rsa_digest_sign_init(void*            vprsactx,
                            const char*      mdname,
                            void*            vrsa,
                            const OSSL_PARAM params[]);
-    fun_ptr fun;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT);
     ENTER();
-    fun = get_default_rsa_signature().digest_sign_init;
-
     if (!fun)
         return 0;
 
@@ -752,9 +729,7 @@ alcp_prov_rsa_digest_sign_final(void*          vprsactx,
     if (rsasize != 256) {
         typedef int (*fun_ptr)(
             void* vprsactx, unsigned char* sig, size_t* siglen, size_t sigsize);
-        fun_ptr fun;
-
-        fun = get_default_rsa_signature().digest_sign_final;
+        fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL);
 
         if (!fun)
             return 0;
@@ -798,10 +773,8 @@ alcp_prov_rsa_digest_verify_init(void*            vprsactx,
                            const char*      mdname,
                            void*            vrsa,
                            const OSSL_PARAM params[]);
-    fun_ptr fun;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_INIT);
     ENTER();
-    fun = get_default_rsa_signature().digest_verify_init;
-
     if (!fun)
         return 0;
 
@@ -855,9 +828,7 @@ alcp_prov_rsa_digest_verify_final(void*                vprsactx,
     if (rsasize != 256) {
         typedef int (*fun_ptr)(
             void* vprsactx, const unsigned char* sig, size_t siglen);
-        fun_ptr fun;
-
-        fun = get_default_rsa_signature().digest_verify_final;
+        fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_FINAL);
 
         if (!fun)
             return 0;
@@ -888,9 +859,7 @@ alcp_prov_rsa_freectx(void* vprsactx)
         return;
 
     typedef void (*fun_ptr)(void* vprsactx);
-    fun_ptr fun;
-
-    fun = get_default_rsa_signature().freectx;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_FREECTX);
 
     if (fun)
         fun(prsactx->ossl_rsa_ctx);
@@ -915,9 +884,7 @@ alcp_prov_rsa_dupctx(void* vprsactx)
     dest_ctx->handle.context = OPENSSL_zalloc(size);
 
     typedef void* (*fun_ptr)(void* vprsactx);
-    fun_ptr fun;
-
-    fun = get_default_rsa_signature().dupctx;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_DUPCTX);
 
     if (fun)
         dest_ctx->ossl_rsa_ctx = fun(prsactx->ossl_rsa_ctx);
@@ -945,7 +912,7 @@ static int
 alcp_prov_rsa_get_ctx_params(void* vprsactx, OSSL_PARAM* params)
 {
     typedef int (*fun_ptr)(void* vprsactx, OSSL_PARAM* params);
-    fun_ptr fun = get_default_rsa_signature().get_ctx_params;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS);
     ENTER();
     if (!fun)
         return 0;
@@ -1007,7 +974,7 @@ static int
 alcp_prov_rsa_get_ctx_md_params(void* vprsactx, OSSL_PARAM* params)
 {
     typedef int (*fun_ptr)(void* vprsactx, OSSL_PARAM* params);
-    fun_ptr fun = get_default_rsa_signature().get_ctx_md_params;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_GET_CTX_MD_PARAMS);
     ENTER();
     if (!fun)
         return 0;
@@ -1020,7 +987,7 @@ static const OSSL_PARAM*
 alcp_prov_rsa_gettable_ctx_md_params(void* vprsactx)
 {
     typedef const OSSL_PARAM* (*fun_ptr)(void* vprsactx);
-    fun_ptr fun = get_default_rsa_signature().gettable_ctx_md_params;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_GETTABLE_CTX_MD_PARAMS);
     ENTER();
     if (!fun)
         return NULL;
@@ -1033,7 +1000,7 @@ static int
 alcp_prov_rsa_set_ctx_md_params(void* vprsactx, const OSSL_PARAM params[])
 {
     typedef int (*fun_ptr)(void* vprsactx, const OSSL_PARAM params[]);
-    fun_ptr fun = get_default_rsa_signature().set_ctx_md_params;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_SET_CTX_MD_PARAMS);
     ENTER();
     if (!fun)
         return 0;
@@ -1046,7 +1013,7 @@ static const OSSL_PARAM*
 alcp_prov_rsa_settable_ctx_md_params(void* vprsactx)
 {
     typedef const OSSL_PARAM* (*fun_ptr)(void* vprsactx);
-    fun_ptr fun = get_default_rsa_signature().settable_ctx_md_params;
+    fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_SETTABLE_CTX_MD_PARAMS);
     ENTER();
     if (!fun)
         return NULL;
