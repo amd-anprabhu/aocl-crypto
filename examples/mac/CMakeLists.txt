@@ -1,4 +1,4 @@
- # Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ # Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions are met:
@@ -22,12 +22,7 @@
  # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  # POSSIBILITY OF SUCH DAMAGE.
- 
-#INCLUDE_DIRECTORIES(
-#	${CMAKE_SOURCE_DIR}/include
-#	${CMAKE_SOURCE_DIR}/lib/include
-#	)
 
-ADD_C_EXAMPLE(hmac hmac.c)
-ADD_C_EXAMPLE(cmac cmac.c)
-ADD_C_EXAMPLE(poly1305 poly1305.c)
+ADD_EXAMPLE(hmac.c)
+ADD_EXAMPLE(cmac.c)
+ADD_EXAMPLE(poly1305.c)
