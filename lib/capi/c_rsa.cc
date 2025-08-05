@@ -48,7 +48,7 @@ Int32
 alcp_rsa_get_digest_info_index(alc_digest_mode_t mode)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
-    ALCP_DEBUG_LOG(LOG_INFO);
+    ALCP_DEBUG_LOG(LOG_INFO, "Mode %d", mode);
 #endif
     int index = 0;
     switch (mode) {
@@ -242,7 +242,7 @@ alc_error_t
 alcp_rsa_add_digest(const alc_rsa_handle_p pRsaHandle, alc_digest_mode_t mode)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
-    ALCP_DEBUG_LOG(LOG_INFO);
+    ALCP_DEBUG_LOG(LOG_INFO, "Mode %d", mode);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
     ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);

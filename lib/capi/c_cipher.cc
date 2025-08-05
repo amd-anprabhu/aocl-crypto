@@ -99,7 +99,7 @@ alcp_cipher_request(const alc_cipher_mode_t mode,
                     alc_cipher_handle_p     pCipherHandle)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
-    ALCP_DEBUG_LOG(LOG_DBG, "KeyLen %6ld", keyLen);
+    ALCP_DEBUG_LOG(LOG_DBG, "Mode %d, KeyLen %6ld", mode, keyLen);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
 

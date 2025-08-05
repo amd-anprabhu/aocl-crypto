@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -66,7 +66,7 @@ alcp_cipher_segment_request(const alc_cipher_mode_t mode,
                             alc_cipher_handle_p     pCipherHandle)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
-    ALCP_DEBUG_LOG(LOG_DBG, "KeyLen %6ld", keyLen);
+    ALCP_DEBUG_LOG(LOG_DBG, "Mode %d, KeyLen %6ld", mode, keyLen);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
 

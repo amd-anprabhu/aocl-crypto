@@ -83,7 +83,7 @@ alcp_cipher_aead_request(const alc_cipher_mode_t mode,
                          alc_cipher_handle_p     pCipherHandle)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
-    ALCP_DEBUG_LOG(LOG_DBG, "KeyLen %6ld", keyLen);
+    ALCP_DEBUG_LOG(LOG_DBG, "Mode %d, KeyLen %6ld", mode, keyLen);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
 
@@ -115,6 +115,9 @@ alcp_cipher_aead_request_with_extState(const alc_cipher_mode_t mode,
                                        alc_cipher_state_t*     pCipherState,
                                        alc_cipher_handle_p     pCipherHandle)
 {
+#ifdef ALCP_ENABLE_DEBUG_LOGGING
+    ALCP_DEBUG_LOG(LOG_DBG, "Mode %d, KeyLen %6ld", mode, keyLen);
+#endif
     alc_error_t err = ALC_ERROR_NONE;
 
     ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);

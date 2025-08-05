@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -51,7 +51,7 @@ alc_error_t
 alcp_digest_request(alc_digest_mode_t mode, alc_digest_handle_p pDigestHandle)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
-    ALCP_DEBUG_LOG(LOG_INFO);
+    ALCP_DEBUG_LOG(LOG_INFO, "Mode: %d", mode);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
 
