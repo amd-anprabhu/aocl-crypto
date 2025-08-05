@@ -32,9 +32,7 @@ ADD_EXAMPLE(aes-ccm.c)
 ADD_EXAMPLE(aes-siv.c)
 ADD_EXAMPLE(chacha20.c)
 ADD_EXAMPLE(aes-speed-cipher.c)
-
 #FIXME: this fails on non-avx512
-#ADD_EXAMPLE(aes-cbc-multibuffer.c)
-
+ADD_EXAMPLE(aes-multibuffer.c)
 ADD_EXAMPLE(aes-speed-gcm.c)
 ADD_EXAMPLE(chacha20-poly1305.c)
