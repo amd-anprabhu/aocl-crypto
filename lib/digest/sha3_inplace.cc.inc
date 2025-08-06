@@ -82,6 +82,9 @@ updateInterState(uint64_t C[cDim], uint64_t D[cDim], Uint64 state[cDim][cDim])
 
 // This is based on section 2.5 of "Keccak implementation overview"
 
+#if defined(__GNUC__) && !defined(__clang__) && !defined(_MSC_VER)
+__attribute__((optimize("no-var-tracking-assignments")))
+#endif
 static inline void
 fFunction(Uint64 state[cDim][cDim])
 {
