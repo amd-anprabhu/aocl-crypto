@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -101,7 +101,7 @@ ALCP_prov_alg_ccm_freectx(void* vctx)
 
     // free alcp
     if (ctx->handle.ch_context != NULL) {
-        alcp_cipher_finish(&(ctx->handle));
+        alcp_cipher_aead_finish(&(ctx->handle));
         OPENSSL_free(ctx->handle.ch_context);
         ctx->handle.ch_context = NULL;
     }
