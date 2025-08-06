@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -52,7 +52,7 @@ bool
 IPPEcdhBase::GeneratePublicKey(const alcp_ecdh_data_t& data)
 {
     mbx_status status = 0;
-    /* FIXME: this is because we are calling 8 elem buffer variant of ipp */
+    /* this is because we are calling 8 elem buffer variant of ipp */
     int elem = 8;
     if (data.m_Peer_PvtKey == NULL) {
         std::cout << "Pvt key data is null" << std::endl;
@@ -121,7 +121,6 @@ IPPEcdhBase::ComputeSecretKey(const alcp_ecdh_data_t& data_peer1,
             std::cout << "Pub key data is null" << std::endl;
             return false;
         }
-        /* FIXME: this is because we are calling 8 elem buffer variant of ipp */
 
         /* compute secret key using pub key of the other peer */
         status =

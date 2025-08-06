@@ -110,8 +110,7 @@ Rsa_Bench(benchmark::State&       state,
         /* for no padding, input size = key size */
         InputSize = KeySize;
     }
-    /*FIXME: keeping input const for now, a valid data for now */
-    std::vector<Uint8> input_data(InputSize, 30);
+    std::vector<Uint8> input_data(InputSize);
     std::vector<Uint8> encrypted_data(KeySize);
     std::vector<Uint8> decrypted_data(KeySize);
     std::vector<Uint8> PubKeyKeyMod(KeySize);

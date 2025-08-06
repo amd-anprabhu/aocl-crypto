@@ -119,11 +119,13 @@ class IPPCipherAeadBase : public CipherAeadBase
     bool decrypt(/*const Uint8* ciphertxt, size_t len, Uint8* plaintxt*/);
     bool decrypt(alcp_dc_ex_t& data);
     bool reset();
-    /* FIXME: not implemented as of now, cross tests are not designed for Cipher
-     * Context copy*/
     bool context_copy();
     bool flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len);
     bool dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len);
-    bool multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint8 ** pIv, Uint64 ivLen, Uint64 numBuffers);
+    bool multibufferInit(const Uint8*  pKey,
+                         Uint64        keyLen,
+                         const Uint8** pIv,
+                         Uint64        ivLen,
+                         Uint64        numBuffers);
 };
 } // namespace alcp::testing

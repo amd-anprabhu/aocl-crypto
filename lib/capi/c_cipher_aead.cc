@@ -195,7 +195,6 @@ alcp_cipher_aead_decrypt(const alc_cipher_handle_p pCipherHandle,
     return i->decrypt(pInput, pOutput, len);
 }
 
-// FIXME: alcp_cipher_init can be reused here as well.
 alc_error_t
 alcp_cipher_aead_init(const alc_cipher_handle_p pCipherHandle,
                       const Uint8*              pKey,

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -84,7 +84,6 @@ create_demo_session(alc_cipher_handle_p handle,
         printf("Error: Unable to Initalize \n");
         goto out;
     }
-    // FIXME: alcp_cipher_aead_int() to be added here
 
     return 0;
 

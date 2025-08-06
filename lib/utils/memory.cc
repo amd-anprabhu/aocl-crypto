@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -31,7 +31,7 @@
 #ifdef ALCP_BUILD_OS_LINUX
 #include <sys/mman.h>
 #else
-// FIXME: Windows header goes here
+// TODO: Windows header goes here
 #endif
 
 namespace alcp::utils {

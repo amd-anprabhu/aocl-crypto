@@ -254,7 +254,7 @@ INSTALL(DIRECTORY ${CMAKE_SOURCE_DIR}/include/alcp
 		)
 
 IF(UNIX AND ALCP_INSTALL_COMBINED_STATIC)
-		# FIXME: SUFIX Debug will be ignored
+		# FIXME: SUFFIX Debug will be ignored
 		INSTALL(FILES ${CMAKE_BINARY_DIR}/libalcp_static.a DESTINATION lib RENAME libalcp.a)
 ELSE()
 	INSTALL(TARGETS alcp_static)

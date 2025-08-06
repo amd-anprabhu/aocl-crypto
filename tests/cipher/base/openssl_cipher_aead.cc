@@ -749,7 +749,7 @@ OpenSSLCipherAeadBase::decrypt(alcp_dc_ex_t& data_in)
             }
         }
 
-        /* FIXME: Hack for test data when CT is NULL */
+        /* FIXME Hack for test data when CT is NULL */
         if (data.m_inl == 0) {
             data.m_out = &temp;
             data.m_in  = &temp;
@@ -781,20 +781,28 @@ OpenSSLCipherAeadBase::context_copy()
 }
 
 bool
-OpenSSLCipherAeadBase::flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len)
+OpenSSLCipherAeadBase::flush(const Uint8** pPlainText,
+                             Uint64        numBuffers,
+                             Uint64        len)
 {
     // Default implementation - return success
     return true;
 }
 
 bool
-OpenSSLCipherAeadBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len)
+OpenSSLCipherAeadBase::dequeue(Uint8** pCipherText,
+                               Uint64  numBuffers,
+                               Uint64  len)
 {
     // Default implementation - return success
     return true;
 }
 bool
-OpenSSLCipherAeadBase::multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint8 ** pIv, Uint64 ivLen, Uint64 numBuffers)
+OpenSSLCipherAeadBase::multibufferInit(const Uint8*  pKey,
+                                       Uint64        keyLen,
+                                       const Uint8** pIv,
+                                       Uint64        ivLen,
+                                       Uint64        numBuffers)
 {
     // Default implementation - return success
     return true;

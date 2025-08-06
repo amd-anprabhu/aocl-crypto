@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -291,7 +291,7 @@ CrossTestXTS(std::shared_ptr<RngBase> rng,
 // Reference :
 // https://google.github.io/googletest/advanced.html#registering-tests-programmatically
 
-// FIXME: We can move glow code to common code
+// TODO: We can move below code to common code
 class CrossTestFixture : public ::testing::Test
 {
   public:

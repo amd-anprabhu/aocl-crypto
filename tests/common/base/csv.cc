@@ -30,7 +30,7 @@
 
 namespace alcp::testing {
 
-// FIXME: Names can be captured from Header of CSV itself (Future
+// TODO: Names can be captured from Header of CSV itself (Future
 // Improvement)
 Csv::Csv(String filename)
     : File(filename)
@@ -101,7 +101,6 @@ Csv::getLineNumber()
     return m_lineno;
 }
 
-// FIXME: Simplify with parseCsv function
 bool
 Csv::genericParse()
 {

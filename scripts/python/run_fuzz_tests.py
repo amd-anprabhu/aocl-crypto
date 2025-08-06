@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+# Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -62,7 +62,7 @@ if not os.path.isdir(CorpusDir):
     os.mkdir(CorpusDir)
     print("Created corpus dir " + CorpusDir)
 
-# FIXME: accept this module as a param?
+# TODO: accept this module as a param?
 Fuzz_Targets = ['Cipher','Digest', 'Ec', 'Mac', 'rng', 'Rsa',]
 
 Fuzz_Executables = []

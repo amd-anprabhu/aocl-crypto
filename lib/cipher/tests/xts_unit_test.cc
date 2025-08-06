@@ -914,7 +914,6 @@ TEST(XTS, decrypt_huge_multi_update)
     }
 }
 
-// FIXME: Need to bring back this testing
 #if 1
 
 using namespace alcp::cipher;

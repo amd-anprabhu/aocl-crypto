@@ -25,7 +25,7 @@
 
 FUNCTION(ADD_EXAMPLE EXAMPLE_SOURCE)
     # Dynamic Example
-    # FIXME: to suppress false warnings from gcc (known issue)
+    # FIXME: to suppress false warnings from gcc (known issue, re-check with newer gcc versions)
     if(CMAKE_COMPILER_IS_GCC)
         set (ALCP_WARNINGS ${ALCP_WARNINGS} -Wno-format-overflow)
     endif()

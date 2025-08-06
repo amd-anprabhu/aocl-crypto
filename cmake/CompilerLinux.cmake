@@ -149,7 +149,6 @@ function(alcp_get_arch_cflags_zen3)
 endfunction(alcp_get_arch_cflags_zen3)
 
 # lib/arch/zen4 Compile Flags
-# FIXME: this function name has to change
 function(alcp_get_arch_cflags_zen4)
     set(ARCH_COMPILE_FLAGS
         -O3 -fPIC -march=znver3 -mavx -mavx2 -maes -mvaes -mpclmul -mavx512f -mavx512dq -mavx512ifma

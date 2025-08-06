@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -41,7 +41,6 @@ TestEcLifecycle(alc_ec_handle_p handle_peer1,
                 Uint64          key_size)
 {
     Uint64 secret_key_len_peer1, secret_key_len_peer2;
-    /* FIXME: this has to be changed once existing bugs are fixed */
     if (alcp_is_error(
             alcp_ec_set_privatekey(handle_peer1, &fuzz_pvtkey_data_peer1[0]))
         || alcp_is_error(

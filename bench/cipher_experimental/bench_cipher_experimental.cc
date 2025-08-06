@@ -105,7 +105,6 @@ BenchGcmCipherExperimental(benchmark::State&            state,
     alignas(16) Uint8 iv[16];
     alignas(16) Uint8 ad[16];
     alignas(16) Uint8 tag[16];
-    // FIXME: Tkey might be needed for XTS
 
     alc_test_gcm_init_data_t dataInit;
     dataInit.m_iv      = iv;
@@ -183,8 +182,6 @@ BenchXtsCipherExperimental(benchmark::State&            state,
     for (Uint32 i = 0; i < keylen / 8 * 2; i++) {
         key[i] = i;
     }
-
-    // FIXME: Tkey might be needed for XTS
 
     alc_test_xts_init_data_t dataInit;
     dataInit.m_iv      = iv;

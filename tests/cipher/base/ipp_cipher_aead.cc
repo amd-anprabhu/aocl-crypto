@@ -261,7 +261,7 @@ IPPCipherAeadBase::alcpCCMModeToFuncCall(alcp_dc_ex_t data, bool enc)
             return false;
         }
 
-        /* FIXME: Hack for test data when PT is NULL */
+        /* FIXME Hack for test data when PT is NULL */
         if (data.m_inl == 0) {
             data.m_out = &Temp;
             data.m_in  = data.m_out;
@@ -295,7 +295,7 @@ IPPCipherAeadBase::alcpCCMModeToFuncCall(alcp_dc_ex_t data, bool enc)
             return false;
         }
 
-        /* FIXME: Hack for test data when PT is NULL */
+        /* Hack for test data when PT is NULL */
         if (data.m_inl == 0) {
             data.m_out = &Temp;
             data.m_in  = data.m_out;

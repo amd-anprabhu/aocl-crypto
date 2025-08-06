@@ -47,7 +47,6 @@ using namespace alcp::testing;
 #include "hmac/openssl_hmac.hh"
 #endif
 
-/* FIXME: recheck these values */
 #define MAX_LOOP      1600
 #define INC_LOOP      1
 #define START_LOOP    1

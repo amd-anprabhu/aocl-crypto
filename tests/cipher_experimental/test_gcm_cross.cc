@@ -300,7 +300,7 @@ CrossTestGCM(std::shared_ptr<RngBase> rng,
 // Reference :
 // https://google.github.io/googletest/advanced.html#registering-tests-programmatically
 
-// FIXME: We can move glow code to common code
+// TODO: We can move below code to common code
 class CrossTestFixture : public ::testing::Test
 {
   public:

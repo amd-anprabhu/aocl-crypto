@@ -186,7 +186,6 @@ class CipherAeadTestingCore
         m_alcpMode      = alcpMode;
         m_cipherHandler = new CipherTesting();
         switch (lib) {
-                // FIXME: OpenSSL and IPP AEAD Bringup needed
             case LIB_TYPE::OPENSSL:
 #ifndef USE_OSSL
                 delete m_cipherHandler;
@@ -360,7 +359,6 @@ RunCipherKatTest(CipherTestingCore& testingCore,
                  int                keySize,
                  bool               CtxCopy)
 {
-    // FIXME: isxts and isgcm unused
     bool                 ret = false;
     alcp_dc_ex_t         data;
     std::shared_ptr<Csv> csv             = testingCore.getCsv();
@@ -697,7 +695,6 @@ CipherAeadKatTest(int keySize, encDec_t encDec, alc_cipher_mode_t mode)
         if ((testing_core.getCsv()->getVect("KEY").size() * 8) != key_size) {
             continue;
         }
-        // FIXME: Cipher Needs to be changed to AES as its only AES
         retval = RunCipherAeadKATTest(testing_core,
                                       encDec,
                                       encDecStr,
@@ -962,7 +959,6 @@ CipherCrossTest(int               keySize,
     }
 }
 
-// FIXME: In future we need a direct path to each aead modes
 /**
  * @brief funtion to avoid repeated code in every cross test, can only be
  * used for AES-CTR,AES-CBC,AES-OFB,AES-CFB

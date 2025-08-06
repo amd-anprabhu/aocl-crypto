@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -61,8 +61,6 @@ class Csv final : private File
     bool genericParse();
 
   public:
-    // FIXME: Names can be captured from Header of CSV itself (Future
-    // Improvement)
     Csv(String filename);
 
     bool readNext();
