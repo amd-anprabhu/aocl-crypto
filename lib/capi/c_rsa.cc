@@ -134,8 +134,8 @@ alcp_rsa_request(alc_rsa_handle_p pRsaHandle)
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, ALC_ERROR_NONE);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
 
@@ -154,13 +154,13 @@ alcp_rsa_publickey_encrypt(const alc_rsa_handle_p pRsaHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "TextSize %6ld", textSize);
 #endif
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, ALC_ERROR_NONE);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, ALC_ERROR_NONE);
-    ALCP_BAD_PTR_ERR_RET(pText, ALC_ERROR_NONE);
-    ALCP_BAD_PTR_ERR_RET(pEncText, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pText);
+    ALCP_BAD_PTR_ERR_RET(pEncText);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
     return ctx->encryptPublicFn(ctx->m_rsa, pText, textSize, pEncText);
 }
@@ -176,13 +176,13 @@ alcp_rsa_privatekey_decrypt(const alc_rsa_handle_p pRsaHandle,
     ALCP_DEBUG_LOG(LOG_DBG, "EncSize %6ld", encSize);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pEncText, err);
-    ALCP_BAD_PTR_ERR_RET(pText, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pEncText);
+    ALCP_BAD_PTR_ERR_RET(pText);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
     err = ctx->decryptPrivateFn(ctx->m_rsa, pEncText, encSize, pText);
     return err;
@@ -245,11 +245,11 @@ alcp_rsa_add_digest(const alc_rsa_handle_p pRsaHandle, alc_digest_mode_t mode)
     ALCP_DEBUG_LOG(LOG_INFO, "Mode %d", mode);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
     if (ctx->m_digest) {
         delete static_cast<digest::IDigest*>(ctx->m_digest);
@@ -273,11 +273,11 @@ alcp_rsa_add_mgf(const alc_rsa_handle_p pRsaHandle, alc_digest_mode_t mode)
 #endif
     using alcp::digest::IDigest;
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
     if (ctx->m_mgf) {
         delete static_cast<digest::IDigest*>(ctx->m_mgf);
@@ -306,18 +306,18 @@ alcp_rsa_publickey_encrypt_oaep(const alc_rsa_handle_p pRsaHandle,
     ALCP_DEBUG_LOG(LOG_DBG, "TextSize %ld,LabelSize %6ld", textSize, labelSize);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pText, err);
-    ALCP_BAD_PTR_ERR_RET(pEncText, err);
-    ALCP_BAD_PTR_ERR_RET(pSeed, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pText);
+    ALCP_BAD_PTR_ERR_RET(pEncText);
+    ALCP_BAD_PTR_ERR_RET(pSeed);
 
     if (label == nullptr && labelSize > 0) {
         return ALC_ERROR_NOT_PERMITTED;
     }
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
     if (!ctx->m_digest) {
         ctx->m_digest = new alcp::digest::Sha256;
@@ -348,18 +348,18 @@ alcp_rsa_privatekey_decrypt_oaep(const alc_rsa_handle_p pRsaHandle,
     ALCP_DEBUG_LOG(LOG_DBG, "EncSize %6ld,LabelSize %6ld", encSize, labelSize);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pEncText, err);
-    ALCP_BAD_PTR_ERR_RET(pText, err);
-    ALCP_BAD_PTR_ERR_RET(textSize, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pEncText);
+    ALCP_BAD_PTR_ERR_RET(pText);
+    ALCP_BAD_PTR_ERR_RET(textSize);
 
     if (label == nullptr && labelSize > 0) {
         return ALC_ERROR_NOT_PERMITTED;
     }
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
     err = ctx->decryptPrivateOaepFn(
         ctx->m_rsa, pEncText, encSize, label, labelSize, pText, *textSize);
@@ -380,17 +380,17 @@ alcp_rsa_privatekey_sign_pss(const alc_rsa_handle_p pRsaHandle,
 #endif
 
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pText, err);
-    ALCP_BAD_PTR_ERR_RET(pSignedBuff, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pText);
+    ALCP_BAD_PTR_ERR_RET(pSignedBuff);
 
     if (pSalt == nullptr && saltSize > 0) {
         return ALC_ERROR_NOT_PERMITTED;
     }
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
     err = ctx->signPrivatePssFn(
         ctx->m_rsa, check, pText, textSize, pSalt, saltSize, pSignedBuff);
@@ -407,13 +407,13 @@ alcp_rsa_publickey_verify_pss(const alc_rsa_handle_p pRsaHandle,
     ALCP_DEBUG_LOG(LOG_DBG, "TextSize %6ld", textSize);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pText, err);
-    ALCP_BAD_PTR_ERR_RET(pSignedBuff, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pText);
+    ALCP_BAD_PTR_ERR_RET(pSignedBuff);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
     err = ctx->verifyPublicPssFn(ctx->m_rsa, pText, textSize, pSignedBuff);
     return err;
@@ -431,17 +431,17 @@ alcp_rsa_privatekey_sign_hash_pss(const alc_rsa_handle_p pRsaHandle,
     ALCP_DEBUG_LOG(LOG_DBG, "SaltSize %6ld", saltSize);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pHash, err);
-    ALCP_BAD_PTR_ERR_RET(pSignedBuff, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pHash);
+    ALCP_BAD_PTR_ERR_RET(pSignedBuff);
 
     if (pSalt == nullptr && saltSize > 0) {
         return ALC_ERROR_NOT_PERMITTED;
     }
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
     err = ctx->signPrivatePssWithoutHashFn(
         ctx->m_rsa, pHash, hashSize, pSalt, saltSize, pSignedBuff);
@@ -458,13 +458,13 @@ alcp_rsa_publickey_verify_hash_pss(const alc_rsa_handle_p pRsaHandle,
     ALCP_DEBUG_LOG(LOG_DBG, "HashSize %6ld", hashSize);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pHash, err);
-    ALCP_BAD_PTR_ERR_RET(pSignedBuff, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pHash);
+    ALCP_BAD_PTR_ERR_RET(pSignedBuff);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
     err = ctx->verifyPublicPssWithoutHashFn(
         ctx->m_rsa, pHash, hashSize, pSignedBuff);
@@ -482,13 +482,13 @@ alcp_rsa_privatekey_sign_pkcs1v15(const alc_rsa_handle_p pRsaHandle,
     ALCP_DEBUG_LOG(LOG_DBG, "TextSize %6ld", textSize);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pText, err);
-    ALCP_BAD_PTR_ERR_RET(pSignedBuff, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pText);
+    ALCP_BAD_PTR_ERR_RET(pSignedBuff);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
     err = ctx->signPrivatePkcsv15Fn(
         ctx->m_rsa, check, pText, textSize, pSignedBuff);
@@ -505,13 +505,13 @@ alcp_rsa_publickey_verify_pkcs1v15(const alc_rsa_handle_p pRsaHandle,
     ALCP_DEBUG_LOG(LOG_DBG, "TextSize %6ld", textSize);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pText, err);
-    ALCP_BAD_PTR_ERR_RET(pSignedBuff, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pText);
+    ALCP_BAD_PTR_ERR_RET(pSignedBuff);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
     err = ctx->verifyPublicPkcsv15Fn(ctx->m_rsa, pText, textSize, pSignedBuff);
     return err;
@@ -527,14 +527,14 @@ alcp_rsa_privatekey_sign_hash_pkcs1v15(const alc_rsa_handle_p pRsaHandle,
     ALCP_DEBUG_LOG(LOG_DBG, "TextSize %6ld", textSize);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pText, err);
-    ALCP_BAD_PTR_ERR_RET(pSignedText, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pText);
+    ALCP_BAD_PTR_ERR_RET(pSignedText);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
 
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
     err = ctx->signPrivatePkcsv15WithoutHashFn(
         ctx->m_rsa, pText, textSize, pSignedText);
     return err;
@@ -549,13 +549,13 @@ alcp_rsa_privatekey_decrypt_pkcs1v15(const alc_rsa_handle_p pRsaHandle,
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pText, err);
-    ALCP_BAD_PTR_ERR_RET(pDecryptText, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pText);
+    ALCP_BAD_PTR_ERR_RET(pDecryptText);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
     err =
         ctx->decryptPrivatePkcsv15Fn(ctx->m_rsa, pText, pDecryptText, textSize);
@@ -571,18 +571,16 @@ alcp_rsa_publickey_verify_hash_pkcs1v15(const alc_rsa_handle_p pRsaHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "TextSize %6ld", textSize);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pText, err);
-    ALCP_BAD_PTR_ERR_RET(pSignedBuff, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pText);
+    ALCP_BAD_PTR_ERR_RET(pSignedBuff);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
-    err = ctx->verifyPublicPkcsv15WithoutHashFn(
+    return ctx->verifyPublicPkcsv15WithoutHashFn(
         ctx->m_rsa, pText, textSize, pSignedBuff);
-    return err;
 }
 
 ALCP_API_EXPORT alc_error_t
@@ -595,18 +593,16 @@ alcp_rsa_publickey_encrypt_pkcs1v15(const alc_rsa_handle_p pRsaHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "TextSize %6ld", textSize);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pText, err);
-    ALCP_BAD_PTR_ERR_RET(pEncryptText, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pText);
+    ALCP_BAD_PTR_ERR_RET(pEncryptText);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
-    err = ctx->encryptPublicPkcsv15Fn(
+    return ctx->encryptPublicPkcsv15Fn(
         ctx->m_rsa, pText, textSize, pEncryptText, randomPad);
-    return err;
 }
 
 Uint64
@@ -616,14 +612,16 @@ alcp_rsa_get_key_size(const alc_rsa_handle_p pRsaHandle)
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
     assert(pRsaHandle != nullptr);
+
+    /* FIXME, this should call ALCP_BAD_PTR_ERR_RET */
     if (pRsaHandle == nullptr) {
         return 0;
     }
 
     /* check if pRsaHandle->context is nullptr */
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, ALC_ERROR_INVALID_ARG);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
     return ctx->getKeySize(ctx->m_rsa);
 }
@@ -637,17 +635,14 @@ alcp_rsa_set_publickey(const alc_rsa_handle_p pRsaHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "KeySize %6ld", keySize);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pModulus, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pModulus);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
-    err = ctx->setPublicKey(ctx->m_rsa, exponent, pModulus, keySize);
-
-    return err;
+    return ctx->setPublicKey(ctx->m_rsa, exponent, pModulus, keySize);
 }
 
 alc_error_t
@@ -658,17 +653,14 @@ alcp_rsa_set_bignum_public_key(const alc_rsa_handle_p pRsaHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pModulus, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pModulus);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
-    err = ctx->setPublicKeyAsBignum(ctx->m_rsa, exponent, pModulus);
-
-    return err;
+    return ctx->setPublicKeyAsBignum(ctx->m_rsa, exponent, pModulus);
 }
 
 alc_error_t
@@ -684,23 +676,20 @@ alcp_rsa_set_privatekey(const alc_rsa_handle_p pRsaHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "KeySize %6ld", size);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(dp, err);
-    ALCP_BAD_PTR_ERR_RET(dq, err);
-    ALCP_BAD_PTR_ERR_RET(p, err);
-    ALCP_BAD_PTR_ERR_RET(q, err);
-    ALCP_BAD_PTR_ERR_RET(qinv, err);
-    ALCP_BAD_PTR_ERR_RET(mod, err);
-    ALCP_ZERO_LEN_ERR_RET(size, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(dp);
+    ALCP_BAD_PTR_ERR_RET(dq);
+    ALCP_BAD_PTR_ERR_RET(p);
+    ALCP_BAD_PTR_ERR_RET(q);
+    ALCP_BAD_PTR_ERR_RET(qinv);
+    ALCP_BAD_PTR_ERR_RET(mod);
+    ALCP_ZERO_LEN_ERR_RET(size);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
-    err = ctx->setPrivateKey(ctx->m_rsa, dp, dq, p, q, qinv, mod, size);
-
-    return err;
+    return ctx->setPrivateKey(ctx->m_rsa, dp, dq, p, q, qinv, mod, size);
 }
 
 alc_error_t
@@ -715,22 +704,19 @@ alcp_rsa_set_bignum_private_key(const alc_rsa_handle_p pRsaHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(dp, err);
-    ALCP_BAD_PTR_ERR_RET(dq, err);
-    ALCP_BAD_PTR_ERR_RET(p, err);
-    ALCP_BAD_PTR_ERR_RET(q, err);
-    ALCP_BAD_PTR_ERR_RET(qinv, err);
-    ALCP_BAD_PTR_ERR_RET(mod, err);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle);
+    ALCP_BAD_PTR_ERR_RET(pRsaHandle->context);
+    ALCP_BAD_PTR_ERR_RET(dp);
+    ALCP_BAD_PTR_ERR_RET(dq);
+    ALCP_BAD_PTR_ERR_RET(p);
+    ALCP_BAD_PTR_ERR_RET(q);
+    ALCP_BAD_PTR_ERR_RET(qinv);
+    ALCP_BAD_PTR_ERR_RET(mod);
 
     auto ctx = static_cast<rsa::Context*>(pRsaHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa, ALC_ERROR_NONE);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rsa);
 
-    err = ctx->setPrivateKeyAsBignum(ctx->m_rsa, dp, dq, p, q, qinv, mod);
-
-    return err;
+    return ctx->setPrivateKeyAsBignum(ctx->m_rsa, dp, dq, p, q, qinv, mod);
 }
 
 void
@@ -769,21 +755,19 @@ alcp_rsa_context_copy(const alc_rsa_handle_p pSrcHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pSrcHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pDestHandle, err);
+    ALCP_BAD_PTR_ERR_RET(pSrcHandle);
+    ALCP_BAD_PTR_ERR_RET(pDestHandle);
 
     auto src_ctx  = static_cast<rsa::Context*>(pSrcHandle->context);
     auto dest_ctx = static_cast<rsa::Context*>(pDestHandle->context);
 
-    ALCP_BAD_PTR_ERR_RET(src_ctx, err);
-    ALCP_BAD_PTR_ERR_RET(dest_ctx, err);
-    ALCP_BAD_PTR_ERR_RET(src_ctx->m_rsa, err);
+    ALCP_BAD_PTR_ERR_RET(src_ctx);
+    ALCP_BAD_PTR_ERR_RET(dest_ctx);
+    ALCP_BAD_PTR_ERR_RET(src_ctx->m_rsa);
 
     new (dest_ctx) rsa::Context;
 
-    err = src_ctx->duplicate(src_ctx, dest_ctx);
-    return err;
+    return src_ctx->duplicate(src_ctx, dest_ctx);
 }
 
 EXTERN_C_END

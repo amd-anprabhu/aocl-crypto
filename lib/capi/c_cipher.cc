@@ -103,13 +103,13 @@ alcp_cipher_request(const alc_cipher_mode_t mode,
 #endif
     alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     new (ctx) Context;
 
-    ALCP_ZERO_LEN_ERR_RET(keyLen, err);
+    ALCP_ZERO_LEN_ERR_RET(keyLen);
 
     auto alcpCipher       = new CipherFactory<iCipher>;
     ctx->m_cipher_factory = static_cast<void*>(alcpCipher);
@@ -134,25 +134,21 @@ alcp_cipher_encrypt(const alc_cipher_handle_p pCipherHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "PTLen %6ld", len);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
-    ALCP_BAD_PTR_ERR_RET(pPlainText, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherText, err);
-
-    ALCP_ZERO_LEN_ERR_RET(len, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(pPlainText);
+    ALCP_BAD_PTR_ERR_RET(pCipherText);
+    ALCP_ZERO_LEN_ERR_RET(len);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
         return ALC_ERROR_BAD_STATE;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
     auto i = static_cast<iCipher*>(ctx->m_cipher);
-    err    = i->encrypt(pPlainText, pCipherText, len);
-
-    return err;
+    return i->encrypt(pPlainText, pCipherText, len);
 }
+
 alc_error_t
 alcp_flush(const alc_cipher_handle_p pCipherHandle,
            const Uint8**             pPlainText,
@@ -162,20 +158,17 @@ alcp_flush(const alc_cipher_handle_p pCipherHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
         return ALC_ERROR_BAD_STATE;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
     auto i = static_cast<iCipher*>(ctx->m_cipher);
-    err    = i->flush(pPlainText, numBuffers, len);
-
-    return err;
+    return i->flush(pPlainText, numBuffers, len);
 }
 
 alc_error_t
@@ -187,22 +180,20 @@ alcp_dequeue(const alc_cipher_handle_p pCipherHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherText, err);
-    ALCP_ZERO_LEN_ERR_RET(len, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(pCipherText);
+    ALCP_ZERO_LEN_ERR_RET(len);
+
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
         return ALC_ERROR_BAD_STATE;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
 
     auto i = static_cast<iCipher*>(ctx->m_cipher);
-    err    = i->dequeue(pCipherText, numBuffers, len);
-
-    return err;
+    return i->dequeue(pCipherText, numBuffers, len);
 }
 
 alc_error_t
@@ -214,25 +205,23 @@ alcp_cipher_decrypt(const alc_cipher_handle_p pCipherHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "CTLen %6ld", len);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
-    ALCP_BAD_PTR_ERR_RET(pPlainText, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherText, err);
-    ALCP_ZERO_LEN_ERR_RET(len, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(pPlainText);
+    ALCP_BAD_PTR_ERR_RET(pCipherText);
+    ALCP_ZERO_LEN_ERR_RET(len);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
         return ALC_ERROR_BAD_STATE;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
 
     auto i = static_cast<iCipher*>(ctx->m_cipher);
-    err    = i->decrypt(pCipherText, pPlainText, len);
-
-    return err;
+    return i->decrypt(pCipherText, pPlainText, len);
 }
+
 alc_error_t
 alcp_multibuffer_init(const alc_cipher_handle_p pCipherHandle,
                       const Uint8*              pKey,
@@ -246,14 +235,14 @@ alcp_multibuffer_init(const alc_cipher_handle_p pCipherHandle,
 #endif
     alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
         return ALC_ERROR_BAD_STATE;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
 
     auto i = static_cast<iCipher*>(ctx->m_cipher);
 
@@ -278,14 +267,14 @@ alcp_cipher_init(const alc_cipher_handle_p pCipherHandle,
 #endif
     alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
         return ALC_ERROR_BAD_STATE;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
 
     auto i = static_cast<iCipher*>(ctx->m_cipher);
 
@@ -334,11 +323,10 @@ alcp_cipher_context_copy(const alc_cipher_handle_p pSrcCipherHandle,
 #endif
     alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pSrcCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pSrcCipherHandle->ch_context, err);
-
-    ALCP_BAD_PTR_ERR_RET(pDstCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pDstCipherHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pSrcCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pSrcCipherHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(pDstCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pDstCipherHandle->ch_context);
 
     auto src_ctx = static_cast<Context*>(pSrcCipherHandle->ch_context);
     auto dst_ctx = static_cast<Context*>(pDstCipherHandle->ch_context);
@@ -365,22 +353,18 @@ alcp_cipher_context_copy(const alc_cipher_handle_p pSrcCipherHandle,
         return ALC_ERROR_BAD_STATE;
     }
     // Validate cipher objects exist
-    ALCP_BAD_PTR_ERR_RET(src_ctx->m_cipher, err);
-    ALCP_BAD_PTR_ERR_RET(dst_ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(src_ctx->m_cipher);
+    ALCP_BAD_PTR_ERR_RET(dst_ctx->m_cipher);
 
     auto src_cipher = static_cast<iCipher*>(src_ctx->m_cipher);
     auto dst_cipher = static_cast<iCipher*>(dst_ctx->m_cipher);
     err             = src_cipher->CopyCtx(src_cipher, dst_cipher);
 
-    if (err != ALC_ERROR_NONE) {
-        return err;
-    }
-
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "Cipher context copied successfully");
 #endif
 
-    return ALC_ERROR_NONE;
+    return err;
 }
 
 EXTERN_C_END

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -56,12 +56,8 @@ alcp_drbg_supported(const alc_drbg_info_p pcDrbgInfo)
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pcDrbgInfo, err);
-    // FIXME: Implement Digest Support check
-    err = drbg::DrbgBuilder::isSupported(*pcDrbgInfo);
-
-    return err;
+    ALCP_BAD_PTR_ERR_RET(pcDrbgInfo);
+    return drbg::DrbgBuilder::isSupported(*pcDrbgInfo);
 }
 
 alc_error_t
@@ -71,17 +67,14 @@ alcp_drbg_request(alc_drbg_handle_p     pDrbgHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pDrbgHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pDrbgInfo, err);
-    ALCP_BAD_PTR_ERR_RET(pDrbgHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pDrbgHandle);
+    ALCP_BAD_PTR_ERR_RET(pDrbgInfo);
+    ALCP_BAD_PTR_ERR_RET(pDrbgHandle->ch_context);
 
     auto p_ctx = static_cast<drbg::Context*>(pDrbgHandle->ch_context);
     new (p_ctx) drbg::Context;
-    err = drbg::DrbgBuilder::build(*pDrbgInfo, *p_ctx);
-
-    return err;
+    return drbg::DrbgBuilder::build(*pDrbgInfo, *p_ctx);
 }
 
 alc_error_t
@@ -95,20 +88,17 @@ alcp_drbg_initialize(alc_drbg_handle_p pDrbgHandle,
                    "personalization_string_length %6ld",
                    personalization_string_length);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pDrbgHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pDrbgHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pDrbgHandle);
+    ALCP_BAD_PTR_ERR_RET(pDrbgHandle->ch_context);
 
     auto p_ctx = static_cast<drbg::Context*>(pDrbgHandle->ch_context);
-    ALCP_BAD_PTR_ERR_RET(p_ctx->m_drbg, err);
-    ALCP_BAD_PTR_ERR_RET(p_ctx->initialize, err);
+    ALCP_BAD_PTR_ERR_RET(p_ctx->m_drbg);
+    ALCP_BAD_PTR_ERR_RET(p_ctx->initialize);
 
-    err = p_ctx->initialize(p_ctx->m_drbg,
-                            cSecurityStrength,
-                            personalization_string,
-                            personalization_string_length);
-
-    return err;
+    return p_ctx->initialize(p_ctx->m_drbg,
+                             cSecurityStrength,
+                             personalization_string,
+                             personalization_string_length);
 }
 
 alc_error_t
@@ -127,22 +117,19 @@ alcp_drbg_randomize(alc_drbg_handle_p pDrbgHandle,
                    cSecurityStrength,
                    cAdditionalInputLength);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pDrbgHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pDrbgHandle->ch_context, err);
-    ALCP_BAD_PTR_ERR_RET(p_Output, err);
+    ALCP_BAD_PTR_ERR_RET(pDrbgHandle);
+    ALCP_BAD_PTR_ERR_RET(pDrbgHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(p_Output);
 
     auto p_ctx = static_cast<drbg::Context*>(pDrbgHandle->ch_context);
-    ALCP_BAD_PTR_ERR_RET(p_ctx->m_drbg, err);
-    ALCP_BAD_PTR_ERR_RET(p_ctx->randomize, err);
-    err = p_ctx->randomize(p_ctx->m_drbg,
-                           p_Output,
-                           cOutputLength,
-                           cSecurityStrength,
-                           cAdditionalInput,
-                           cAdditionalInputLength);
-
-    return err;
+    ALCP_BAD_PTR_ERR_RET(p_ctx->m_drbg);
+    ALCP_BAD_PTR_ERR_RET(p_ctx->randomize);
+    return p_ctx->randomize(p_ctx->m_drbg,
+                            p_Output,
+                            cOutputLength,
+                            cSecurityStrength,
+                            cAdditionalInput,
+                            cAdditionalInputLength);
 }
 
 alc_error_t
@@ -151,19 +138,18 @@ alcp_drbg_finish(alc_drbg_handle_p pDrbgHandle)
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pDrbgHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pDrbgHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pDrbgHandle);
+    ALCP_BAD_PTR_ERR_RET(pDrbgHandle->ch_context);
 
     auto p_ctx = static_cast<drbg::Context*>(pDrbgHandle->ch_context);
 
     if (p_ctx->m_drbg && p_ctx->finish) {
         p_ctx->finish(p_ctx->m_drbg);
     } else {
-        err = ALC_ERROR_EXISTS;
+        return ALC_ERROR_EXISTS;
     }
     p_ctx->~Context();
-    return err;
+    return ALC_ERROR_NONE;
 }
 } // namespace alcp::drbg
 EXTERN_C_END

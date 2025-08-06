@@ -113,9 +113,7 @@ template<typename ALGONAME>
 static alc_error_t
 __build_with_copy_sha(Context& srcCtx, Context& destCtx)
 {
-    alc_error_t err = ALC_ERROR_NONE;
-
-    ALCP_BAD_PTR_ERR_RET(srcCtx.m_digest, ALC_ERROR_INVALID_ARG);
+    ALCP_BAD_PTR_ERR_RET(srcCtx.m_digest);
 
     auto algo = new ALGONAME(*reinterpret_cast<ALGONAME*>(srcCtx.m_digest));
     destCtx.m_digest = static_cast<void*>(algo);
@@ -127,7 +125,7 @@ __build_with_copy_sha(Context& srcCtx, Context& destCtx)
     destCtx.duplicate    = srcCtx.duplicate;
     destCtx.shakeSqueeze = srcCtx.shakeSqueeze;
 
-    return err;
+    return ALC_ERROR_NONE;
 }
 
 template<typename ALGONAME>

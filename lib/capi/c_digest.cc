@@ -53,18 +53,14 @@ alcp_digest_request(alc_digest_mode_t mode, alc_digest_handle_p pDigestHandle)
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO, "Mode: %d", mode);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-
-    ALCP_BAD_PTR_ERR_RET(pDigestHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pDigestHandle->context, err);
+    ALCP_BAD_PTR_ERR_RET(pDigestHandle);
+    ALCP_BAD_PTR_ERR_RET(pDigestHandle->context);
 
     auto ctx = static_cast<digest::Context*>(pDigestHandle->context);
 
     new (ctx) digest::Context;
 
-    err = digest::DigestBuilder::Build(mode, *ctx);
-
-    return err;
+    return digest::DigestBuilder::Build(mode, *ctx);
 }
 
 alc_error_t
@@ -73,15 +69,13 @@ alcp_digest_init(alc_digest_handle_p pDigestHandle)
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pDigestHandle, err);
+    ALCP_BAD_PTR_ERR_RET(pDigestHandle);
 
     auto ctx = static_cast<digest::Context*>(pDigestHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx, err);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_digest, err);
+    ALCP_BAD_PTR_ERR_RET(ctx);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_digest);
 
-    err = ctx->init(ctx->m_digest);
-    return err;
+    return ctx->init(ctx->m_digest);
 }
 
 alc_error_t
@@ -92,17 +86,14 @@ alcp_digest_update(const alc_digest_handle_p pDigestHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "DigestSize %6ld", size);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pDigestHandle, err);
+    ALCP_BAD_PTR_ERR_RET(pDigestHandle);
 
     auto ctx = static_cast<digest::Context*>(pDigestHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx, err);
-    ALCP_BAD_PTR_ERR_RET(pMsgBuf, err);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_digest, err);
+    ALCP_BAD_PTR_ERR_RET(ctx);
+    ALCP_BAD_PTR_ERR_RET(pMsgBuf);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_digest);
 
-    err = ctx->update(ctx->m_digest, pMsgBuf, size);
-
-    return err;
+    return ctx->update(ctx->m_digest, pMsgBuf, size);
 }
 
 alc_error_t
@@ -113,16 +104,13 @@ alcp_digest_finalize(const alc_digest_handle_p pDigestHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "DigestSize %6ld", size);
 #endif
-    alc_error_t err;
-    ALCP_BAD_PTR_ERR_RET(pDigestHandle, err);
+    ALCP_BAD_PTR_ERR_RET(pDigestHandle);
 
     auto ctx = static_cast<digest::Context*>(pDigestHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx, err);
-    ALCP_BAD_PTR_ERR_RET(buf, err);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_digest, err);
-    err = ctx->finalize(ctx->m_digest, buf, size);
-
-    return err;
+    ALCP_BAD_PTR_ERR_RET(ctx);
+    ALCP_BAD_PTR_ERR_RET(buf);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_digest);
+    return ctx->finalize(ctx->m_digest, buf, size);
 }
 
 void
@@ -150,14 +138,15 @@ alcp_digest_shake_squeeze(const alc_digest_handle_p pDigestHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "DigestSize %6ld", size);
 #endif
-    ALCP_BAD_PTR_ERR_RET(pDigestHandle, err);
+    ALCP_BAD_PTR_ERR_RET(pDigestHandle);
 
     auto ctx = static_cast<digest::Context*>(pDigestHandle->context);
-    ALCP_BAD_PTR_ERR_RET(ctx, err);
-    ALCP_BAD_PTR_ERR_RET(pBuff, err);
-    ALCP_BAD_PTR_ERR_RET(ctx->m_digest, err);
+    ALCP_BAD_PTR_ERR_RET(ctx);
+    ALCP_BAD_PTR_ERR_RET(pBuff);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_digest);
 
     if (size == 0) {
+        /* FIXME this should return zerolen error*/
         return ALC_ERROR_NONE;
     }
 
@@ -175,14 +164,14 @@ alcp_digest_context_copy(const alc_digest_handle_p pSrcHandle,
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pSrcHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pDestHandle, err);
+    ALCP_BAD_PTR_ERR_RET(pSrcHandle);
+    ALCP_BAD_PTR_ERR_RET(pDestHandle);
 
     auto src_ctx  = static_cast<digest::Context*>(pSrcHandle->context);
     auto dest_ctx = static_cast<digest::Context*>(pDestHandle->context);
-    ALCP_BAD_PTR_ERR_RET(src_ctx, err);
-    ALCP_BAD_PTR_ERR_RET(dest_ctx, err);
-    ALCP_BAD_PTR_ERR_RET(src_ctx->m_digest, err);
+    ALCP_BAD_PTR_ERR_RET(src_ctx);
+    ALCP_BAD_PTR_ERR_RET(dest_ctx);
+    ALCP_BAD_PTR_ERR_RET(src_ctx->m_digest);
 
     new (dest_ctx) digest::Context;
 

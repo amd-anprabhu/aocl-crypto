@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -54,16 +54,12 @@ alcp_mac_request(alc_mac_handle_p pMacHandle, alc_mac_type_t mi_type)
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-
-    ALCP_BAD_PTR_ERR_RET(pMacHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pMacHandle);
+    ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context);
 
     auto p_ctx = static_cast<mac::Context*>(pMacHandle->ch_context);
     new (p_ctx) mac::Context;
-    err = mac::MacBuilder::build(mi_type, p_ctx);
-
-    return err;
+    return mac::MacBuilder::build(mi_type, p_ctx);
 }
 
 alc_error_t
@@ -72,14 +68,12 @@ alcp_mac_update(alc_mac_handle_p pMacHandle, const Uint8* buff, Uint64 size)
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "MacSize %6ld", size);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pMacHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pMacHandle);
+    ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context);
 
     auto p_ctx = static_cast<mac::Context*>(pMacHandle->ch_context);
 
-    err = p_ctx->update(p_ctx->m_mac, buff, size);
-    return err;
+    return p_ctx->update(p_ctx->m_mac, buff, size);
 }
 
 alc_error_t
@@ -88,14 +82,11 @@ alcp_mac_finalize(alc_mac_handle_p pMacHandle, Uint8* buff, Uint64 size)
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "MacSize %6ld", size);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-
-    ALCP_BAD_PTR_ERR_RET(pMacHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pMacHandle);
+    ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context);
 
     auto p_ctx = static_cast<mac::Context*>(pMacHandle->ch_context);
-    err        = p_ctx->finalize(p_ctx->m_mac, buff, size);
-    return err;
+    return p_ctx->finalize(p_ctx->m_mac, buff, size);
 }
 
 alc_error_t
@@ -104,16 +95,14 @@ alcp_mac_finish(alc_mac_handle_p pMacHandle)
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-
-    ALCP_BAD_PTR_ERR_RET(pMacHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pMacHandle);
+    ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context);
 
     auto p_ctx = static_cast<mac::Context*>(pMacHandle->ch_context);
     p_ctx->finish(p_ctx->m_mac, p_ctx->m_digest);
     p_ctx->~Context();
     // FIXME: This function is always returning no errors
-    return err;
+    return ALC_ERROR_NONE;
 }
 
 alc_error_t
@@ -122,15 +111,11 @@ alcp_mac_reset(alc_mac_handle_p pMacHandle)
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-
-    ALCP_BAD_PTR_ERR_RET(pMacHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pMacHandle);
+    ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context);
 
     auto p_ctx = static_cast<mac::Context*>(pMacHandle->ch_context);
-    err        = p_ctx->reset(p_ctx->m_mac);
-    // FIXME: This function is always returning no errors
-    return err;
+    return p_ctx->reset(p_ctx->m_mac);
 }
 
 alc_error_t
@@ -142,17 +127,12 @@ alcp_mac_init(alc_mac_handle_p pMacHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "KeySize %6ld", size);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-
-    ALCP_BAD_PTR_ERR_RET(pMacHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context, err);
-    ALCP_BAD_PTR_ERR_RET(key, err);
+    ALCP_BAD_PTR_ERR_RET(pMacHandle);
+    ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(key);
 
     auto p_ctx = static_cast<mac::Context*>(pMacHandle->ch_context);
-    err        = p_ctx->init(p_ctx, key, size, info);
-
-    // FIXME: This function is always returning no errors
-    return err;
+    return p_ctx->init(p_ctx, key, size, info);
 }
 
 alc_error_t
@@ -162,20 +142,17 @@ alcp_mac_context_copy(const alc_mac_handle_p pSrcHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pSrcHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pDestHandle, err);
+    ALCP_BAD_PTR_ERR_RET(pSrcHandle);
+    ALCP_BAD_PTR_ERR_RET(pDestHandle);
 
     auto src_ctx  = static_cast<mac::Context*>(pSrcHandle->ch_context);
     auto dest_ctx = static_cast<mac::Context*>(pDestHandle->ch_context);
 
-    ALCP_BAD_PTR_ERR_RET(src_ctx, err);
-    ALCP_BAD_PTR_ERR_RET(dest_ctx, err);
+    ALCP_BAD_PTR_ERR_RET(src_ctx);
+    ALCP_BAD_PTR_ERR_RET(dest_ctx);
 
     new (dest_ctx) mac::Context;
 
-    err = mac::MacBuilder::BuildWithCopy(src_ctx, dest_ctx);
-
-    return err;
+    return mac::MacBuilder::BuildWithCopy(src_ctx, dest_ctx);
 }
 EXTERN_C_END
