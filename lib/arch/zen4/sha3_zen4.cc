@@ -94,12 +94,13 @@ namespace alcp::digest { namespace zen4 {
         state[row][2] = _mm_cvtsi64_si128(para_state[row][4]);
     }
 
-    static inline void fFunction(Uint64        para_state[cDim][cDim],
-                                 const Uint64* pSrc,
-                                 const Uint64  chunk_size_u64,
-                                 const Uint64* pRoundConstants,
-                                 const Uint64 (*pRotationConstants)[5],
-                                 const Uint64 (*pRotationConstantsHarmonize)[5])
+    static inline void __attribute__((always_inline)) fFunction(
+        Uint64        para_state[cDim][cDim],
+        const Uint64* pSrc,
+        const Uint64  chunk_size_u64,
+        const Uint64* pRoundConstants,
+        const Uint64 (*pRotationConstants)[5],
+        const Uint64 (*pRotationConstantsHarmonize)[5])
     {
         // Loading data
         __m128i state[cDim][cRegs]{};
