@@ -69,49 +69,49 @@ class CipherTestingCore
   private:
     std::shared_ptr<Csv> m_csv;
 
-    // FIXME: Change these to unique_ptr
-    CipherTesting*    m_cipherHandler = {};
-    AlcpCipherBase*   m_acb           = {};
-    LIB_TYPE          m_lib{};
-    alc_cipher_mode_t m_alcpMode{};
+    std::unique_ptr<CipherTesting> m_cipherHandler =
+        std::make_unique<CipherTesting>();
+    std::unique_ptr<AlcpCipherBase> m_acb = nullptr;
+    LIB_TYPE                        m_lib{};
+    alc_cipher_mode_t               m_alcpMode{};
 #ifdef USE_IPP
-    IPPCipherBase* icb = nullptr;
+    std::unique_ptr<IPPCipherBase> icb = nullptr;
 #endif
 #ifdef USE_OSSL
-    OpenSSLCipherBase* ocb = nullptr;
+    std::unique_ptr<OpenSSLCipherBase> ocb = nullptr;
 #endif
   public:
     CipherTestingCore(LIB_TYPE lib, alc_cipher_mode_t alcpMode)
     {
         m_lib           = lib;
         m_alcpMode      = alcpMode;
-        m_cipherHandler = new CipherTesting();
+        m_cipherHandler = std::make_unique<CipherTesting>();
         switch (lib) {
             case LIB_TYPE::OPENSSL:
 #ifndef USE_OSSL
-                delete m_cipherHandler;
+                m_cipherHandler.reset();
                 throw "OpenSSL not available!";
 #else
-                ocb = new OpenSSLCipherBase(alcpMode, NULL);
-                m_cipherHandler->setcb(ocb);
+                ocb = std::make_unique<OpenSSLCipherBase>(alcpMode, nullptr);
+                m_cipherHandler->setcb(ocb.get());
 #endif
                 break;
             case LIB_TYPE::IPP:
 #ifndef USE_IPP
-                delete m_cipherHandler;
+                m_cipherHandler.reset();
                 throw "IPP not available!";
 #else
                 if (!useipp) {
-                    delete m_cipherHandler;
+                    m_cipherHandler.reset();
                     throw "IPP disabled!";
                 }
-                icb = new IPPCipherBase(alcpMode, NULL);
-                m_cipherHandler->setcb(icb);
+                icb = std::make_unique<IPPCipherBase>(alcpMode, nullptr);
+                m_cipherHandler->setcb(icb.get());
 #endif
                 break;
             case LIB_TYPE::ALCP:
-                m_acb = new AlcpCipherBase(alcpMode, NULL);
-                m_cipherHandler->setcb(m_acb);
+                m_acb = std::make_unique<AlcpCipherBase>(alcpMode, nullptr);
+                m_cipherHandler->setcb(m_acb.get());
                 break;
         }
     }
@@ -123,50 +123,44 @@ class CipherTestingCore
                                       + std::string(".csv"));
         // Initialize cipher testing classes
         /* alcpMode is valid only for AES schemes */
-        m_cipherHandler = new CipherTesting();
-        m_acb           = new AlcpCipherBase(alcpMode, NULL);
-        m_cipherHandler->setcb(m_acb);
+        m_cipherHandler = std::make_unique<CipherTesting>();
+        m_acb           = std::make_unique<AlcpCipherBase>(alcpMode, nullptr);
+        m_cipherHandler->setcb(m_acb.get());
 #ifdef USE_IPP
-        icb = new IPPCipherBase(alcpMode, NULL);
+        icb = std::make_unique<IPPCipherBase>(alcpMode, nullptr);
         if (useipp) {
             std::cout << "Using IPP" << std::endl;
-            m_cipherHandler->setcb(icb);
+            m_cipherHandler->setcb(icb.get());
         }
 #else
         if (useipp) {
-            printErrors("IPP is unavailable at the moment switching to ALCP!");
+            printErrors("IPP is unavailable, switching to ALCP!");
         }
 #endif
 #ifdef USE_OSSL
-        ocb = new OpenSSLCipherBase(alcpMode, NULL);
+        ocb = std::make_unique<OpenSSLCipherBase>(alcpMode, nullptr);
         if (useossl) {
             std::cout << "Using OpenSSL" << std::endl;
-            m_cipherHandler->setcb(ocb);
+            m_cipherHandler->setcb(ocb.get());
         }
 #else
         if (useossl) {
-            printErrors(
-                "OpenSSL is unavailable at the moment switching to ALCP!");
+            printErrors("OpenSSL is unavailable, switching to ALCP!");
         }
 #endif
     }
     ~CipherTestingCore()
     {
-        if (m_cipherHandler != nullptr)
-            delete m_cipherHandler;
-        if (m_acb != nullptr)
-            delete m_acb;
+        m_acb.reset();
 #ifdef USE_IPP
-        if (icb != nullptr)
-            delete icb;
+        icb.reset();
 #endif
 #ifdef USE_OSSL
-        if (ocb != nullptr)
-            delete ocb;
+        ocb.reset();
 #endif
     }
     std::shared_ptr<Csv> getCsv() { return m_csv; }
-    CipherTesting*       getCipherHandler() { return m_cipherHandler; }
+    CipherTesting*       getCipherHandler() { return m_cipherHandler.get(); }
 };
 
 class CipherAeadTestingCore
@@ -890,8 +884,10 @@ CipherCrossTest(int               keySize,
             }
 
             if (encDec == ENCRYPT) {
-                // The order of these calls are important in case of inplace buffer. 
-                //Hence first external library calls are placed followed by ALCP library calls
+                // The order of these calls are important in case of inplace
+                // buffer.
+                // Hence first external library calls are placed followed by
+                // ALCP library calls
                 ret = extTC->getCipherHandler()->testingEncrypt(data_ext, key);
                 if (!ret) {
                     std::cout << "ERROR: Enc: ext lib" << std::endl;
@@ -903,8 +899,10 @@ CipherCrossTest(int               keySize,
                     std::cout << "ERROR: Enc: ext lib" << std::endl;
                     FAIL();
                 }
-                ASSERT_TRUE(ArraysMatch(data_alc.m_out, data_ext.m_out,
-                                        data_alc.m_outl, data_ext.m_outl));
+                ASSERT_TRUE(ArraysMatch(data_alc.m_out,
+                                        data_ext.m_out,
+                                        data_alc.m_outl,
+                                        data_ext.m_outl));
                 if (verbose > 1) {
                     PrintCipherTestData(key, data_alc, mode);
                     PrintCipherTestData(key, data_ext, mode);
@@ -921,7 +919,10 @@ CipherCrossTest(int               keySize,
                     std::cout << "ERROR: Enc: Main lib" << std::endl;
                     FAIL();
                 }
-                ASSERT_TRUE(ArraysMatch(data_alc.m_out, data_ext.m_out,data_alc.m_outl,data_ext.m_outl));
+                ASSERT_TRUE(ArraysMatch(data_alc.m_out,
+                                        data_ext.m_out,
+                                        data_alc.m_outl,
+                                        data_ext.m_outl));
 
                 /* now decrypt, use the CT created after encryption, pass it on
                  * to decrypt as input */
@@ -947,8 +948,10 @@ CipherCrossTest(int               keySize,
                 // Check if the external library's output matches the plaintext
                 ASSERT_TRUE(ArraysMatch(out_ct_ext, out_pt));
                 // Check if the main library's output matches the plaintext
-                ASSERT_TRUE(ArraysMatch(data_alc.m_in, data_ext.m_in,
-                                        data_alc.m_inl, data_ext.m_outl));
+                ASSERT_TRUE(ArraysMatch(data_alc.m_in,
+                                        data_ext.m_in,
+                                        data_alc.m_inl,
+                                        data_ext.m_outl));
 
                 if (verbose > 1) {
                     PrintCipherTestData(key, data_alc, mode);
