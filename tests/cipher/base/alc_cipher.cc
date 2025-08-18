@@ -238,7 +238,12 @@ AlcpCipherBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len)
     alc_error_t err;
     err = alcp_dequeue(m_handle, pCipherText, numBuffers, len);
     if (alcp_is_error(err)) {
-        std::cout << "Error code in alcp_cipher_dequeue:" << err << std::endl;
+        if (err == ALC_ERROR_NO_FALLBACK) {
+            std::cout << "Not supported on non-avx512 architectures" << std::endl;
+        } else {
+            std::cout << "Error code in alcp_cipher_dequeue:" << err
+                      << std::endl;
+        }
         return false;
     }
     return true;

@@ -115,7 +115,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::dequeue(Uint8** pCipherText,
     }
 
     if (__builtin_expect(arch < CpuCipherFeatures::eVaes512, 0)) {
-        return ALC_ERROR_NOT_SUPPORTED;
+        return ALC_ERROR_NO_FALLBACK;
     }
     using EncryptWrapper = std::function<alc_error_t(
         int bufferIdx, int i, size_t numBuffers)>;

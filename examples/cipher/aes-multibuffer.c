@@ -236,7 +236,7 @@ alcp_aes_multibuffer_encrypt_demo(
     }
     
     err = alcp_dequeue(&handle, p_ciphertxt, num_buffers, len);
-    if (err == ALC_ERROR_NOT_SUPPORTED) {
+    if (err == ALC_ERROR_NOT_SUPPORTED || err == ALC_ERROR_NO_FALLBACK) {
         //printf("Unsupported on non-avx512 architectures\n");
         // Clean up memory and return but don't treat as error
         for (Uint32 i = 0; i < num_buffers; i++) {

@@ -331,6 +331,12 @@ typedef enum _alc_error_generic
      */
     ALC_ERROR_TAG_MISMATCH,
 
+    /*
+     * Algorithm is implimented for specific hardware only
+     * and no fallback implementaion is available
+     */
+    ALC_ERROR_NO_FALLBACK,
+
 } alc_error_generic_t;
 ```
 

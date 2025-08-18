@@ -307,11 +307,16 @@ TEST_P(AESMultibufferTest, MultibufferEncrypt)
     // Dequeue output data
     err =
         alcp_dequeue(&handle, output_pointers.data(), num_buffers, block_size);
-    if (err == ALC_ERROR_NOT_SUPPORTED) {
+    if (err == ALC_ERROR_NO_FALLBACK) {
         printf("Unsupported on non-avx512 architectures\n");
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
         GTEST_SKIP() << "Dequeue operation not supported on this architecture";
+    } else if (err == ALC_ERROR_NOT_SUPPORTED) {
+        printf("Unsupported AES mode\n");
+        alcp_cipher_finish(&handle);
+        free(handle.ch_context);
+        GTEST_SKIP() << "Dequeue operation not supported for this mode";
     } else if (alcp_is_error(err)) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
