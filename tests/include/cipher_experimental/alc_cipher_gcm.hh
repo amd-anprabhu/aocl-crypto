@@ -48,13 +48,7 @@ class AlcpGcmCipher : public ITestCipher
 
     bool finalize(alc_test_finalize_data_p data) override;
 
-    ~AlcpGcmCipher() override
-    {
-        if (m_handle.ch_context) {
-            free(m_handle.ch_context);
-            m_handle.ch_context = nullptr;
-        }
-    }
+    ~AlcpGcmCipher() = default;
 };
 
 } // namespace alcp::testing::cipher::gcm

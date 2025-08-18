@@ -75,10 +75,7 @@ BenchCipherExperimental(benchmark::State&            state,
     }
 
     // Cleanup
-    // FIXME: this needs fixes. If encrypt, after update test interface call,
-    // we should save the tag and use it in finalize, else the get tag call in
-    // finalize will fail.
-    no_err = iTestCipher->finalize(&dataFinalize);
+    no_err &= iTestCipher->finalize(&dataFinalize);
     // FIXME: 'finalize' does not need to be benched after multi-decrypt
     // operations on a single encrypted buffer.
     //  It errors out due to tag mismatches in case of openssl.Add error check
@@ -127,18 +124,18 @@ BenchGcmCipherExperimental(benchmark::State&            state,
     dataFinalize.m_tag_len      = 16;
     dataFinalize.m_tag          = tag;
     dataFinalize.verified       = false;
+
     if constexpr (encryptor == false) { // Decrypt
         // Create a vaid data for decryption (mainly tag and ct)
-        std::unique_ptr<ITestCipher> encryptCipher =
-            std::make_unique<AlcpGcmCipher<true>>();
+        iTestCipher = std::make_unique<AlcpGcmCipher<true>>();
         bool no_err = true;
-        no_err &= encryptCipher->init(&dataInit);
+        no_err &= iTestCipher->init(&dataInit);
         if (no_err == false) {
             state.SkipWithError("MicroBench: Initialization failed for decrypt "
                                 "ct,tag generation using encrypt");
             return -1;
         }
-        no_err &= encryptCipher->update(&dataUpdate);
+        no_err &= iTestCipher->update(&dataUpdate);
         if (no_err == false) {
             state.SkipWithError("MicroBench: Update failed for decrypt "
                                 "ct,tag generation using encrypt");
@@ -147,7 +144,7 @@ BenchGcmCipherExperimental(benchmark::State&            state,
         // After encrypting, to decrypt output becomes input
         dataUpdate.m_input  = output_text;
         dataUpdate.m_output = input_text;
-        no_err &= encryptCipher->finalize(&dataFinalize);
+        no_err &= iTestCipher->finalize(&dataFinalize);
         if (no_err == false) {
             state.SkipWithError("MicroBench: Finalize failed for decrypt "
                                 "ct,tag generation using encrypt");

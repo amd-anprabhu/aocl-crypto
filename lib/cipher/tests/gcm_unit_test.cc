@@ -414,11 +414,10 @@ TEST_P(GCM_KAT, Decrypt)
     }
     EXPECT_EQ(m_err, ALC_ERROR_NONE);
 
-    std::vector<Uint8> out_tag(m_tag.size(), 0);
+    // If there is tag, try to get the tag.
     if (!m_tag.empty()) {
-        m_err = pGcmObj->getTag(&(out_tag.at(0)), m_tag.size());
-        /* tag check is done internally, only check the error code here */
-        EXPECT_EQ(m_err, ALC_ERROR_TAG_MISMATCH);
+        m_err = pGcmObj->getTag(&(m_tag.at(0)), m_tag.size());
+        EXPECT_EQ(m_err, ALC_ERROR_NONE);
     }
 }
 
@@ -602,7 +601,6 @@ TEST(GCM, DecryptUpdateSingle)
                                0xff, 0x3c, 0x3b, 0x07, 0xa2, 0x4c, 0x62, 0xfe };
 
     std::vector<Uint8> out(48);
-    std::vector<Uint8> tag_out(16);
 
     auto alcpCipher = new CipherFactory<iCipherAead>;
     auto aead       = alcpCipher->create("aes-gcm-128");
@@ -621,9 +619,9 @@ TEST(GCM, DecryptUpdateSingle)
 
     EXPECT_EQ(out, ptext);
 
-    err = aead->getTag(getPtr(tag_out), 16);
-    /* tag check is done internally */
-    EXPECT_EQ(err, ALC_ERROR_TAG_MISMATCH);
+    err = aead->getTag(getPtr(tag), 16);
+
+    EXPECT_EQ(err, ALC_ERROR_NONE);
 
     delete alcpCipher;
 }
@@ -656,7 +654,6 @@ TEST(GCM, DecryptUpdateMultiple)
                                0xff, 0x3c, 0x3b, 0x07, 0xa2, 0x4c, 0x62, 0xfe };
 
     std::vector<Uint8> out(48);
-    std::vector<Uint8> tag_out(16);
 
     auto alcpCipher = new CipherFactory<iCipherAead>;
     auto aead       = alcpCipher->create("aes-gcm-128");
@@ -678,9 +675,9 @@ TEST(GCM, DecryptUpdateMultiple)
 
     EXPECT_EQ(out, ptext);
 
-    err = aead->getTag(getPtr(tag_out), 16);
-    /* tag check is done internally */
-    EXPECT_EQ(err, ALC_ERROR_TAG_MISMATCH);
+    err = aead->getTag(getPtr(tag), 16);
+
+    EXPECT_EQ(err, ALC_ERROR_NONE);
 
     delete alcpCipher;
 }

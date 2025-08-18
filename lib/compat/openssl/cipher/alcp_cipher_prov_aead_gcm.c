@@ -641,32 +641,37 @@ gcm_cipher_internal(ALCP_PROV_CIPHER_CTX* ctx,
         }
     } else {
         if (cipherctx->enc) {
-            cipherctx->tagLength =
-                EVP_GCM_TLS_TAG_LEN; // this is not done alcp side.
+            /* Use configured tag length if available, otherwise default to max */
+            if (cipherctx->tagLength == UNINITIALISED_SIZET) {
+                cipherctx->tagLength = GCM_TAG_MAX_SIZE;
+            }
+        } else {
+            /* The expected tag must have been provided via set_ctx_params */
+            if (cipherctx->tagLength == UNINITIALISED_SIZET)
+                goto err;
         }
-        /* The tag must be set before actually decrypting data */
-        if (!cipherctx->enc && cipherctx->tagLength == UNINITIALISED_SIZET)
-            goto err;
 #if PROV_GCM_DEBUG
         printf(" tag %lu \n", cipherctx->tagLength);
 #endif
 
-        Uint8 tagBuf[AES_BLOCK_SIZE];
-        if (cipherctx->enc) {
-            err = alcp_cipher_aead_get_tag(&(ctx->handle), tagBuf, cipherctx->tagLength);
-        }
-        else {
-            err = alcp_cipher_aead_get_tag(&(ctx->handle), cipherctx->buf, cipherctx->tagLength);
-        }
+        /* On encrypt: write computed tag into buf for get_ctx_params().
+           On decrypt: verify against expected tag already stored in buf. */
+        err = alcp_cipher_aead_get_tag(
+            &(ctx->handle), cipherctx->buf, cipherctx->tagLength);
         if (alcp_is_error(err)) {
             printf("Error: gcm getTag failed \n");
             goto err;
         }
-        
+#if 0
         if (cipherctx->enc) {
             memcpy(cipherctx->buf, tagBuf, cipherctx->tagLength);
+        } else {
+            if (memcmp(cipherctx->buf, tagBuf, cipherctx->tagLength)) {
+                printf("Error: gcm Tag mismatched \n");
+                goto err;
+            }
         }
-
+#endif
         cipherctx->ivState = IV_STATE_FINISHED; /* Don't reuse the IV */
         goto finish;
     }
@@ -777,15 +782,24 @@ alcp_gcm_one_shot(ALCP_PROV_CIPHER_CTX* ctx,
         goto err;
     }
 
-    cipherctx->tagLength = GCM_TAG_MAX_SIZE;
-    Uint8 tagBuf[GCM_TAG_MAX_SIZE];
-    err =
-        alcp_cipher_aead_get_tag(&(ctx->handle), tagBuf, cipherctx->tagLength);
+    /* Determine effective tag length */
+    size_t effective_tag_len = 0;
+    if (tag_len != 0) {
+        effective_tag_len = tag_len;
+    } else if (cipherctx->tagLength != UNINITIALISED_SIZET) {
+        effective_tag_len = cipherctx->tagLength;
+    } else {
+        effective_tag_len = GCM_TAG_MAX_SIZE;
+    }
+    cipherctx->tagLength = effective_tag_len;
+    /* On encryption, retrieve the computed tag directly into caller buffer */
+    /* On decryption, verify against the provided tag */
+    err = alcp_cipher_aead_get_tag(&(ctx->handle), tag, cipherctx->tagLength);
     if (alcp_is_error(err)) {
         printf("Error: gcm getTag failed \n");
         goto err;
     }
-
+#if 0
     if (cipherctx->enc) {
         memcpy(tag, tagBuf, cipherctx->tagLength);
     } else {
@@ -794,7 +808,7 @@ alcp_gcm_one_shot(ALCP_PROV_CIPHER_CTX* ctx,
             goto err;
         }
     }
-
+#endif
     ret = 1;
 
 err:
