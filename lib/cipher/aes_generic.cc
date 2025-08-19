@@ -117,8 +117,8 @@ AesGenericCiphersT<mode, keyLenBits, arch>::dequeue(Uint8** pCipherText,
     if (__builtin_expect(arch < CpuCipherFeatures::eVaes512, 0)) {
         return ALC_ERROR_NO_FALLBACK;
     }
-    using EncryptWrapper = std::function<alc_error_t(
-        int bufferIdx, int i, size_t numBuffers)>;
+    using EncryptWrapper =
+        std::function<alc_error_t(int bufferIdx, int i, size_t numBuffers)>;
 
     EncryptWrapper encryptWrapper[3];
 
@@ -192,7 +192,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::dequeue(Uint8** pCipherText,
     int processedBuffers = 0;
     for (int i = 7; i >= 0; i--) {
         if (numBuffers & (1ULL << i)) {
-            size_t      bufferCount = (1ULL << i);
+            size_t bufferCount = (1ULL << i);
 
             if (i == 0) {
                 err = encryptWrapper[0](processedBuffers, i, bufferCount);
@@ -218,10 +218,15 @@ template<alcp::cipher::CipherMode       mode,
 alc_error_t
 AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pinput,
                                                     Uint8*       pOutput,
-                                                    Uint64       len)
+                                                    Uint64       len,
+                                                    Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
-    m_isEnc_aes     = ALCP_ENC;
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen     = 0;
+    m_isEnc_aes = ALCP_ENC;
     if (!(m_isKeySet_aes)) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
@@ -241,12 +246,69 @@ AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pinput,
     }
 
     if constexpr (mode == CipherMode::eAesCBC) {
+#ifdef AES_MULTI_UPDATE
+        // Complete partial block if available
+        if (m_partial_len > 0 && len > 0) {
+            Uint32 need = 16U - m_partial_len;
+            Uint32 take = static_cast<Uint32>(len < static_cast<Uint64>(need)
+                                                  ? len
+                                                  : static_cast<Uint64>(need));
+            memcpy(m_partial_block + m_partial_len, pinput, take);
+            m_partial_len += take;
+            pinput += take;
+            len -= take;
+            if (m_partial_len == 16U) {
+                err = aesni::EncryptCbc(m_partial_block,
+                                        pOutput,
+                                        16,
+                                        m_cipher_key_data.m_enc_key,
+                                        getRounds(),
+                                        m_pIv_aes);
+                if (err != ALC_ERROR_NONE) {
+                    return err;
+                }
+                pOutput += 16;
+                *outlen += 16;
+                m_partial_len = 0;
+            }
+        }
+
+        // Process full blocks from remaining input
+        Uint64 fullBytes = (len / 16ULL) * 16ULL;
+        if (fullBytes > 0) {
+            err = aesni::EncryptCbc(pinput,
+                                    pOutput,
+                                    fullBytes,
+                                    m_cipher_key_data.m_enc_key,
+                                    getRounds(),
+                                    m_pIv_aes);
+            if (err != ALC_ERROR_NONE) {
+                return err;
+            }
+            pinput += fullBytes;
+            pOutput += fullBytes;
+            len -= fullBytes;
+            *outlen += fullBytes;
+        }
+
+        // Buffer trailing bytes (<16)
+        if (len > 0) {
+            memcpy(m_partial_block, pinput, static_cast<size_t>(len));
+            m_partial_len = static_cast<Uint32>(len);
+        }
+
+#else
         err = aesni::EncryptCbc(pinput,
                                 pOutput,
                                 len,
                                 m_cipher_key_data.m_enc_key,
                                 getRounds(),
                                 m_pIv_aes);
+        if (err != ALC_ERROR_NONE) {
+            return err;
+        }
+        *outlen = len; // Set output length for CBC mode
+#endif // AES_MULTI_UPDATE
     } else if constexpr (mode == CipherMode::eAesOFB) {
         err = aesni::EncryptOfb(pinput,
                                 pOutput,
@@ -285,6 +347,12 @@ AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pinput,
                                 getRounds(),
                                 m_pIv_aes);
     }
+
+    // Set output length for stream modes
+    if constexpr (mode != CipherMode::eAesCBC) {
+        *outlen = len;
+    }
+
     // WIP, other generic modes to be added.
     return err;
 }
@@ -295,10 +363,15 @@ template<alcp::cipher::CipherMode       mode,
 alc_error_t
 AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pinput,
                                                     Uint8*       pOutput,
-                                                    Uint64       len)
+                                                    Uint64       len,
+                                                    Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
-    m_isEnc_aes     = ALCP_DEC;
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen     = 0;
+    m_isEnc_aes = ALCP_DEC;
     if (!(m_isKeySet_aes)) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
@@ -312,8 +385,65 @@ AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pinput,
     }
 
     if constexpr (mode == CipherMode::eAesCBC) {
+#ifdef AES_MULTI_UPDATE
+        // 1) Complete partial block if available
+        if (m_partial_len > 0 && len > 0) {
+            Uint32 need = 16U - m_partial_len;
+            Uint32 take = static_cast<Uint32>(len < static_cast<Uint64>(need)
+                                                  ? len
+                                                  : static_cast<Uint64>(need));
+            memcpy(m_partial_block + m_partial_len, pinput, take);
+            m_partial_len += take;
+            pinput += take;
+            len -= take;
+            if (m_partial_len == 16U) {
+                err = alcp::cipher::tDecryptCbc<keyLenBits, arch>(
+                    m_partial_block,
+                    pOutput,
+                    16,
+                    m_cipher_key_data.m_dec_key,
+                    m_pIv_aes);
+                if (err != ALC_ERROR_NONE) {
+                    return err;
+                }
+                pOutput += 16;
+                *outlen += 16;
+                m_partial_len = 0;
+            }
+        }
+
+        // 2) Process full blocks from remaining input
+        Uint64 fullBytes = (len / 16ULL) * 16ULL;
+        if (fullBytes > 0) {
+            err = alcp::cipher::tDecryptCbc<keyLenBits, arch>(
+                pinput,
+                pOutput,
+                fullBytes,
+                m_cipher_key_data.m_dec_key,
+                m_pIv_aes);
+            if (err != ALC_ERROR_NONE) {
+                return err;
+            }
+            pinput += fullBytes;
+            pOutput += fullBytes;
+            len -= fullBytes;
+            *outlen += fullBytes;
+        }
+
+        // 3) Buffer trailing bytes (<16)
+        if (len > 0) {
+            memcpy(m_partial_block, pinput, static_cast<size_t>(len));
+            m_partial_len = static_cast<Uint32>(len);
+        }
+
+#else
         err = alcp::cipher::tDecryptCbc<keyLenBits, arch>(
             pinput, pOutput, len, m_cipher_key_data.m_dec_key, m_pIv_aes);
+        if (err != ALC_ERROR_NONE) {
+            return err;
+        }
+        *outlen = len; // Set output length for CBC mode
+#endif // AES_MULTI_UPDATE
     } else if constexpr (mode == CipherMode::eAesOFB) {
         err = aesni::DecryptOfb(pinput,
                                 pOutput,
@@ -352,6 +482,12 @@ AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pinput,
                                            getRounds(),
                                            m_pIv_aes);
     }
+
+    // Set output length for stream modes
+    if constexpr (mode != CipherMode::eAesCBC) {
+        *outlen = len;
+    }
+
     return err;
 }
 

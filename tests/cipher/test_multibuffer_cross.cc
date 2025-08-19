@@ -160,9 +160,14 @@ class AESMultibufferTest
             return expected;
         }
 
+        Uint64 outlen = 0;
+
         // Encrypt the plaintext
-        err = alcp_cipher_encrypt(
-            &handle, plaintext.data(), expected.data(), plaintext.size());
+        err = alcp_cipher_encrypt(&handle,
+                                  plaintext.data(),
+                                  expected.data(),
+                                  plaintext.size(),
+                                  &outlen);
         if (alcp_is_error(err)) {
             alcp_cipher_finish(&handle);
             free(handle.ch_context);

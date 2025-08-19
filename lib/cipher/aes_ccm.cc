@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -333,29 +333,59 @@ CcmHash::getTag(Uint8* pOutput, Uint64 tagLen)
 
 template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
 alc_error_t
-CcmT<keyLenBits, arch>::encrypt(const Uint8* pInput, Uint8* pOutput, Uint64 len)
+CcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
+                                Uint8*       pOutput,
+                                Uint64       len,
+                                Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
     m_isEnc_aes     = ALCP_ENC;
+
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen = 0;
+
     if (!(m_ivState_aes && m_isKeySet_aes)) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
     }
     err = Ccm::cryptUpdate(pInput, pOutput, len, 1);
+
+    // AEAD modes: output length equals input length on success
+    if (err == ALC_ERROR_NONE) {
+        *outlen = len;
+    }
+
     return err;
 }
 
 template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
 alc_error_t
-CcmT<keyLenBits, arch>::decrypt(const Uint8* pInput, Uint8* pOutput, Uint64 len)
+CcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
+                                Uint8*       pOutput,
+                                Uint64       len,
+                                Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
     m_isEnc_aes     = ALCP_DEC;
+
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen = 0;
+
     if (!(m_ivState_aes && m_isKeySet_aes)) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
     }
     err = Ccm::cryptUpdate(pInput, pOutput, len, 0);
+
+    // AEAD modes: output length equals input length on success
+    if (err == ALC_ERROR_NONE) {
+        *outlen = len;
+    }
+
     return err;
 }
 

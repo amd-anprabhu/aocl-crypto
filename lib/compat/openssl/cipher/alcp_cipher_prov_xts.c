@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -215,9 +215,9 @@ alc_prov_aes_xts_cipher(void*                vctx,
     alc_error_t err = ALC_ERROR_NONE;
 
     if (cipherctx->enc) {
-        err = alcp_cipher_encrypt(&(ctx->handle), in, out, inl);
+        err = alcp_cipher_encrypt(&(ctx->handle), in, out, inl, outl);
     } else {
-        err = alcp_cipher_decrypt(&(ctx->handle), in, out, inl);
+        err = alcp_cipher_decrypt(&(ctx->handle), in, out, inl, outl);
     }
     if (alcp_is_error(err)) {
         PRINT("CIPHER PROVIDER: Error in "

@@ -277,8 +277,8 @@ alcp_aes_multibuffer_decrypt_demo(
     Uint8*       plaintxt)
 {
     alc_error_t err;
-
-    err = alcp_cipher_decrypt(&handle, ciphertxt, plaintxt, len);
+    Uint64 outlen = 0;
+    err = alcp_cipher_decrypt(&handle, ciphertxt, plaintxt, len, &outlen);
     if (alcp_is_error(err)) {
         printf("Error: unable decrypt \n");
         return;

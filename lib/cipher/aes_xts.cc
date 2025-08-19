@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -178,9 +178,18 @@ Xts::expandTweakKeys(const Uint8* pKey, int len)
 template<alcp::cipher::CipherKeyLen     keyLenBits,
          alcp::utils::CpuCipherFeatures arch>
 alc_error_t
-XtsT<keyLenBits, arch>::encrypt(const Uint8* pinput, Uint8* pOutput, Uint64 len)
+XtsT<keyLenBits, arch>::encrypt(const Uint8* pinput,
+                                Uint8*       pOutput,
+                                Uint64       len,
+                                Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
+
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen = 0;
+
     if (!(m_ivState_aes && m_isKeySet_aes)) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
@@ -220,6 +229,12 @@ XtsT<keyLenBits, arch>::encrypt(const Uint8* pinput, Uint8* pOutput, Uint64 len)
                                 getRounds(),
                                 m_xts.m_tweak_block);
     }
+
+    // XTS is a block-aligned mode: output length equals input length on success
+    if (err == ALC_ERROR_NONE) {
+        *outlen = len;
+    }
+
     m_xts.m_aes_block_id += blocks_in;
     return err;
 };
@@ -227,9 +242,18 @@ XtsT<keyLenBits, arch>::encrypt(const Uint8* pinput, Uint8* pOutput, Uint64 len)
 template<alcp::cipher::CipherKeyLen     keyLenBits,
          alcp::utils::CpuCipherFeatures arch>
 alc_error_t
-XtsT<keyLenBits, arch>::decrypt(const Uint8* pinput, Uint8* pOutput, Uint64 len)
+XtsT<keyLenBits, arch>::decrypt(const Uint8* pinput,
+                                Uint8*       pOutput,
+                                Uint64       len,
+                                Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
+
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen = 0;
+
     if (!(m_ivState_aes && m_isKeySet_aes)) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
@@ -376,6 +400,48 @@ XtsBlockT<keyLenBits, arch>::decrypt(const Uint8* pinput,
     m_xts.m_aes_block_id += blocks_in;
     return err;
 };
+
+template<alcp::cipher::CipherKeyLen     keyLenBits,
+         alcp::utils::CpuCipherFeatures arch>
+alc_error_t
+XtsBlockT<keyLenBits, arch>::decrypt(const Uint8* pinput,
+                                     Uint8*       pOutput,
+                                     Uint64       len,
+                                     Uint64*      outlen)
+{
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen = 0;
+
+    // Delegate to the 3-arg decrypt to avoid code duplication
+    alc_error_t err = decrypt(pinput, pOutput, len);
+    if (err == ALC_ERROR_NONE) {
+        *outlen = len;
+    }
+    return err;
+};
+
+template<alcp::cipher::CipherKeyLen     keyLenBits,
+         alcp::utils::CpuCipherFeatures arch>
+alc_error_t
+XtsBlockT<keyLenBits, arch>::encrypt(const Uint8* pinput,
+                                     Uint8*       pOutput,
+                                     Uint64       len,
+                                     Uint64*      outlen)
+{
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen = 0;
+
+    // Delegate to the 3-arg encrypt to avoid code duplication
+    alc_error_t err = encrypt(pinput, pOutput, len);
+    if (err == ALC_ERROR_NONE) {
+        *outlen = len;
+    }
+    return err;
+}
 
 template<alcp::cipher::CipherKeyLen     keyLenBits,
          alcp::utils::CpuCipherFeatures arch>

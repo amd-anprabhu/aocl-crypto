@@ -49,6 +49,9 @@ main()
     Uint8* cipherText = new Uint8[dataLen];
     Uint8* outputText = new Uint8[dataLen];
 
+    Uint64 outlen  = 0;
+    Uint64 outlen2 = 0;
+
     memset(inputText, 10, dataLen);
 
     auto alcpCipher = new CipherFactory<iCipher>;
@@ -67,7 +70,7 @@ main()
     }
 
     // core encrypt
-    err = aesmode->encrypt(inputText, cipherText, dataLen);
+    err = aesmode->encrypt(inputText, cipherText, dataLen, &outlen);
     if (err != ALC_ERROR_NONE) {
         printf("\n cipher encrypt failed");
         goto dealloc;
@@ -81,7 +84,7 @@ main()
         goto dealloc;
     }
 
-    err = aesmode->decrypt(cipherText, outputText, dataLen);
+    err = aesmode->decrypt(cipherText, outputText, dataLen, &outlen2);
     if (err != ALC_ERROR_NONE) {
         printf("\n cipher encrypt failed");
         goto dealloc;

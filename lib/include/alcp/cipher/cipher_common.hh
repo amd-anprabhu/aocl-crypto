@@ -57,11 +57,13 @@ namespace alcp::cipher {
       public:                                                                  \
         alc_error_t encrypt(const Uint8* pPlainText,                           \
                             Uint8*       pCipherText,                          \
-                            Uint64       len) override;                              \
+                            Uint64       len,                                  \
+                            Uint64*      outlen) override;                          \
                                                                                \
         alc_error_t decrypt(const Uint8* pCipherText,                          \
                             Uint8*       pPlainText,                           \
-                            Uint64       len) override;                              \
+                            Uint64       len,                                  \
+                            Uint64*      outlen) override;                          \
         alc_error_t finish(const void*) override                               \
         {                                                                      \
             return ALC_ERROR_NONE;                                             \
@@ -70,8 +72,18 @@ namespace alcp::cipher {
         {                                                                      \
             return ALC_ERROR_NONE;                                             \
         };                                                                     \
-        alc_error_t flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len) override { return ALC_ERROR_NONE; } \
-        alc_error_t dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len) override { return ALC_ERROR_NONE; } \
+        alc_error_t flush(const Uint8** pPlainText,                            \
+                          Uint64        numBuffers,                            \
+                          Uint64        len) override                                 \
+        {                                                                      \
+            return ALC_ERROR_NONE;                                             \
+        }                                                                      \
+        alc_error_t dequeue(Uint8** pCipherText,                               \
+                            Uint64  numBuffers,                                \
+                            Uint64  len) override                               \
+        {                                                                      \
+            return ALC_ERROR_NONE;                                             \
+        }                                                                      \
     };
 
 // Macro to generate cipher authentication class

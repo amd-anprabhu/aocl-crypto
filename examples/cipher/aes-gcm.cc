@@ -51,6 +51,9 @@ main()
     Uint8* aad        = new Uint8[16];
     Uint8* tag        = new Uint8[16];
 
+    Uint64 outlen  = 0;
+    Uint64 outlen2 = 0;
+
     memset(inputText, 10, dataLen);
     memset(aad, 30, 16);
 
@@ -75,7 +78,7 @@ main()
         goto dealloc;
     }
 
-    err = aead->encrypt(inputText, cipherText, dataLen);
+    err = aead->encrypt(inputText, cipherText, dataLen, &outlen);
     if (err != ALC_ERROR_NONE) {
         printf("\n cipher encrypt failed\n");
         goto dealloc;
@@ -113,7 +116,7 @@ main()
     }
 
     // Decrypt
-    err = aead->decrypt(cipherText, outputText, dataLen);
+    err = aead->decrypt(cipherText, outputText, dataLen, &outlen2);
     if (err != ALC_ERROR_NONE) {
         printf("\n cipher decrypt failed\n");
         goto dealloc;

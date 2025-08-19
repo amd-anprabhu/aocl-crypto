@@ -374,13 +374,17 @@ TEST_P(GCM_KAT, Encrypt)
 
     // Encrypt the plaintext into ciphertext.
     if (!m_plaintext.empty()) {
-        m_err = pGcmObj->encrypt(
-            &(m_plaintext.at(0)), &(out_ciphertext.at(0)), m_plaintext.size());
+        Uint64 outlen = 0;
+        m_err         = pGcmObj->encrypt(&(m_plaintext.at(0)),
+                                 &(out_ciphertext.at(0)),
+                                 m_plaintext.size(),
+                                 &outlen);
         EXPECT_EQ(out_ciphertext, m_ciphertext);
     } else {
         // Call encrypt update with a valid memory if no plaintext
-        Uint8 a;
-        m_err = pGcmObj->encrypt(&a, &a, 0);
+        Uint8  a;
+        Uint64 outlen = 0;
+        m_err         = pGcmObj->encrypt(&a, &a, 0, &outlen);
     }
     EXPECT_EQ(m_err, ALC_ERROR_NONE);
 
@@ -404,13 +408,17 @@ TEST_P(GCM_KAT, Decrypt)
 
     // Decrypt the ciphertext into plaintext
     if (!m_ciphertext.empty()) {
-        m_err = pGcmObj->decrypt(
-            &(m_ciphertext.at(0)), &(out_plaintext.at(0)), m_ciphertext.size());
+        Uint64 outlen = 0;
+        m_err         = pGcmObj->decrypt(&(m_ciphertext.at(0)),
+                                 &(out_plaintext.at(0)),
+                                 m_ciphertext.size(),
+                                 &outlen);
         EXPECT_EQ(out_plaintext, m_plaintext);
     } else {
         // Call decrypt update with a valid memory if no plaintext
-        Uint8 a;
-        m_err = pGcmObj->decrypt(&a, &a, 0);
+        Uint8  a;
+        Uint64 outlen = 0;
+        m_err         = pGcmObj->decrypt(&a, &a, 0, &outlen);
     }
     EXPECT_EQ(m_err, ALC_ERROR_NONE);
 
@@ -450,7 +458,8 @@ TEST(GCM, InvalidTagLen)
 
     // Skipping Aad as its not mandatory
 
-    err = aead->encrypt(pt, cipherText, sizeof(pt));
+    Uint64 outlen = 0;
+    err           = aead->encrypt(pt, cipherText, sizeof(pt), &outlen);
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
     // TODO: Create a parametrized test
@@ -503,7 +512,8 @@ TEST(GCM, EncryptUpdateSingle)
     err = aead->setAad(getPtr(aad), aad.size());
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
-    err = aead->encrypt(getPtr(ptext), getPtr(out), ptext.size());
+    Uint64 outlen = 0;
+    err = aead->encrypt(getPtr(ptext), getPtr(out), ptext.size(), &outlen);
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
     EXPECT_EQ(out, ctext);
@@ -558,11 +568,15 @@ TEST(GCM, EncryptUpdateMultiple)
     err = aead->setAad(getPtr(aad), aad.size());
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
-    err = aead->encrypt(getPtr(ptext), getPtr(out), ptext.size() - 16);
+    Uint64 outlen = 0;
+    err = aead->encrypt(getPtr(ptext), getPtr(out), ptext.size() - 16, &outlen);
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
-    err = aead->encrypt(
-        getPtr(ptext) + ptext.size() - 16, getPtr(out) + ptext.size() - 16, 16);
+    Uint64 outlen2 = 0;
+    err            = aead->encrypt(getPtr(ptext) + ptext.size() - 16,
+                        getPtr(out) + ptext.size() - 16,
+                        16,
+                        &outlen2);
 
     EXPECT_EQ(out, ctext);
 
@@ -615,7 +629,8 @@ TEST(GCM, DecryptUpdateSingle)
     err = aead->setAad(getPtr(aad), aad.size());
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
-    err = aead->decrypt(&ctext[0], getPtr(out), ptext.size());
+    Uint64 outlen = 0;
+    err = aead->decrypt(&ctext[0], getPtr(out), ptext.size(), &outlen);
 
     EXPECT_EQ(out, ptext);
 
@@ -668,10 +683,14 @@ TEST(GCM, DecryptUpdateMultiple)
     err = aead->setAad(getPtr(aad), aad.size());
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
-    err = aead->decrypt(&ctext[0], getPtr(out), ctext.size() - 16);
+    Uint64 outlen = 0;
+    err = aead->decrypt(&ctext[0], getPtr(out), ctext.size() - 16, &outlen);
 
-    err = aead->decrypt(
-        &ctext[0] + ctext.size() - 16, getPtr(out) + ctext.size() - 16, 16);
+    Uint64 outlen2 = 0;
+    err            = aead->decrypt(&ctext[0] + ctext.size() - 16,
+                        getPtr(out) + ctext.size() - 16,
+                        16,
+                        &outlen2);
 
     EXPECT_EQ(out, ptext);
 

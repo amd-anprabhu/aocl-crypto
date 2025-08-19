@@ -171,7 +171,8 @@ aclp_aes_encrypt_demo(
 {
     alc_error_t err;
 
-    err = alcp_cipher_encrypt(&handle, plaintxt, ciphertxt, len);
+    Uint64 outlen = 0;
+    err = alcp_cipher_encrypt(&handle, plaintxt, ciphertxt, len, &outlen);
     if (alcp_is_error(err)) {
         printf("Error: unable encrypt \n");
         return;
@@ -186,7 +187,8 @@ aclp_aes_decrypt_demo(
 {
     alc_error_t err;
 
-    err = alcp_cipher_decrypt(&handle, ciphertxt, plaintxt, len);
+    Uint64 outlen = 0;
+    err = alcp_cipher_decrypt(&handle, ciphertxt, plaintxt, len, &outlen);
     if (alcp_is_error(err)) {
         printf("Error: unable decrypt \n");
         return;

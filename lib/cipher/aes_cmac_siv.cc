@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -300,7 +300,8 @@ template<alcp::cipher::CipherKeyLen     keyLenBits,
 alc_error_t
 SivT<keyLenBits, arch>::encrypt(const Uint8* pPlainText,
                                 Uint8*       pCipherText,
-                                Uint64       len)
+                                Uint64       len,
+                                Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
     // Mask Vector for disabling 2 bits in the counter
@@ -317,11 +318,18 @@ SivT<keyLenBits, arch>::encrypt(const Uint8* pPlainText,
         q[i] = m_cmacTemp[i] & q[i];
     }
     ctrobj->init(m_key2, (static_cast<Uint32>(keyLenBits)), q, 16);
-    err = ctrobj->encrypt(pPlainText, pCipherText, len + m_padLen);
+    Uint64 ctr_outlen = 0;
+    err = ctrobj->encrypt(pPlainText, pCipherText, len + m_padLen, &ctr_outlen);
     if (alcp_is_error(err)) {
         err = ALC_ERROR_BAD_STATE;
         return err;
     }
+
+    // AES-CMAC-SIV is an AEAD: output length equals input length on success
+    if (outlen != nullptr) {
+        *outlen = len;
+    }
+
     return err;
 }
 
@@ -330,7 +338,8 @@ template<alcp::cipher::CipherKeyLen     keyLenBits,
 alc_error_t
 SivT<keyLenBits, arch>::decrypt(const Uint8* pCipherText,
                                 Uint8*       pPlainText,
-                                Uint64       len)
+                                Uint64       len,
+                                Uint64*      outlen)
 
 {
     alc_error_t err = ALC_ERROR_NONE;
@@ -345,7 +354,8 @@ SivT<keyLenBits, arch>::decrypt(const Uint8* pCipherText,
     }
 
     ctrobj->init(m_key2, (static_cast<Uint32>(keyLenBits)), q, 16);
-    err = ctrobj->decrypt(pCipherText, pPlainText, len); //, mac);
+    Uint64 ctr_outlen = 0;
+    err = ctrobj->decrypt(pCipherText, pPlainText, len, &ctr_outlen); //, mac);
     if (alcp_is_error(err)) {
         err = ALC_ERROR_BAD_STATE;
         return err;
@@ -368,6 +378,12 @@ SivT<keyLenBits, arch>::decrypt(const Uint8* pCipherText,
         return ALC_ERROR_TAG_MISMATCH;
 #endif
     }
+
+    // AES-CMAC-SIV is an AEAD: output length equals input length on success
+    if (outlen != nullptr) {
+        *outlen = len;
+    }
+
     return err;
 }
 

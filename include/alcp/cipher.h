@@ -182,13 +182,16 @@ alcp_multibuffer_init(const alc_cipher_handle_p pCipherHandle,
  * @param[in]    pPlainText    Pointer to Plain Text
  * @param[out]   pCipherText   Pointer to Cipher Text
  * @param[in]    datalen           Length of cipher/plain text
+ * @param[out]   outlen        Pointer to store actual bytes written to
+ * pCipherText
  * @return   &nbsp; Error Code for the API called.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_cipher_encrypt(const alc_cipher_handle_p pCipherHandle,
                     const Uint8*              pPlainText,
                     Uint8*                    pCipherText,
-                    Uint64                    datalen);
+                    Uint64                    datalen,
+                    Uint64*                   outlen);
 
 /**
  * @brief    Decrypt the cipher text and write it to plain text with
@@ -202,16 +205,19 @@ alcp_cipher_encrypt(const alc_cipher_handle_p pCipherHandle,
  *           valid only if @ref alcp_is_error (ret) is false
  * @param[in]    pCipherHandle    Session handle for future encrypt decrypt
  *                         operation
- * @param[in]    pPlainText    Pointer to Plain Text
- * @param[out]   pCipherText   Pointer to Cipher Text
+ * @param[in]    pCipherText   Pointer to Cipher Text
+ * @param[out]   pPlainText    Pointer to Plain Text
  * @param[in]    datalen           Length of cipher/plain text
+ * @param[out]   outlen        Pointer to store actual bytes written to
+ * pPlainText
  * @return   &nbsp; Error Code for the API called.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_cipher_decrypt(const alc_cipher_handle_p pCipherHandle,
                     const Uint8*              pCipherText,
                     Uint8*                    pPlainText,
-                    Uint64                    datalen);
+                    Uint64                    datalen,
+                    Uint64*                   outlen);
 
 /**
  * @brief       Release resources allocated by alcp_cipher_request.

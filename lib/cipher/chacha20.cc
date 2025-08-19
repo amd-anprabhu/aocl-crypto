@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -34,19 +34,32 @@ namespace alcp::cipher {
 
 #define CHACHA_CRYPT_WRAPPER_FUNC(CLASS_NAME, WRAPPER_FUNC, FUNC_NAME)         \
     alc_error_t CLASS_NAME::WRAPPER_FUNC(                                      \
-        const Uint8* pInput, Uint8* pOutput, Uint64 len)                       \
+        const Uint8* pInput, Uint8* pOutput, Uint64 len, Uint64* outlen)       \
     {                                                                          \
-        alc_error_t err      = ALC_ERROR_NONE;                                 \
-        Uint64      blocks   = len / cMBlockSize;                              \
-        int         remBytes = len - (blocks * cMBlockSize);                   \
-        err                  = FUNC_NAME(m_key,                                \
-                        cMKeylen,                             \
-                        m_iv,                                 \
-                        cMIvlen,                              \
-                        pInput,                               \
-                        pOutput,                              \
-                        blocks,                               \
-                        remBytes);                            \
+        alc_error_t err = ALC_ERROR_NONE;                                      \
+                                                                               \
+        if (outlen == nullptr) {                                               \
+            return ALC_ERROR_INVALID_ARG;                                      \
+        }                                                                      \
+        *outlen = 0;                                                           \
+                                                                               \
+        Uint64 blocks   = len / cMBlockSize;                                   \
+        int    remBytes = len - (blocks * cMBlockSize);                        \
+        err             = FUNC_NAME(m_key,                                     \
+                        cMKeylen,                                  \
+                        m_iv,                                      \
+                        cMIvlen,                                   \
+                        pInput,                                    \
+                        pOutput,                                   \
+                        blocks,                                    \
+                        remBytes);                                 \
+                                                                               \
+        /* ChaCha20 is a stream cipher: output length equals input length on   \
+         * success */                                                          \
+        if (err == ALC_ERROR_NONE) {                                           \
+            *outlen = len;                                                     \
+        }                                                                      \
+                                                                               \
         /*err                  = FUNC_NAME(pInput, len, pOutput);*/            \
         return err;                                                            \
     }

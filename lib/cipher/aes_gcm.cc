@@ -175,10 +175,19 @@ GcmAuth::setTagLength(Uint64 tagLength)
 template<alcp::cipher::CipherKeyLen     keyLenBits,
          alcp::utils::CpuCipherFeatures arch>
 alc_error_t
-GcmT<keyLenBits, arch>::decrypt(const Uint8* pInput, Uint8* pOutput, Uint64 len)
+GcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
+                                Uint8*       pOutput,
+                                Uint64       len,
+                                Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
     m_isEnc_aes     = ALCP_DEC;
+
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen = 0;
+
     if (!(m_ivState_aes && m_isKeySet_aes)) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
@@ -200,6 +209,9 @@ GcmT<keyLenBits, arch>::decrypt(const Uint8* pInput, Uint8* pOutput, Uint64 len)
                                          m_cipher_key_data.m_enc_key,
                                          getRounds(),
                                          &m_gcm_ctx);
+            if (err == ALC_ERROR_NONE) {
+                *outlen = len;
+            }
             return err;
         } else if constexpr (keyLenBits
                              == alcp::cipher::CipherKeyLen::eKey192Bit) {
@@ -270,10 +282,19 @@ GcmT<keyLenBits, arch>::decrypt(const Uint8* pInput, Uint8* pOutput, Uint64 len)
 template<alcp::cipher::CipherKeyLen     keyLenBits,
          alcp::utils::CpuCipherFeatures arch>
 alc_error_t
-GcmT<keyLenBits, arch>::encrypt(const Uint8* pInput, Uint8* pOutput, Uint64 len)
+GcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
+                                Uint8*       pOutput,
+                                Uint64       len,
+                                Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
     m_isEnc_aes     = ALCP_ENC;
+
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen = 0;
+
     if (!(m_ivState_aes && m_isKeySet_aes)) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
@@ -296,6 +317,9 @@ GcmT<keyLenBits, arch>::encrypt(const Uint8* pInput, Uint8* pOutput, Uint64 len)
                                          m_cipher_key_data.m_enc_key,
                                          getRounds(),
                                          &m_gcm_ctx);
+            if (err == ALC_ERROR_NONE) {
+                *outlen = len;
+            }
             return err;
         } else if constexpr (keyLenBits
                              == alcp::cipher::CipherKeyLen::eKey192Bit) {

@@ -166,7 +166,11 @@ alcp_cipher_aead_encrypt(const alc_cipher_handle_p pCipherHandle,
 
     auto i = static_cast<iCipherAead*>(ctx->m_cipher);
 
-    return i->encrypt(pInput, pOutput, len);
+    // FIXME: Remove this variable when the AEAD CAPI changes are done.
+    Uint64      outlen = 0;
+    alc_error_t err    = i->encrypt(pInput, pOutput, len, &outlen);
+
+    return err;
 }
 
 alc_error_t
@@ -191,8 +195,12 @@ alcp_cipher_aead_decrypt(const alc_cipher_handle_p pCipherHandle,
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
 
     auto i = static_cast<iCipherAead*>(ctx->m_cipher);
-    // ALCP_BAD_PTR_ERR_RET(i->decrypt, err);
-    return i->decrypt(pInput, pOutput, len);
+
+    // FIXME: Remove this variable when the AEAD CAPI changes are done.
+    Uint64      outlen = 0;
+    alc_error_t err    = i->decrypt(pInput, pOutput, len, &outlen);
+
+    return err;
 }
 
 alc_error_t

@@ -330,7 +330,8 @@ namespace crypto {
                 return std::vector<Uint8>(0);
             }
 
-            err = aead->encrypt(getPtr(in), getPtr(out), in.size());
+            Uint64 outlen = 0;
+            err = aead->encrypt(getPtr(in), getPtr(out), in.size(), &outlen);
             if (err != ALC_ERROR_NONE) {
                 printf("Error: Unable to Encrypt \n");
                 delete alcpCipher;
@@ -370,7 +371,8 @@ namespace crypto {
                 return std::vector<Uint8>(0);
             }
 
-            err = aead->decrypt(getPtr(in), getPtr(out), in.size());
+            Uint64 outlen = 0;
+            err = aead->decrypt(getPtr(in), getPtr(out), in.size(), &outlen);
             if (err != ALC_ERROR_NONE) {
                 printf("Error: Unable to Encrypt \n");
                 delete alcpCipher;

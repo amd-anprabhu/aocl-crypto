@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -47,7 +47,7 @@ std::vector<Uint8> key = { 0x0d, 0x3c, 0x13, 0x53, 0xea, 0x0f, 0x01, 0x06,
                            0x83, 0x47, 0x98, 0xc8, 0x6d, 0x3d, 0xc7, 0x4e };
 const string cCipher   = "aes-ofb-128"; // Needs to be modified base on the key
 std::vector<Uint8> iv  = { 0xf6, 0xe5, 0x25, 0x16, 0x7d, 0xca, 0x50, 0xbf,
-                          0x1b, 0x9f, 0xb8, 0x13, 0xd2, 0xec, 0xab, 0x5e };
+                           0x1b, 0x9f, 0xb8, 0x13, 0xd2, 0xec, 0xab, 0x5e };
 std::vector<Uint8> plainText = {
     0x12, 0xb0, 0xe9, 0x9b, 0x7f, 0xf8, 0xc4, 0x6a, 0xb0, 0xae, 0x00, 0xf7,
     0xfb, 0x7a, 0xa7, 0x19, 0x3d, 0x0c, 0x87, 0xe9, 0x14, 0x01, 0x02, 0x62,
@@ -137,7 +137,8 @@ TEST(OFB, BasicEncryption)
 
     ofb->init(&key[0], 128, &iv[0], iv.size());
 
-    ofb->encrypt(&plainText[0], &output[0], plainText.size());
+    Uint64 outlen = 0;
+    ofb->encrypt(&plainText[0], &output[0], plainText.size(), &outlen);
 
     delete alcpCipher;
     EXPECT_EQ(cipherText, output);
@@ -156,7 +157,8 @@ TEST(OFB, BasicDecryption)
 
     ofb->init(&key[0], 128, &iv[0], iv.size());
 
-    ofb->decrypt(&cipherText[0], &output[0], cipherText.size());
+    Uint64 outlen = 0;
+    ofb->decrypt(&cipherText[0], &output[0], cipherText.size(), &outlen);
 
     delete alcpCipher;
     EXPECT_EQ(plainText, output);
@@ -183,9 +185,11 @@ TEST(OFB, MultiUpdateEncryption)
     }
 
     for (Uint64 i = 0; i < plainText.size() / 16; i++) {
-        err = ofb->encrypt(&plainText[0] + i * 16,
+        Uint64 outlen = 0;
+        err           = ofb->encrypt(&plainText[0] + i * 16,
                            &output[0] + i * 16,
-                           16); // 16 byte chunks
+                           16,
+                           &outlen); // 16 byte chunks
         if (alcp_is_error(err)) {
             std::cout << "Encrypt failed!" << std::endl;
         }
@@ -217,7 +221,9 @@ TEST(OFB, MultiUpdateDecryption)
     }
 
     for (Uint64 i = 0; i < plainText.size() / 16; i++) {
-        err = ofb->decrypt(&cipherText[0] + i * 16, &output[0] + i * 16, 16);
+        Uint64 outlen = 0;
+        err           = ofb->decrypt(
+            &cipherText[0] + i * 16, &output[0] + i * 16, 16, &outlen);
         if (alcp_is_error(err)) {
             std::cout << "Decrypt failed!" << std::endl;
         }
@@ -262,8 +268,11 @@ TEST(OFB, RandomEncryptDecryptTest)
             std::cout << "RANDOM_TEST: Init Failure!" << std::endl;
         }
 
-        s = ofb->encrypt(
-            &plainTextVect[0], &cipherText_vect[0], plainTextVect.size());
+        Uint64 outlen = 0;
+        s             = ofb->encrypt(&plainTextVect[0],
+                         &cipherText_vect[0],
+                         plainTextVect.size(),
+                         &outlen);
         if (s != ALC_ERROR_NONE) {
             std::cout << "RANDOM_TEST: Encrypt Failure!" << std::endl;
         }
@@ -273,8 +282,11 @@ TEST(OFB, RandomEncryptDecryptTest)
             std::cout << "RANDOM_TEST: Init Failure!" << std::endl;
         }
 
-        s = ofb->decrypt(
-            &cipherText_vect[0], &plainTextOut[0], plainTextVect.size());
+        Uint64 outlen2 = 0;
+        s              = ofb->decrypt(&cipherText_vect[0],
+                         &plainTextOut[0],
+                         plainTextVect.size(),
+                         &outlen2);
         if (s != ALC_ERROR_NONE) {
             std::cout << "RANDOM_TEST: Decrypt Failure!" << std::endl;
         }

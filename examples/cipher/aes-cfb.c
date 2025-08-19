@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2021-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -144,7 +144,8 @@ encrypt_demo(const Uint8* plaintxt,
     }
 
     // Encrypt the plaintext with the initialized key and iv
-    err = alcp_cipher_encrypt(&handle, plaintxt, ciphertxt, len);
+    Uint64 outlen = 0;
+    err = alcp_cipher_encrypt(&handle, plaintxt, ciphertxt, len, &outlen);
     if (alcp_is_error(err)) {
         printf("Error: Unable to Encrypt \n");
         return close_demo_session_exit();
@@ -184,7 +185,8 @@ decrypt_demo(const Uint8* ciphertxt,
     }
 
     // Decrypt the ciphertext with the initialized key and iv
-    err = alcp_cipher_decrypt(&handle, ciphertxt, plaintxt, len);
+    Uint64 outlen = 0;
+    err = alcp_cipher_decrypt(&handle, ciphertxt, plaintxt, len, &outlen);
     if (alcp_is_error(err)) {
         printf("Error: Unable to Decrypt \n");
         return close_demo_session_exit();

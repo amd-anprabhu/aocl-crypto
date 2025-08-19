@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -53,7 +53,8 @@ namespace vaes512 {
             return err;
         }
         std::fill(m_poly1305_key, m_poly1305_key + 32, 0);
-        err = ChaCha256::encrypt(m_poly1305_key, m_poly1305_key, 32);
+        Uint64 outlen = 0;
+        err = ChaCha256::encrypt(m_poly1305_key, m_poly1305_key, 32, &outlen);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
@@ -86,16 +87,25 @@ namespace vaes512 {
     /* chacha256::encrypt and poly::update to be fused */
     alc_error_t ChaChaPoly256::encrypt(const Uint8* inputBuffer,
                                        Uint8*       outputBuffer,
-                                       Uint64       bufferLength)
+                                       Uint64       bufferLength,
+                                       Uint64*      outlen)
     {
 
         alc_error_t err = ALC_ERROR_NONE;
         // set  Counter to 1
         (*(reinterpret_cast<Uint32*>(ChaCha256::m_iv))) += 1;
-        err = ChaCha256::encrypt(inputBuffer, outputBuffer, bufferLength);
+        Uint64 chacha_outlen = 0;
+        err                  = ChaCha256::encrypt(
+            inputBuffer, outputBuffer, bufferLength, &chacha_outlen);
 
         if (err != ALC_ERROR_NONE) {
             return err;
+        }
+
+        // ChaCha20-Poly1305 is an AEAD: output length equals input length on
+        // success
+        if (outlen != nullptr) {
+            *outlen = bufferLength;
         }
 
         m_len_input_processed.u64 += bufferLength;
@@ -139,15 +149,24 @@ namespace vaes512 {
 
     alc_error_t ChaChaPoly256::decrypt(const Uint8* inputBuffer,
                                        Uint8*       outputBuffer,
-                                       Uint64       bufferLength)
+                                       Uint64       bufferLength,
+                                       Uint64*      outlen)
     {
 
         alc_error_t err = ALC_ERROR_NONE;
         // set  Counter to 1
         (*(reinterpret_cast<Uint32*>(ChaCha256::m_iv))) += 1;
-        err = ChaCha256::encrypt(inputBuffer, outputBuffer, bufferLength);
+        Uint64 chacha_outlen = 0;
+        err                  = ChaCha256::encrypt(
+            inputBuffer, outputBuffer, bufferLength, &chacha_outlen);
         if (err != ALC_ERROR_NONE) {
             return err;
+        }
+
+        // ChaCha20-Poly1305 is an AEAD: output length equals input length on
+        // success
+        if (outlen != nullptr) {
+            *outlen = bufferLength;
         }
 
         m_len_input_processed.u64 += bufferLength;
@@ -237,7 +256,8 @@ namespace ref {
             return err;
         }
         std::fill(m_poly1305_key, m_poly1305_key + 32, 0);
-        err = ChaCha256::encrypt(m_poly1305_key, m_poly1305_key, 32);
+        Uint64 outlen = 0;
+        err = ChaCha256::encrypt(m_poly1305_key, m_poly1305_key, 32, &outlen);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
@@ -271,15 +291,24 @@ namespace ref {
     /* chacha256::encrypt and poly::update to be fused */
     alc_error_t ChaChaPoly256::encrypt(const Uint8* inputBuffer,
                                        Uint8*       outputBuffer,
-                                       Uint64       bufferLength)
+                                       Uint64       bufferLength,
+                                       Uint64*      outlen)
     {
         alc_error_t err = ALC_ERROR_NONE;
         // set  Counter to 1
         (*(reinterpret_cast<Uint32*>(ChaCha256::m_iv))) += 1;
-        err = ChaCha256::encrypt(inputBuffer, outputBuffer, bufferLength);
+        Uint64 chacha_outlen = 0;
+        err                  = ChaCha256::encrypt(
+            inputBuffer, outputBuffer, bufferLength, &chacha_outlen);
 
         if (err != ALC_ERROR_NONE) {
             return err;
+        }
+
+        // ChaCha20-Poly1305 is an AEAD: output length equals input length on
+        // success
+        if (outlen != nullptr) {
+            *outlen = bufferLength;
         }
 
         m_len_input_processed.u64 += bufferLength;
@@ -322,16 +351,25 @@ namespace ref {
 
     alc_error_t ChaChaPoly256::decrypt(const Uint8* inputBuffer,
                                        Uint8*       outputBuffer,
-                                       Uint64       bufferLength)
+                                       Uint64       bufferLength,
+                                       Uint64*      outlen)
     {
 
         alc_error_t err = ALC_ERROR_NONE;
         // set  Counter to 1
         (*(reinterpret_cast<Uint32*>(ChaCha256::m_iv))) += 1;
-        err = ChaCha256::encrypt(inputBuffer, outputBuffer, bufferLength);
+        Uint64 chacha_outlen = 0;
+        err                  = ChaCha256::encrypt(
+            inputBuffer, outputBuffer, bufferLength, &chacha_outlen);
 
         if (err != ALC_ERROR_NONE) {
             return err;
+        }
+
+        // ChaCha20-Poly1305 is an AEAD: output length equals input length on
+        // success
+        if (outlen != nullptr) {
+            *outlen = bufferLength;
         }
 
         m_len_input_processed.u64 += bufferLength;

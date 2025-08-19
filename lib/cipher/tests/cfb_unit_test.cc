@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -46,7 +46,7 @@ std::vector<Uint8> key = { 0x4b, 0x59, 0x9b, 0x08, 0x42, 0x1c, 0x8e, 0xe5,
                            0x15, 0x23, 0xd4, 0xdf, 0x99, 0x51, 0x3d, 0x08 };
 const string cCipher   = "aes-cfb-128"; // Needs to be modified base on the key
 std::vector<Uint8> iv  = { 0x59, 0x97, 0x56, 0xcd, 0x45, 0x6b, 0xbf, 0x6f,
-                          0x8a, 0x79, 0x0e, 0x99, 0xcb, 0x9c, 0x0f, 0x83 };
+                           0x8a, 0x79, 0x0e, 0x99, 0xcb, 0x9c, 0x0f, 0x83 };
 std::vector<Uint8> plainText = {
     0xa9, 0xd6, 0x49, 0x1d, 0xbc, 0x25, 0x45, 0xc5, 0xdf, 0x7b, 0xb3, 0xe6,
     0x42, 0xf2, 0x2c, 0x89, 0x69, 0x6a, 0x1b, 0x6c, 0x0a, 0x1c, 0x39, 0x58,
@@ -145,7 +145,8 @@ TEST(CFB, BasicEncryption)
 
     cfb->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
-    cfb->encrypt(&plainText[0], &output[0], plainText.size());
+    Uint64 outlen = 0;
+    cfb->encrypt(&plainText[0], &output[0], plainText.size(), &outlen);
 
     delete alcpCipher;
     EXPECT_EQ(cipherText, output);
@@ -165,7 +166,8 @@ TEST(CFB, BasicDecryption)
 
     cfb->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
-    cfb->decrypt(&cipherText[0], &output[0], cipherText.size());
+    Uint64 outlen = 0;
+    cfb->decrypt(&cipherText[0], &output[0], cipherText.size(), &outlen);
 
     delete alcpCipher;
     EXPECT_EQ(plainText, output);
@@ -188,8 +190,11 @@ TEST(CFB, MultiUpdateEncryption)
     alc_error_t err = cfb->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
     for (Uint64 i = 0; i < plainText.size() / 16; i++) {
-        err = cfb->encrypt(
-            &plainText[0] + i * 16, &output[0] + i * 16, 16); // 16 byte chunks
+        Uint64 outlen = 0;
+        err           = cfb->encrypt(&plainText[0] + i * 16,
+                           &output[0] + i * 16,
+                           16,
+                           &outlen); // 16 byte chunks
         if (alcp_is_error(err)) {
             std::cout << "Encrypt failed!" << std::endl;
         }
@@ -225,8 +230,9 @@ TEST(CFB, MultiUpdateDecryption)
         }
 
         for (Uint64 i = 0; i < plainText.size() / 16; i++) {
-            err =
-                cfb->decrypt(&cipherText[0] + i * 16, &output[0] + i * 16, 16);
+            Uint64 outlen = 0;
+            err           = cfb->decrypt(
+                &cipherText[0] + i * 16, &output[0] + i * 16, 16, &outlen);
             if (alcp_is_error(err)) {
                 std::cout << "Decrypt failed!" << std::endl;
             }
@@ -242,9 +248,9 @@ TEST(CFB, MultiUpdateDecryption)
 TEST(CFB, RandomEncryptDecryptTest)
 {
     Uint8        key_256[32] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-                          0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-                          0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-                          0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe };
+                                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe };
     const Uint64 cTextSize   = 100000;
     std::vector<Uint8> plain_text_vect(cTextSize);
     std::vector<Uint8> cipher_text_vect(cTextSize);
@@ -281,13 +287,19 @@ TEST(CFB, RandomEncryptDecryptTest)
             }
             cfb->init(key_256, 256, &iv[0], sizeof(iv));
 
-            cfb->encrypt(
-                &plainTextVect[0], &cipher_text_vect[0], plainTextVect.size());
+            Uint64 outlen = 0;
+            cfb->encrypt(&plainTextVect[0],
+                         &cipher_text_vect[0],
+                         plainTextVect.size(),
+                         &outlen);
 
             cfb->init(key_256, 256, &iv[0], sizeof(iv));
 
-            cfb->decrypt(
-                &cipher_text_vect[0], &plainTextOut[0], plainTextVect.size());
+            outlen = 0;
+            cfb->decrypt(&cipher_text_vect[0],
+                         &plainTextOut[0],
+                         plainTextVect.size(),
+                         &outlen);
 
             EXPECT_EQ(plainTextVect, plainTextOut);
 

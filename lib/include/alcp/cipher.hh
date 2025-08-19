@@ -88,20 +88,30 @@ namespace alcp { namespace cipher {
         virtual alc_error_t init(const Uint8* pKey,
                                  Uint64       keyLen,
                                  const Uint8* pIv,
-                                 Uint64       ivLen)  = 0;
+                                 Uint64       ivLen)      = 0;
         virtual alc_error_t decrypt(const Uint8* pSrc,
                                     Uint8*       pDst,
-                                    Uint64       len) = 0;
+                                    Uint64       len,
+                                    Uint64*      outlen) = 0;
         virtual alc_error_t encrypt(const Uint8* pSrt,
                                     Uint8*       pDrc,
-                                    Uint64       len) = 0;
+                                    Uint64       len,
+                                    Uint64*      outlen) = 0;
 
         virtual alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) = 0;
 
-        virtual alc_error_t finish(const void*) = 0;
-        virtual alc_error_t multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint8 ** pIv, Uint64 ivLen, Uint64 numBuffers) = 0;
-        virtual alc_error_t flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len) = 0;
-        virtual alc_error_t dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len) = 0;
+        virtual alc_error_t finish(const void*)                = 0;
+        virtual alc_error_t multibufferInit(const Uint8*  pKey,
+                                            Uint64        keyLen,
+                                            const Uint8** pIv,
+                                            Uint64        ivLen,
+                                            Uint64        numBuffers) = 0;
+        virtual alc_error_t flush(const Uint8** pPlainText,
+                                  Uint64        numBuffers,
+                                  Uint64        len)                  = 0;
+        virtual alc_error_t dequeue(Uint8** pCipherText,
+                                    Uint64  numBuffers,
+                                    Uint64  len)                = 0;
     };
 
     // iCipher segments
@@ -159,9 +169,13 @@ namespace alcp { namespace cipher {
                                      // modes
     {
       public:
-        virtual ~iCipherAead() = default;
-        virtual alc_error_t flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len) override = 0;
-        virtual alc_error_t dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len) override = 0;
+        virtual ~iCipherAead()                           = default;
+        virtual alc_error_t flush(const Uint8** pPlainText,
+                                  Uint64        numBuffers,
+                                  Uint64        len) override   = 0;
+        virtual alc_error_t dequeue(Uint8** pCipherText,
+                                    Uint64  numBuffers,
+                                    Uint64  len) override = 0;
     };
 
     /* Cipher Factory for different Aead and non-Aead modes */
@@ -169,8 +183,9 @@ namespace alcp { namespace cipher {
     class ALCP_API_EXPORT CipherFactory
     {
       private:
-        CpuCipherFeatures   m_currentArch  = getCpuCipherFeature();
-        CpuCipherFeatures m_arch = m_currentArch; // Default to detected arch to avoid wrong dispatch
+        CpuCipherFeatures m_currentArch = getCpuCipherFeature();
+        CpuCipherFeatures m_arch =
+            m_currentArch; // Default to detected arch to avoid wrong dispatch
         INTERFACE*          m_iCipher      = nullptr;
         cipherAlgoMapT      m_cipherMap    = {};
         alc_cipher_state_t* m_cipher_state = nullptr;

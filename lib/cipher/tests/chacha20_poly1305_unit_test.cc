@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -136,16 +136,20 @@ class ChaChaPolyTest : public testing::Test
         alc_error_t err = ALC_ERROR_NONE;
 
         if (isEncryptTest) {
-            err = aead->encrypt(&expected_plaintext[0],
+            Uint64 outlen = 0;
+            err           = aead->encrypt(&expected_plaintext[0],
                                 &ciphertext[0],
-                                expected_plaintext.size());
+                                expected_plaintext.size(),
+                                &outlen);
             ASSERT_EQ(err, ALC_ERROR_NONE);
             EXPECT_EQ(ciphertext, expected_ciphertext)
                 << "Failed Encryption: Input Size" << size << std::endl;
         } else {
-            err = aead->decrypt(&expected_ciphertext[0],
+            Uint64 outlen = 0;
+            err           = aead->decrypt(&expected_ciphertext[0],
                                 &plaintext[0],
-                                expected_ciphertext.size());
+                                expected_ciphertext.size(),
+                                &outlen);
             ASSERT_EQ(err, ALC_ERROR_NONE);
             EXPECT_EQ(plaintext, expected_plaintext)
                 << "Failed Encryption: Input Size" << size << std::endl;
@@ -225,7 +229,9 @@ TEST(Chacha20Poly1305, PerformanceTest)
     totalTimeElapsed = 0.0;
     for (int k = 0; k < 1000000000; k++) {
         ALCP_CRYPT_TIMER_START
-        chacha_poly.encrypt(&plaintext[0], &ciphertext[0], plaintext.size());
+        Uint64 outlen3 = 0;
+        chacha_poly.encrypt(
+            &plaintext[0], &ciphertext[0], plaintext.size(), &outlen3);
         ALCP_CRYPT_GET_TIME(0, "Encrypt")
         if (totalTimeElapsed > 1) {
             std::cout << "\n\n"

@@ -270,14 +270,16 @@ TEST(XTS, valid_all_sizes_encrypt_decrypt_test)
             auto               dest    = std::make_unique<Uint8[]>(i);
             fillRandom(plainText);
 
-            err = xts->encrypt(&(plainText[0]), dest.get(), ct_size);
+            Uint64 outlen = 0;
+            err = xts->encrypt(&(plainText[0]), dest.get(), ct_size, &outlen);
             EXPECT_EQ(err, ALC_ERROR_NONE);
 
             std::vector<Uint8> pt(i, 0);
 
             err = xts->init(key, 256, iv, 16);
             EXPECT_EQ(err, ALC_ERROR_NONE);
-            err = xts->decrypt(dest.get(), &(pt[0]), ct_size);
+            Uint64 outlen2 = 0;
+            err = xts->decrypt(dest.get(), &(pt[0]), ct_size, &outlen2);
 
             EXPECT_TRUE(err == ALC_ERROR_NONE);
             EXPECT_EQ(plainText, pt);
@@ -360,8 +362,11 @@ TEST(XTS, encrypt_huge)
 
         std::vector<Uint8> output_buffer(plainText.size(), 0x0);
 
-        err = xts->encrypt(
-            &(plainText[0]), &(output_buffer[0]), output_buffer.size());
+        Uint64 outlen = 0;
+        err           = xts->encrypt(&(plainText[0]),
+                           &(output_buffer[0]),
+                           output_buffer.size(),
+                           &outlen);
 
         EXPECT_TRUE(err == ALC_ERROR_NONE);
 
@@ -435,8 +440,11 @@ TEST(XTS, decrypt_huge)
 
         EXPECT_TRUE(err == ALC_ERROR_NONE);
 
-        err = xts->decrypt(
-            &(cipherText[0]), &(output_buffer[0]), output_buffer.size());
+        Uint64 outlen = 0;
+        err           = xts->decrypt(&(cipherText[0]),
+                           &(output_buffer[0]),
+                           output_buffer.size(),
+                           &outlen);
 
         EXPECT_TRUE(err == ALC_ERROR_NONE);
 
@@ -525,7 +533,8 @@ TEST(XTS, encrypt_huge_multi_update)
                 multi_update_size = plainText.size();
             }
             while (multi_update_size > 0) {
-                err = xts->encrypt(curr_pt, curr_ot, 16);
+                Uint64 outlen = 0;
+                err           = xts->encrypt(curr_pt, curr_ot, 16, &outlen);
 
                 EXPECT_FALSE(alcp_is_error(err));
                 multi_update_size -= 16;
@@ -534,7 +543,9 @@ TEST(XTS, encrypt_huge_multi_update)
             }
             // Last 2 blocks if available
             if (extra_update_size) {
-                err = xts->encrypt(curr_pt, curr_ot, extra_update_size);
+                Uint64 outlen = 0;
+                err =
+                    xts->encrypt(curr_pt, curr_ot, extra_update_size, &outlen);
 
                 EXPECT_FALSE(alcp_is_error(err));
             }
@@ -997,8 +1008,9 @@ TEST_P(XTS_KAT, valid_encrypt_request)
 
     pXtsObj->init(m_key.data(), m_key_size * 8, m_iv.data(), m_iv.size());
 
-    alc_error_t err = pXtsObj->encrypt(
-        &(m_plaintext.at(0)), &(out.at(0)), m_plaintext.size());
+    Uint64      outlen = 0;
+    alc_error_t err    = pXtsObj->encrypt(
+        &(m_plaintext.at(0)), &(out.at(0)), m_plaintext.size(), &outlen);
 
     EXPECT_EQ(err, ALC_ERROR_NONE);
     EXPECT_EQ(out, m_ciphertext);
@@ -1012,8 +1024,9 @@ TEST_P(XTS_KAT, valid_decrypt_request)
 
     pXtsObj->init(m_key.data(), m_key_size * 8, m_iv.data(), m_iv.size());
 
-    alc_error_t err = pXtsObj->decrypt(
-        &(m_ciphertext.at(0)), &(out.at(0)), m_plaintext.size());
+    Uint64      outlen = 0;
+    alc_error_t err    = pXtsObj->decrypt(
+        &(m_ciphertext.at(0)), &(out.at(0)), m_plaintext.size(), &outlen);
 
     EXPECT_EQ(err, ALC_ERROR_NONE);
     EXPECT_EQ(out, m_plaintext);
@@ -1024,12 +1037,15 @@ TEST_P(XTS_KAT, valid_encrypt_decrypt_test)
     pXtsObj->init(m_key.data(), m_key_size * 8, m_iv.data(), m_iv.size());
     std::vector<Uint8> outct(m_ciphertext.size()), outpt(m_plaintext.size());
 
-    alc_error_t err = pXtsObj->encrypt(
-        &(m_plaintext.at(0)), &(outct.at(0)), m_plaintext.size());
+    Uint64      outlen = 0;
+    alc_error_t err    = pXtsObj->encrypt(
+        &(m_plaintext.at(0)), &(outct.at(0)), m_plaintext.size(), &outlen);
 
     pXtsObj->init(m_key.data(), m_key_size * 8, m_iv.data(), m_iv.size());
 
-    err = pXtsObj->decrypt(&(outct.at(0)), &(outpt.at(0)), m_plaintext.size());
+    Uint64 outlen2 = 0;
+    err            = pXtsObj->decrypt(
+        &(outct.at(0)), &(outpt.at(0)), m_plaintext.size(), &outlen2);
 
     EXPECT_TRUE(err == ALC_ERROR_NONE);
     EXPECT_EQ(m_plaintext, outpt);

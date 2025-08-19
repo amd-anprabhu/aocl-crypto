@@ -406,9 +406,9 @@ ALCP_prov_cipher_generic_block_update(void*        vctx,
 
         /* Shouldn't normally fail */
         if (cipherctx->enc) {
-            err = alcp_cipher_encrypt(&(ctx->handle), in, out, inl);
+            err = alcp_cipher_encrypt(&(ctx->handle), in, out, inl, outl);
         } else {
-            err = alcp_cipher_decrypt(&(ctx->handle), in, out, inl);
+            err = alcp_cipher_decrypt(&(ctx->handle), in, out, inl, outl);
         }
         if (alcp_is_error(err)) {
             printf("Error: cipher encrypt/decrypt failed \n");
@@ -462,10 +462,10 @@ ALCP_prov_cipher_generic_block_update(void*        vctx,
 
         if (cipherctx->enc) {
             err =
-                alcp_cipher_encrypt(&(ctx->handle), cipherctx->buf, out, blksz);
+                alcp_cipher_encrypt(&(ctx->handle), cipherctx->buf, out, blksz, outl);
         } else {
             err =
-                alcp_cipher_decrypt(&(ctx->handle), cipherctx->buf, out, blksz);
+                alcp_cipher_decrypt(&(ctx->handle), cipherctx->buf, out, blksz, outl);
         }
         if (alcp_is_error(err)) {
             printf("Error: cipher encrypt/decrypt failed \n");
@@ -492,9 +492,9 @@ ALCP_prov_cipher_generic_block_update(void*        vctx,
     }
     if (nextblocks > 0) {
         if (cipherctx->enc) {
-            err = alcp_cipher_encrypt(&(ctx->handle), in, out, nextblocks);
+            err = alcp_cipher_encrypt(&(ctx->handle), in, out, nextblocks, outl);
         } else {
-            err = alcp_cipher_decrypt(&(ctx->handle), in, out, nextblocks);
+            err = alcp_cipher_decrypt(&(ctx->handle), in, out, nextblocks, outl);
         }
         if (alcp_is_error(err)) {
             printf("Error: cipher encrypt/decrypt failed \n");
@@ -562,10 +562,10 @@ ALCP_prov_cipher_generic_block_final(void*   vctx,
 
         if (cipherctx->enc) {
             err =
-                alcp_cipher_encrypt(&(ctx->handle), cipherctx->buf, out, blksz);
+                alcp_cipher_encrypt(&(ctx->handle), cipherctx->buf, out, blksz, outl);
         } else {
             err =
-                alcp_cipher_decrypt(&(ctx->handle), cipherctx->buf, out, blksz);
+                alcp_cipher_decrypt(&(ctx->handle), cipherctx->buf, out, blksz, outl);
         }
         if (alcp_is_error(err)) {
             printf("Error: cipher encrypt/decrypt failed \n");
@@ -588,13 +588,14 @@ ALCP_prov_cipher_generic_block_final(void*   vctx,
         return 0;
     }
 
+    
     if (cipherctx->enc) {
         // FIXME: input and output buffer are same, this might fail
         err = alcp_cipher_encrypt(
-            &(ctx->handle), cipherctx->buf, cipherctx->buf, blksz);
+            &(ctx->handle), cipherctx->buf, cipherctx->buf, blksz, outl);
     } else {
         err = alcp_cipher_decrypt(
-            &(ctx->handle), cipherctx->buf, cipherctx->buf, blksz);
+            &(ctx->handle), cipherctx->buf, cipherctx->buf, blksz, outl);
     }
     if (alcp_is_error(err)) {
         printf("Error: cipher encrypt/decrypt failed \n");
@@ -649,10 +650,11 @@ ALCP_prov_cipher_generic_stream_update(void*        vctx,
         return 0;
     }
 
+    
     if (cipherctx->enc) {
-        err = alcp_cipher_encrypt(&(ctx->handle), in, out, inl);
+        err = alcp_cipher_encrypt(&(ctx->handle), in, out, inl, outl);
     } else {
-        err = alcp_cipher_decrypt(&(ctx->handle), in, out, inl);
+        err = alcp_cipher_decrypt(&(ctx->handle), in, out, inl, outl);
     }
     if (alcp_is_error(err)) {
         printf("Error: cipher encrypt/decrypt failed \n");
@@ -749,10 +751,11 @@ ALCP_prov_cipher_generic_cipher(void*        vctx,
         return 0;
     }
 
+    
     if (cipherctx->enc) {
-        err = alcp_cipher_encrypt(&(ctx->handle), in, out, inl);
+        err = alcp_cipher_encrypt(&(ctx->handle), in, out, inl, outl);
     } else {
-        err = alcp_cipher_decrypt(&(ctx->handle), in, out, inl);
+        err = alcp_cipher_decrypt(&(ctx->handle), in, out, inl, outl);
     }
     if (alcp_is_error(err)) {
         printf("Error: cipher encrypt/decrypt failed \n");

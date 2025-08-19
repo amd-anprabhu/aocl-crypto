@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -120,17 +120,20 @@ alcp_encdecAES(const Ipp8u*       pSrc,
     }
 
     // Do the actual decryption
+    Uint64 outlen = 0;
     if (enc) {
         // err = alcp_cipher_encrypt(&handle, plaintxt, ciphertxt, len, iv);
         err = alcp_cipher_encrypt(&(context->handle),
                                   reinterpret_cast<const Uint8*>(pSrc),
                                   reinterpret_cast<Uint8*>(pDst),
-                                  len);
+                                  len,
+                                  &outlen);
     } else {
         err = alcp_cipher_decrypt(&(context->handle),
                                   reinterpret_cast<const Uint8*>(pSrc),
                                   reinterpret_cast<Uint8*>(pDst),
-                                  len);
+                                  len,
+                                  &outlen);
     }
 #ifdef DEBUG
     if (mode == ALC_AES_MODE_XTS) {

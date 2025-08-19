@@ -161,8 +161,10 @@ bool
 AlcpCipherBase::encrypt(alcp_dc_ex_t& data)
 {
     alc_error_t err;
+    Uint64      outlen = 0;
 
-    err = alcp_cipher_encrypt(m_handle, data.m_in, data.m_out, data.m_inl);
+    err = alcp_cipher_encrypt(
+        m_handle, data.m_in, data.m_out, data.m_inl, &outlen);
     if (alcp_is_error(err)) {
         goto enc_out;
     }
@@ -177,8 +179,10 @@ bool
 AlcpCipherBase::decrypt(alcp_dc_ex_t& data)
 {
     alc_error_t err;
+    Uint64      outlen = 0;
 
-    err = alcp_cipher_decrypt(m_handle, data.m_in, data.m_out, data.m_inl);
+    err = alcp_cipher_decrypt(
+        m_handle, data.m_in, data.m_out, data.m_inl, &outlen);
     if (alcp_is_error(err)) {
         goto dec_out;
     }

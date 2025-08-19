@@ -129,7 +129,8 @@ alc_error_t
 alcp_cipher_encrypt(const alc_cipher_handle_p pCipherHandle,
                     const Uint8*              pPlainText,
                     Uint8*                    pCipherText,
-                    Uint64                    len)
+                    Uint64                    len,
+                    Uint64*                   outlen)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "PTLen %6ld", len);
@@ -140,13 +141,18 @@ alcp_cipher_encrypt(const alc_cipher_handle_p pCipherHandle,
     ALCP_BAD_PTR_ERR_RET(pCipherText);
     ALCP_ZERO_LEN_ERR_RET(len);
 
+    // Zero-initialize outlen for safety
+    *outlen = 0;
+
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
         return ALC_ERROR_BAD_STATE;
     }
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
-    auto i = static_cast<iCipher*>(ctx->m_cipher);
-    return i->encrypt(pPlainText, pCipherText, len);
+    auto        i   = static_cast<iCipher*>(ctx->m_cipher);
+    alc_error_t err = i->encrypt(pPlainText, pCipherText, len, outlen);
+
+    return err;
 }
 
 alc_error_t
@@ -200,7 +206,8 @@ alc_error_t
 alcp_cipher_decrypt(const alc_cipher_handle_p pCipherHandle,
                     const Uint8*              pCipherText,
                     Uint8*                    pPlainText,
-                    Uint64                    len)
+                    Uint64                    len,
+                    Uint64*                   outlen)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "CTLen %6ld", len);
@@ -212,14 +219,19 @@ alcp_cipher_decrypt(const alc_cipher_handle_p pCipherHandle,
     ALCP_BAD_PTR_ERR_RET(pCipherText);
     ALCP_ZERO_LEN_ERR_RET(len);
 
+    // Zero-initialize outlen for safety
+    *outlen = 0;
+
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
         return ALC_ERROR_BAD_STATE;
     }
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
 
-    auto i = static_cast<iCipher*>(ctx->m_cipher);
-    return i->decrypt(pCipherText, pPlainText, len);
+    auto        i   = static_cast<iCipher*>(ctx->m_cipher);
+    alc_error_t err = i->decrypt(pCipherText, pPlainText, len, outlen);
+
+    return err;
 }
 
 alc_error_t

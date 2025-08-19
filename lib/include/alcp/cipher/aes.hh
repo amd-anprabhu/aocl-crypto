@@ -80,6 +80,10 @@ class Aes : public Rijndael
     const Uint8**                      m_pData_aes                  = nullptr;
     Uint8**                            m_pIvs_aes                   = nullptr;
 
+    // Partial block buffering for outlen support
+    __attribute__((aligned(16))) Uint8 m_partial_block[16] = {};
+    Uint32 m_partial_len = 0; // 0..15 bytes buffered
+
     // Data Size Limits
     Uint32 m_ivLen_max = MAX_CIPHER_IV_SIZE;
     Uint32 m_ivLen_min = 1;
@@ -134,9 +138,24 @@ class Aes : public Rijndael
         m_nrounds                   = getRounds();
     }
 
-    virtual alc_error_t flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len) { return ALC_ERROR_NOT_SUPPORTED; }
-    virtual alc_error_t dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len) { return ALC_ERROR_NOT_SUPPORTED; }
-    virtual alc_error_t multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint8 ** pIv, Uint64 ivLen, Uint64 numBuffers)  {
+    virtual alc_error_t flush(const Uint8** pPlainText,
+                              Uint64        numBuffers,
+                              Uint64        len)
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+    virtual alc_error_t dequeue(Uint8** pCipherText,
+                                Uint64  numBuffers,
+                                Uint64  len)
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+    virtual alc_error_t multibufferInit(const Uint8*  pKey,
+                                        Uint64        keyLen,
+                                        const Uint8** pIv,
+                                        Uint64        ivLen,
+                                        Uint64        numBuffers)
+    {
         return ALC_ERROR_NOT_SUPPORTED;
     }
 
