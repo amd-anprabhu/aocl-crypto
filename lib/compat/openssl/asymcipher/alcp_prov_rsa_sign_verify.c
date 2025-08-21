@@ -186,9 +186,6 @@ alcp_prov_rsa_set_ctx_params(void* vprsactx, const OSSL_PARAM params[])
     if (fun) {
         ret = fun(prsactx->ossl_rsa_ctx, params);
     }
-    if (!ret || prsactx->rsa_size != 256) {
-        return ret;
-    }
 
     if (prsactx->ossl_rsa_ctx->mgf1_mdname[0] != 0) {
         int mode_mgf =
@@ -212,7 +209,7 @@ alcp_prov_rsa_set_ctx_params(void* vprsactx, const OSSL_PARAM params[])
         }
     }
     EXIT();
-    return 1;
+    return ret;
 }
 
 static int
@@ -234,6 +231,7 @@ alcp_rsa_signverify_init(void*            vprsactx,
     prsactx->mode = -1;
 
     int ret = 0;
+    if (prsactx->rsa_size != 256) {
     typedef int (*fun_ptr)(
         void* vprsactx, void* vrsa, const OSSL_PARAM params[]);
     fun_ptr fun;
@@ -246,18 +244,16 @@ alcp_rsa_signverify_init(void*            vprsactx,
         return 0;
 
     ret = fun(prsactx->ossl_rsa_ctx, vrsa, params);
-
+    EXIT();
+    return ret;
+    }
     Rsa* rsa          = prsactx->ossl_rsa_ctx->rsa;
     prsactx->rsa_size = alcp_rsa_size(rsa);
     if ((EVP_PKEY_OP_SIGN == operation)
         && (rsa->dmp1 == NULL || rsa->dmq1 == NULL || rsa->iqmp == NULL)) {
         prsactx->crt_disabled = 1;
     } else {
-        prsactx->crt_disabled = 0;
-    }
-
-    if (prsactx->rsa_size != 256 || prsactx->crt_disabled) {
-        return ret;
+        return 0;
     }
 
     if (EVP_PKEY_OP_SIGN == operation) {
@@ -349,6 +345,7 @@ alcp_prov_rsa_sign(void*                vprsactx,
     alc_error_t err    = ALC_ERROR_NONE;
     int         mdsize = prsactx->mdsize;
     if (mdsize != 0) {
+        EXIT();
         if (tbslen != (size_t)mdsize) {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST_LENGTH);
             return 0;
@@ -542,7 +539,7 @@ alcp_prov_rsa_verify(void*                vprsactx,
     size_t rsasize = prsactx->rsa_size;
     ENTER();
     if (rsasize != 256 || prsactx->crt_disabled
-        || prsactx->ossl_rsa_ctx->pad_mode == RSA_X931_PADDING) {
+        || prsactx->ossl_rsa_ctx->pad_mode == RSA_X931_PADDING || prsactx->ossl_rsa_ctx->pad_mode == RSA_PKCS1_PSS_PADDING) {
         typedef int (*fun_ptr)(void*                vprsactx,
                                const unsigned char* sig,
                                size_t               siglen,
@@ -659,7 +656,8 @@ alcp_prov_rsa_digest_sign_init(void*            vprsactx,
                                const OSSL_PARAM params[])
 {
     alc_prov_rsa_ctx* prsactx = (alc_prov_rsa_ctx*)vprsactx;
-
+    int rsasize = prsactx->rsa_size;
+    if (rsasize != 256) {
     typedef int (*fun_ptr)(void*            vprsactx,
                            const char*      mdname,
                            void*            vrsa,
@@ -670,7 +668,9 @@ alcp_prov_rsa_digest_sign_init(void*            vprsactx,
         return 0;
 
     int ret = fun(prsactx->ossl_rsa_ctx, mdname, vrsa, params);
-
+    EXIT();
+    return ret;
+    }
     Rsa* rsa          = prsactx->ossl_rsa_ctx->rsa;
     prsactx->rsa_size = alcp_rsa_size(rsa);
 
@@ -678,12 +678,9 @@ alcp_prov_rsa_digest_sign_init(void*            vprsactx,
         prsactx->crt_disabled = 1;
     } else {
         prsactx->crt_disabled = 0;
+        return 0;
     }
 
-    if (prsactx->rsa_size != 256 || prsactx->crt_disabled) {
-        EXIT();
-        return ret;
-    }
 
     BigNum      dp   = { rsa->dmp1->d, rsa->dmp1->top };
     BigNum      dq   = { rsa->dmq1->d, rsa->dmq1->top };
@@ -709,7 +706,7 @@ alcp_prov_rsa_digest_sign_init(void*            vprsactx,
         return 0;
     }
     EXIT();
-    return ret;
+    return 1;
 }
 
 static int
@@ -756,7 +753,6 @@ alcp_prov_rsa_digest_sign_final(void*          vprsactx,
 
     int ret = alcp_prov_rsa_sign(
         vprsactx, sig, siglen, sigsize, digest, (size_t)dlen);
-
     EXIT();
     return ret;
 }
@@ -825,7 +821,7 @@ alcp_prov_rsa_digest_verify_final(void*                vprsactx,
         return 0;
 
     size_t rsasize = prsactx->rsa_size;
-    if (rsasize != 256) {
+    if (rsasize != 256 || prsactx->ossl_rsa_ctx->pad_mode == RSA_X931_PADDING || prsactx->ossl_rsa_ctx->pad_mode == RSA_PKCS1_PSS_PADDING) {
         typedef int (*fun_ptr)(
             void* vprsactx, const unsigned char* sig, size_t siglen);
         fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_FINAL);
