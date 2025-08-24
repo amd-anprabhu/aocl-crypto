@@ -252,9 +252,10 @@ alcp_rsa_signverify_init(void*            vprsactx,
     if ((EVP_PKEY_OP_SIGN == operation)
         && (rsa->dmp1 == NULL || rsa->dmq1 == NULL || rsa->iqmp == NULL)) {
         prsactx->crt_disabled = 1;
-    } else {
         return 0;
-    }
+    } else {
+        prsactx->crt_disabled = 0;
+    }    
 
     if (EVP_PKEY_OP_SIGN == operation) {
         BigNum      dp   = { rsa->dmp1->d, rsa->dmp1->top };
@@ -271,6 +272,11 @@ alcp_rsa_signverify_init(void*            vprsactx,
             return 0;
         }
     } else {
+        if (rsa->e == NULL || rsa->n == NULL) {
+            ERR_raise(ERR_LIB_PROV, PROV_R_NO_KEY_SET);
+            return 0;
+        }
+
         BigNum      exponent = { rsa->e->d, rsa->e->top };
         BigNum      modulus  = { rsa->n->d, rsa->n->top };
         alc_error_t err      = alcp_rsa_set_bignum_public_key(
@@ -676,9 +682,9 @@ alcp_prov_rsa_digest_sign_init(void*            vprsactx,
 
     if (rsa->dmp1 == NULL || rsa->dmq1 == NULL || rsa->iqmp == NULL) {
         prsactx->crt_disabled = 1;
+        return 0;
     } else {
         prsactx->crt_disabled = 0;
-        return 0;
     }
 
 
