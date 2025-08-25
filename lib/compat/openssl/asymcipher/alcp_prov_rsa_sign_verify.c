@@ -231,7 +231,6 @@ alcp_rsa_signverify_init(void*            vprsactx,
     prsactx->mode = -1;
 
     int ret = 0;
-    if (prsactx->rsa_size != 256) {
     typedef int (*fun_ptr)(
         void* vprsactx, void* vrsa, const OSSL_PARAM params[]);
     fun_ptr fun;
@@ -244,11 +243,11 @@ alcp_rsa_signverify_init(void*            vprsactx,
         return 0;
 
     ret = fun(prsactx->ossl_rsa_ctx, vrsa, params);
-    EXIT();
-    return ret;
-    }
     Rsa* rsa          = prsactx->ossl_rsa_ctx->rsa;
     prsactx->rsa_size = alcp_rsa_size(rsa);
+    if (prsactx->rsa_size != 256) {
+        return ret;
+    }
     if ((EVP_PKEY_OP_SIGN == operation)
         && (rsa->dmp1 == NULL || rsa->dmq1 == NULL || rsa->iqmp == NULL)) {
         prsactx->crt_disabled = 1;
