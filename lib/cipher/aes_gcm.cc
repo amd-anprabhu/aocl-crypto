@@ -81,6 +81,16 @@ Gcm::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv, Uint64 ivLen)
                              m_gcm_ctx.m_reverse_mask_128);
     }
 
+    #ifdef AES_MULTI_UPDATE
+    // Initialize streaming fields
+    memset(m_gcm_ctx.m_partial_buffer, 0, 16);
+    m_gcm_ctx.m_partial_buffer_len = 0;
+    m_gcm_ctx.m_has_partial_data = false;
+    // Initialize AAD buffering fields
+    m_gcm_ctx.m_aad_buffer.clear();
+    m_gcm_ctx.m_aad_processed = false;
+    #endif
+
     return err;
 }
 
