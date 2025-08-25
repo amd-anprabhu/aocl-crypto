@@ -28,8 +28,13 @@
 
 #include "digest/alcp_digest_prov.h"
 
-static const OSSL_PARAM shake_known_gettable_ctx_params[] = {
+static const OSSL_PARAM shake_known_settable_ctx_params[] = {
     OSSL_PARAM_int(OSSL_DIGEST_PARAM_XOF, NULL), OSSL_PARAM_END
+};
+static const OSSL_PARAM shake_known_gettable_ctx_params[] = {
+    OSSL_PARAM_int(OSSL_DIGEST_PARAM_XOFLEN, NULL),
+    OSSL_PARAM_int(OSSL_DIGEST_PARAM_SIZE, NULL),
+    OSSL_PARAM_END
 };
 static inline int
 shake_set_ctx_params(alc_prov_digest_ctx_p cctx, const OSSL_PARAM params[])
@@ -37,13 +42,10 @@ shake_set_ctx_params(alc_prov_digest_ctx_p cctx, const OSSL_PARAM params[])
     ENTER();
     const OSSL_PARAM* param =
         OSSL_PARAM_locate_const(params, OSSL_DIGEST_PARAM_XOFLEN);
-    Uint64 digest_size = 0;
-    if (param && !OSSL_PARAM_get_size_t(param, &digest_size)) {
+    if (param != NULL
+        && !OSSL_PARAM_get_size_t(param, &cctx->shake_digest_size)) {
         ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
         return 0;
-    }
-    if (digest_size) {
-        cctx->shake_digest_size = digest_size;
     }
     EXIT();
     return 1;
@@ -82,6 +84,14 @@ alcp_prov_shake_init(void* vctx, const OSSL_PARAM params[])
 
 const OSSL_PARAM*
 alcp_prov_shake_settable_ctx_params(void* cctx, void* provctx)
+{
+    ENTER();
+    EXIT();
+    return shake_known_settable_ctx_params;
+}
+
+const OSSL_PARAM*
+alcp_prov_shake_gettable_ctx_params(void* cctx, void* provctx)
 {
     ENTER();
     EXIT();
@@ -138,16 +148,47 @@ alcp_prov_shake_digest_final(void*          vctx,
         return 1;
     }
     alc_prov_digest_ctx_p dctx = vctx;
-    *outl                      = dctx->shake_digest_size;
+    if (dctx->shake_digest_size == SIZE_MAX) {
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST_LENGTH);
+        return 0;
+    }
+    *outl = dctx->shake_digest_size;
     return alcp_prov_digest_final(vctx, out, dctx->shake_digest_size);
+}
+
+int
+alcp_prov_digest_get_ctx_params(OSSL_PARAM params[], void* vctx)
+{
+    ENTER();
+    OSSL_PARAM*           param = NULL;
+    alc_prov_digest_ctx_p pctx  = vctx;
+
+    if (pctx == NULL) {
+        return 0;
+    }
+
+    OSSL_PARAM_LOCATE_SET_SIZE(
+        params, OSSL_DIGEST_PARAM_XOFLEN, param, pctx->shake_digest_size);
+
+    OSSL_PARAM_LOCATE_SET_SIZE(
+        params, OSSL_DIGEST_PARAM_SIZE, param, pctx->shake_digest_size);
+
+    EXIT();
+    return 1;
 }
 
 #define CREATE_SHAKE_SPECIFIC_DISPATCHERS(name, len)                           \
     static int alcp_prov_##name##_shake_init(alc_prov_digest_ctx_p pctx,       \
                                              const OSSL_PARAM      params[])   \
     {                                                                          \
-        pctx->shake_digest_size = len / 8;                                     \
         return alcp_prov_shake_init(pctx, params);                             \
+    }                                                                          \
+    static OSSL_FUNC_digest_get_ctx_params_fn                                  \
+               alcp_prov_digest_##name##_get_ctx_params;                       \
+    static int alcp_prov_digest_##name##_get_ctx_params(void*      vctx,       \
+                                                        OSSL_PARAM params[])   \
+    {                                                                          \
+        return alcp_prov_digest_get_ctx_params(params, vctx);                  \
     }
 
 // clang-format off
@@ -176,26 +217,33 @@ alcp_prov_shake_digest_final(void*          vctx,
     { 0, NULL}                                                                 \
     }
 
-#if (OPENSSL_API_LEVEL >= 30300)                                                 
-    #define Digest_Squeeze { OSSL_FUNC_DIGEST_SQUEEZE, (fptr_t)alcp_prov_shake_squeeze },
+#if (OPENSSL_API_LEVEL >= 30300)
+#define Digest_Squeeze                                                         \
+    { OSSL_FUNC_DIGEST_SQUEEZE, (fptr_t)alcp_prov_shake_squeeze },
 #else
-    #define Digest_Squeeze
-#endif 
-
+#define Digest_Squeeze
+#endif
 
 #define ALCP_CREATE_SHAKE_FUNCTIONS(                                           \
     name, grp, len, blockSize, alcp_mode, grp_upper_case, flags)               \
     CREATE_SHAKE_SPECIFIC_DISPATCHERS(name, len)                               \
     CREATE_COMMON_DEFINITIONS(                                                 \
-        name, grp, len, blockSize, alcp_mode, grp_upper_case, flags)           \
-    { OSSL_FUNC_DIGEST_FINAL, (fptr_t)alcp_prov_shake_digest_final },          \
-    { OSSL_FUNC_DIGEST_INIT, (fptr_t)alcp_prov_##name##_shake_init },          \
-    { OSSL_FUNC_DIGEST_SETTABLE_CTX_PARAMS,                                    \
+        name, grp, len, blockSize, alcp_mode, grp_upper_case, flags){          \
+        OSSL_FUNC_DIGEST_FINAL, (fptr_t)alcp_prov_shake_digest_final           \
+    },                                                                         \
+        { OSSL_FUNC_DIGEST_INIT, (fptr_t)alcp_prov_##name##_shake_init },      \
+        { OSSL_FUNC_DIGEST_SETTABLE_CTX_PARAMS,                                \
           (fptr_t)alcp_prov_shake_settable_ctx_params },                       \
-    { OSSL_FUNC_DIGEST_SET_CTX_PARAMS,                                         \
+        { OSSL_FUNC_DIGEST_SET_CTX_PARAMS,                                     \
           (fptr_t)alcp_prov_shake_set_ctx_params },                            \
-      Digest_Squeeze                                                            \
-    { 0, NULL }                                                                \
+        { OSSL_FUNC_DIGEST_GETTABLE_CTX_PARAMS,                                \
+          (fptr_t)alcp_prov_shake_gettable_ctx_params },                       \
+        { OSSL_FUNC_DIGEST_GET_CTX_PARAMS,                                     \
+          (fptr_t)alcp_prov_digest_##name##_get_ctx_params },                  \
+        Digest_Squeeze                                                         \
+    {                                                                          \
+        0, NULL                                                                \
+    }                                                                          \
     }
 
 // clang-format on
