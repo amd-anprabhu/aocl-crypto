@@ -354,14 +354,20 @@ ccm_tls_cipher(ALCP_PROV_CIPHER_CTX* ctx,
 
     if (cipherctx->enc) {
 
-        if (alcp_cipher_aead_encrypt(&(ctx->handle), in, out, len)) {
+        {
+            Uint64 outlen = 0;
+            if (alcp_cipher_aead_encrypt(&(ctx->handle), in, out, len, &outlen)) {
             goto err;
+            }
         }
         olen = len + EVP_CCM_TLS_EXPLICIT_IV_LEN + cipherctx->ccm.m;
     } else {
 
-        if (alcp_cipher_aead_decrypt(&(ctx->handle), in, out, len)) {
+        {
+            Uint64 outlen = 0;
+            if (alcp_cipher_aead_decrypt(&(ctx->handle), in, out, len, &outlen)) {
             goto err;
+            }
         }
         olen = len;
     }
@@ -434,8 +440,11 @@ alcp_prov_ccm_cipher_internal(ALCP_PROV_CIPHER_CTX* ctx,
         }
 
         if (cipherctx->enc) {
-            if (alcp_cipher_aead_encrypt(&(ctx->handle), in, out, len)) {
+            {
+                Uint64 outlen = 0;
+                if (alcp_cipher_aead_encrypt(&(ctx->handle), in, out, len, &outlen)) {
                 goto err;
+                }
             }
             cipherctx->ccm.isTagSet = 1;
         } else {
@@ -443,8 +452,11 @@ alcp_prov_ccm_cipher_internal(ALCP_PROV_CIPHER_CTX* ctx,
             if (!cipherctx->ccm.isTagSet)
                 goto err;
 
-            if (alcp_cipher_aead_decrypt(&(ctx->handle), in, out, len)) {
+            {
+                Uint64 outlen = 0;
+                if (alcp_cipher_aead_decrypt(&(ctx->handle), in, out, len, &outlen)) {
                 goto err;
+                }
             }
 
             if (alcp_cipher_aead_get_tag(

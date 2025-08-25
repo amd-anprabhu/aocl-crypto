@@ -101,8 +101,8 @@ encrypt_demo(alc_cipher_handle_p handle,
 {
     alc_error_t err;
 
-    Uint64 outlen = 0;
-    err = alcp_cipher_encrypt(handle, plaintxt, ciphertxt, len, &outlen);
+    Uint64 encrypt_outlen = 0;
+    err = alcp_cipher_encrypt(handle, plaintxt, ciphertxt, len, &encrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: Unable to Encrypt \n");
 
@@ -121,8 +121,8 @@ decrypt_demo(alc_cipher_handle_p handle,
 {
     alc_error_t err;
 
-    Uint64 outlen = 0;
-    err = alcp_cipher_decrypt(handle, ciphertxt, plaintxt, len, &outlen);
+    Uint64 decrypt_outlen = 0;
+    err = alcp_cipher_decrypt(handle, ciphertxt, plaintxt, len, &decrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: Unable to Decrypt \n");
 

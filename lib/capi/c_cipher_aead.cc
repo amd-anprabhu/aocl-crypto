@@ -147,7 +147,8 @@ alc_error_t
 alcp_cipher_aead_encrypt(const alc_cipher_handle_p pCipherHandle,
                          const Uint8*              pInput,
                          Uint8*                    pOutput,
-                         Uint64                    len)
+                         Uint64                    len,
+                         Uint64*                   outlen)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "EncLen %6ld", len);
@@ -157,6 +158,7 @@ alcp_cipher_aead_encrypt(const alc_cipher_handle_p pCipherHandle,
     ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
     ALCP_BAD_PTR_ERR_RET(pInput);
     ALCP_BAD_PTR_ERR_RET(pOutput);
+    ALCP_BAD_PTR_ERR_RET(outlen);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
@@ -166,9 +168,7 @@ alcp_cipher_aead_encrypt(const alc_cipher_handle_p pCipherHandle,
 
     auto i = static_cast<iCipherAead*>(ctx->m_cipher);
 
-    // FIXME: Remove this variable when the AEAD CAPI changes are done.
-    Uint64      outlen = 0;
-    alc_error_t err    = i->encrypt(pInput, pOutput, len, &outlen);
+    alc_error_t err = i->encrypt(pInput, pOutput, len, outlen);
 
     return err;
 }
@@ -177,7 +177,8 @@ alc_error_t
 alcp_cipher_aead_decrypt(const alc_cipher_handle_p pCipherHandle,
                          const Uint8*              pInput,
                          Uint8*                    pOutput,
-                         Uint64                    len)
+                         Uint64                    len,
+                         Uint64*                   outlen)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "DecLen %6ld", len);
@@ -187,6 +188,7 @@ alcp_cipher_aead_decrypt(const alc_cipher_handle_p pCipherHandle,
     ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
     ALCP_BAD_PTR_ERR_RET(pInput);
     ALCP_BAD_PTR_ERR_RET(pOutput);
+    ALCP_BAD_PTR_ERR_RET(outlen);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
@@ -196,9 +198,7 @@ alcp_cipher_aead_decrypt(const alc_cipher_handle_p pCipherHandle,
 
     auto i = static_cast<iCipherAead*>(ctx->m_cipher);
 
-    // FIXME: Remove this variable when the AEAD CAPI changes are done.
-    Uint64      outlen = 0;
-    alc_error_t err    = i->decrypt(pInput, pOutput, len, &outlen);
+    alc_error_t err = i->decrypt(pInput, pOutput, len, outlen);
 
     return err;
 }

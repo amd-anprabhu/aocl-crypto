@@ -149,8 +149,8 @@ encrypt_demo(const Uint8* plaintxt,
     }
 
     // Encrypt the plaintext with the initialized key and iv
-    Uint64 outlen = 0;
-    err = alcp_cipher_encrypt(&handle, plaintxt, ciphertxt, len, &outlen);
+    Uint64 encrypt_outlen = 0;
+    err = alcp_cipher_encrypt(&handle, plaintxt, ciphertxt, len, &encrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: Unable to Encrypt \n");
         return close_demo_session_exit();
@@ -190,8 +190,8 @@ decrypt_demo(const Uint8* ciphertxt,
     }
 
     // Decrypt the ciphertext with the initialized key and iv
-    Uint64 outlen = 0;
-    err = alcp_cipher_decrypt(&handle, ciphertxt, plaintxt, len, &outlen);
+    Uint64 decrypt_outlen = 0;
+    err = alcp_cipher_decrypt(&handle, ciphertxt, plaintxt, len, &decrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: Unable to Decrypt \n");
         return close_demo_session_exit();

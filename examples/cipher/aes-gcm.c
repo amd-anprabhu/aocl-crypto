@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -353,7 +353,8 @@ alcp_aes_gcm_encrypt_demo(
     }
 
     // GCM encrypt
-    err = alcp_cipher_aead_encrypt(&handle, plaintxt, ciphertxt, len);
+    Uint64 encrypt_outlen = 0;
+    err = alcp_cipher_aead_encrypt(&handle, plaintxt, ciphertxt, len, &encrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: unable encrypt \n");
         return -1;
@@ -398,7 +399,8 @@ alcp_aes_gcm_decrypt_demo(const Uint8* ciphertxt,
     }
 
     // GCM decrypt
-    err = alcp_cipher_aead_decrypt(&handle, ciphertxt, plaintxt, len);
+    Uint64 decrypt_outlen = 0;
+    err = alcp_cipher_aead_decrypt(&handle, ciphertxt, plaintxt, len, &decrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: unable decrypt \n");
         return -1;

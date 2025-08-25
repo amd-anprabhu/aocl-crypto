@@ -159,7 +159,10 @@ alcp_aes_gcm_encrypt_demo(
         ALCP_CRYPT_TIMER_START
 
         // GCM encrypt
-        err = alcp_cipher_aead_encrypt(&handle, plaintxt, ciphertxt, len);
+        {
+            Uint64 encrypt_outlen = 0;
+            err           = alcp_cipher_aead_encrypt(&handle, plaintxt, ciphertxt, len, &encrypt_outlen);
+        }
         if (alcp_is_error(err)) {
             printf("Error: unable encrypt \n");
             return;
@@ -223,7 +226,10 @@ alcp_aes_gcm_decrypt_demo(const Uint8* ciphertxt,
         ALCP_CRYPT_TIMER_START
 
         // GCM decrypt
-        err = alcp_cipher_aead_decrypt(&handle, ciphertxt, plaintxt, len);
+        {
+            Uint64 decrypt_outlen = 0;
+            err           = alcp_cipher_aead_decrypt(&handle, ciphertxt, plaintxt, len, &decrypt_outlen);
+        }
         if (alcp_is_error(err)) {
             printf("Error: unable decrypt \n");
             return;

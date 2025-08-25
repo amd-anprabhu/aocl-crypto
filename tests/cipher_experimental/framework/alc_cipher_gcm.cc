@@ -80,19 +80,27 @@ AlcpGcmCipher<encryptor>::update(alc_test_update_data_p data)
         reinterpret_cast<alc_test_gcm_update_data_p>(data);
     alc_error_t err;
     if constexpr (encryptor == true) {
-        err = alcp_cipher_aead_encrypt(&m_handle,
+        {
+            Uint64 outlen = 0;
+            err           = alcp_cipher_aead_encrypt(&m_handle,
                                        p_gcm_update_data->m_input,
                                        p_gcm_update_data->m_output,
-                                       p_gcm_update_data->m_input_len);
+                                       p_gcm_update_data->m_input_len,
+                                       &outlen);
+        }
         if (alcp_is_error(err)) {
             printf("Error: unable encrypt \n");
             return false;
         }
     } else {
-        err = alcp_cipher_aead_decrypt(&m_handle,
+        {
+            Uint64 outlen = 0;
+            err           = alcp_cipher_aead_decrypt(&m_handle,
                                        p_gcm_update_data->m_input,
                                        p_gcm_update_data->m_output,
-                                       p_gcm_update_data->m_input_len);
+                                       p_gcm_update_data->m_input_len,
+                                       &outlen);
+        }
         if (alcp_is_error(err)) {
             printf("Error: unable decrypt \n");
             return false;

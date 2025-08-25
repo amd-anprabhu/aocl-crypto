@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -222,9 +222,11 @@ siv_cipher(void*                vctx,
 
         alc_error_t err = ALC_ERROR_NONE;
         if (cipherctx->enc) {
-            err = alcp_cipher_aead_encrypt(&(ctx->handle), in, out, inl);
+            Uint64 outlen = 0;
+            err           = alcp_cipher_aead_encrypt(&(ctx->handle), in, out, inl, &outlen);
         } else {
-            err = alcp_cipher_aead_decrypt(&(ctx->handle), in, out, inl);
+            Uint64 outlen = 0;
+            err           = alcp_cipher_aead_decrypt(&(ctx->handle), in, out, inl, &outlen);
         }
         if (alcp_is_error(err)) {
             return 0;

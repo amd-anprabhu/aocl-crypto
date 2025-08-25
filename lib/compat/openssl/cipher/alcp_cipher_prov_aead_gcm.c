@@ -624,14 +624,20 @@ gcm_cipher_internal(ALCP_PROV_CIPHER_CTX* ctx,
 #endif
                 // printf("  \n cipherstate %p ",
                 // (void*)&ctx->prov_cipher_data.cipherState);
-                err = alcp_cipher_aead_encrypt(&(ctx->handle), in, out, len);
+                {
+                    Uint64 outlen = 0;
+                    err           = alcp_cipher_aead_encrypt(&(ctx->handle), in, out, len, &outlen);
+                }
             } else {
 #if PROV_GCM_DEBUG
                 printf("\n");
                 printf(" dec %lu dec_counter %d ", len, dec_counter);
                 dec_counter++;
 #endif
-                err = alcp_cipher_aead_decrypt(&(ctx->handle), in, out, len);
+                {
+                    Uint64 outlen = 0;
+                    err           = alcp_cipher_aead_decrypt(&(ctx->handle), in, out, len, &outlen);
+                }
             }
 
             if (alcp_is_error(err)) {
@@ -767,12 +773,18 @@ alcp_gcm_one_shot(ALCP_PROV_CIPHER_CTX* ctx,
     }
 
     if (cipherctx->enc) {
-        err = alcp_cipher_aead_encrypt(&(ctx->handle), in, out, in_len);
+        {
+            Uint64 outlen = 0;
+            err           = alcp_cipher_aead_encrypt(&(ctx->handle), in, out, in_len, &outlen);
+        }
 #if PROV_GCM_DEBUG
         printf(" enc len %lu \n", in_len);
 #endif
     } else {
-        err = alcp_cipher_aead_decrypt(&(ctx->handle), in, out, in_len);
+        {
+            Uint64 outlen = 0;
+            err           = alcp_cipher_aead_decrypt(&(ctx->handle), in, out, in_len, &outlen);
+        }
 #if PROV_GCM_DEBUG
         printf(" dec len %lu \n", in_len);
 #endif

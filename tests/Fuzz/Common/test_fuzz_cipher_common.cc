@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -62,16 +62,20 @@ TestAEADCipherLifecycle_0(alc_cipher_handle_p handle,
                           Uint8*              tag,
                           Uint64              tagl)
 {
-    if (alcp_is_error(alcp_cipher_aead_init(handle, key, keylen, iv, ivl))
-        || alcp_is_error(alcp_cipher_aead_set_aad(handle, ad, adl))
-        || alcp_is_error(
-            alcp_cipher_aead_encrypt(handle, plaintxt, &ciphertxt[0], pt_len))
-        || alcp_is_error(alcp_cipher_aead_get_tag(handle, &tag[0], tagl))) {
-        std::cout << "Neg lifecycle Test FAIL! AEAD init->SetAD->Enc->GetTag"
-                  << std::endl;
-        return false;
-    }
+    alc_error_t err    = ALC_ERROR_NONE;
+    Uint64      outlen = 0;
+    err                = alcp_cipher_aead_init(handle, key, keylen, iv, ivl);
+    if (alcp_is_error(err)) goto fail;
+    err = alcp_cipher_aead_set_aad(handle, ad, adl);
+    if (alcp_is_error(err)) goto fail;
+    err = alcp_cipher_aead_encrypt(handle, plaintxt, &ciphertxt[0], pt_len, &outlen);
+    if (alcp_is_error(err)) goto fail;
+    err = alcp_cipher_aead_get_tag(handle, &tag[0], tagl);
+    if (alcp_is_error(err)) goto fail;
     return true;
+fail:
+    std::cout << "Neg lifecycle Test FAIL! AEAD init->SetAD->Enc->GetTag" << std::endl;
+    return false;
 }
 bool
 TestAEADCipherLifecycle_0_dec(alc_cipher_handle_p handle,
@@ -87,16 +91,20 @@ TestAEADCipherLifecycle_0_dec(alc_cipher_handle_p handle,
                               Uint8*              tag,
                               Uint64              tagl)
 {
-    if (alcp_is_error(alcp_cipher_aead_init(handle, key, keylen, iv, ivl))
-        || alcp_is_error(alcp_cipher_aead_set_aad(handle, ad, adl))
-        || alcp_is_error(
-            alcp_cipher_aead_decrypt(handle, ciphertxt, plaintxt, pt_len))
-        || alcp_is_error(alcp_cipher_aead_get_tag(handle, &tag[0], tagl))) {
-        std::cout << "Neg lifecycle Test FAIL! AEAD init->SetAD->Dec->GetTag"
-                  << std::endl;
-        return false;
-    }
+    alc_error_t err    = ALC_ERROR_NONE;
+    Uint64      outlen = 0;
+    err                = alcp_cipher_aead_init(handle, key, keylen, iv, ivl);
+    if (alcp_is_error(err)) goto fail;
+    err = alcp_cipher_aead_set_aad(handle, ad, adl);
+    if (alcp_is_error(err)) goto fail;
+    err = alcp_cipher_aead_decrypt(handle, ciphertxt, plaintxt, pt_len, &outlen);
+    if (alcp_is_error(err)) goto fail;
+    err = alcp_cipher_aead_get_tag(handle, &tag[0], tagl);
+    if (alcp_is_error(err)) goto fail;
     return true;
+fail:
+    std::cout << "Neg lifecycle Test FAIL! AEAD init->SetAD->Dec->GetTag" << std::endl;
+    return false;
 }
 bool
 TestAEADCipherLifecycle_1(alc_cipher_handle_p handle,
@@ -112,16 +120,18 @@ TestAEADCipherLifecycle_1(alc_cipher_handle_p handle,
                           Uint8*              tag,
                           Uint64              tagl)
 {
-    if (alcp_is_error(alcp_cipher_aead_set_aad(handle, ad, adl))
-        || alcp_is_error(
-            alcp_cipher_aead_encrypt(handle, plaintxt, &ciphertxt[0], pt_len))
-        || alcp_is_error(alcp_cipher_aead_get_tag(handle, &tag[0], tagl))) {
-        std::cout << "Neg lifecycle Test FAIL! AEAD SetAD->Enc->GetTag on an "
-                     "uninitialized handle"
-                  << std::endl;
-        return false;
-    }
+    alc_error_t err    = ALC_ERROR_NONE;
+    Uint64      outlen = 0;
+    err                = alcp_cipher_aead_set_aad(handle, ad, adl);
+    if (alcp_is_error(err)) goto fail;
+    err = alcp_cipher_aead_encrypt(handle, plaintxt, &ciphertxt[0], pt_len, &outlen);
+    if (alcp_is_error(err)) goto fail;
+    err = alcp_cipher_aead_get_tag(handle, &tag[0], tagl);
+    if (alcp_is_error(err)) goto fail;
     return true;
+fail:
+    std::cout << "Neg lifecycle Test FAIL! AEAD SetAD->Enc->GetTag on an uninitialized handle" << std::endl;
+    return false;
 }
 bool
 TestAEADCipherLifecycle_1_dec(alc_cipher_handle_p handle,
@@ -137,16 +147,18 @@ TestAEADCipherLifecycle_1_dec(alc_cipher_handle_p handle,
                               Uint8*              tag,
                               Uint64              tagl)
 {
-    if (alcp_is_error(alcp_cipher_aead_set_aad(handle, ad, adl))
-        || alcp_is_error(
-            alcp_cipher_aead_encrypt(handle, ciphertxt, plaintxt, pt_len))
-        || alcp_is_error(alcp_cipher_aead_get_tag(handle, &tag[0], tagl))) {
-        std::cout << "Neg lifecycle Test FAIL! AEAD SetAD->Dec->GetTag on an "
-                     "uninitialized handle"
-                  << std::endl;
-        return false;
-    }
+    alc_error_t err    = ALC_ERROR_NONE;
+    Uint64      outlen = 0;
+    err                = alcp_cipher_aead_set_aad(handle, ad, adl);
+    if (alcp_is_error(err)) goto fail;
+    err = alcp_cipher_aead_encrypt(handle, ciphertxt, plaintxt, pt_len, &outlen);
+    if (alcp_is_error(err)) goto fail;
+    err = alcp_cipher_aead_get_tag(handle, &tag[0], tagl);
+    if (alcp_is_error(err)) goto fail;
     return true;
+fail:
+    std::cout << "Neg lifecycle Test FAIL! AEAD SetAD->Dec->GetTag on an uninitialized handle" << std::endl;
+    return false;
 }
 
 bool
@@ -166,9 +178,9 @@ TestAEADCipherLifecycle_2(alc_cipher_handle_p handle,
     /* try to call encrypt on a finished handle */
     alcp_cipher_aead_init(handle, key, keylen, iv, ivl);
     alcp_cipher_aead_set_aad(handle, ad, adl);
-    alcp_cipher_aead_encrypt(handle, ciphertxt, plaintxt, pt_len);
+    { Uint64 outlen = 0; alcp_cipher_aead_encrypt(handle, ciphertxt, plaintxt, pt_len, &outlen); }
     alcp_cipher_finish(handle);
-    alcp_cipher_aead_encrypt(handle, ciphertxt, plaintxt, pt_len);
+    { Uint64 outlen = 0; alcp_cipher_aead_encrypt(handle, ciphertxt, plaintxt, pt_len, &outlen); }
     return true;
 }
 bool
@@ -188,9 +200,15 @@ TestAEADCipherLifecycle_2_dec(alc_cipher_handle_p handle,
     /* try to call encrypt on a finished handle */
     alcp_cipher_aead_init(handle, key, keylen, iv, ivl);
     alcp_cipher_aead_set_aad(handle, ad, adl);
-    alcp_cipher_aead_encrypt(handle, ciphertxt, plaintxt, pt_len);
+    {
+        Uint64 outlen = 0;
+        alcp_cipher_aead_encrypt(handle, ciphertxt, plaintxt, pt_len, &outlen);
+    }
     alcp_cipher_finish(handle);
-    alcp_cipher_aead_encrypt(handle, ciphertxt, plaintxt, pt_len);
+    {
+        Uint64 outlen = 0;
+        alcp_cipher_aead_encrypt(handle, ciphertxt, plaintxt, pt_len, &outlen);
+    }
     return true;
 }
 
@@ -652,8 +670,11 @@ ALCP_Fuzz_AEAD_Cipher_Encrypt(alc_cipher_mode_t Mode,
             std::cout << "alcp_cipher_aead_set_aad failed" << std::endl;
             goto AEAD_ENC_ERROR_EXIT;
         }
-        err = alcp_cipher_aead_encrypt(
-            handle_encrypt, plaintxt, &ciphertxt[0], pt_len);
+        {
+            Uint64 outlen = 0;
+            err           = alcp_cipher_aead_encrypt(
+                handle_encrypt, plaintxt, &ciphertxt[0], pt_len, &outlen);
+        }
         if (alcp_is_error(err)) {
             std::cout << "alcp_cipher_aead_encrypt failed" << std::endl;
             goto AEAD_ENC_ERROR_EXIT;
@@ -791,8 +812,11 @@ ALCP_Fuzz_AEAD_Cipher_Decrypt(alc_cipher_mode_t Mode,
                       << std::endl;
             goto AEAD_DEC_ERROR_EXIT;
         }
-        err = alcp_cipher_aead_decrypt(
-            handle_decrypt, ciphertxt, &plaintxt[0], ct_len);
+        {
+            Uint64 outlen = 0;
+            err           = alcp_cipher_aead_decrypt(
+                handle_decrypt, ciphertxt, &plaintxt[0], ct_len, &outlen);
+        }
         if (alcp_is_error(err)) {
             std::cout << "alcp_cipher_aead_decrypt failed" << std::endl;
             goto AEAD_DEC_ERROR_EXIT;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -172,7 +172,8 @@ aclp_aes_ccm_encrypt_demo(
         return close_demo_session_exit();
     }
 
-    err = alcp_cipher_aead_encrypt(&handle, plaintxt, ciphertxt, len);
+    Uint64 encrypt_outlen = 0;
+    err           = alcp_cipher_aead_encrypt(&handle, plaintxt, ciphertxt, len, &encrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: unable encrypt \n");
         return close_demo_session_exit();
@@ -246,7 +247,8 @@ aclp_aes_ccm_decrypt_demo(const Uint8* ciphertxt,
 
     // CCM decrypt
     // Decrypt can be called only single time in case of single-update
-    err = alcp_cipher_aead_decrypt(&handle, ciphertxt, plaintxt, len);
+    Uint64 decrypt_outlen = 0;
+    err           = alcp_cipher_aead_decrypt(&handle, ciphertxt, plaintxt, len, &decrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: unable decrypt \n");
         return close_demo_session_exit();

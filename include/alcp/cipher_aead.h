@@ -145,6 +145,7 @@ alcp_cipher_aead_init(const alc_cipher_handle_p pCipherHandle,
  * @param[in]    pInput    Pointer to plainText
  * @param[out]   pOutput   Pointer to cipherText
  * @param[in]    len       Length of plainText/cipherText
+ * @param[out]   outlen    Pointer to store actual bytes written to pOutput
  * @return   &nbsp; Error Code for the API called. If alc_error_t
  * is not ALC_ERROR_NONE then an error has occurred and handle will be invalid
  * for future operations
@@ -153,7 +154,8 @@ ALCP_API_EXPORT alc_error_t
 alcp_cipher_aead_encrypt(const alc_cipher_handle_p pCipherHandle,
                          const Uint8*              pInput,
                          Uint8*                    pOutput,
-                         Uint64                    len);
+                         Uint64                    len,
+                         Uint64*                   outlen);
 
 /**
  * @brief    AEAD decryption of cipher text and write it to plain text with
@@ -169,6 +171,7 @@ alcp_cipher_aead_encrypt(const alc_cipher_handle_p pCipherHandle,
  * @param[in]    pInput    Pointer to CipherText
  * @param[out]   pOutput   Pointer to PlainText
  * @param[in]    len       Length of PlainText/CipherText
+ * @param[out]   outlen    Pointer to store actual bytes written to pOutput
  * @return   &nbsp; Error Code for the API called. If alc_error_t
  * is not ALC_ERROR_NONE then an error has occurred and handle will be invalid
  * for future operations
@@ -177,7 +180,8 @@ ALCP_API_EXPORT alc_error_t
 alcp_cipher_aead_decrypt(const alc_cipher_handle_p pCipherHandle,
                          const Uint8*              pInput,
                          Uint8*                    pOutput,
-                         Uint64                    len);
+                         Uint64                    len,
+                         Uint64*                   outlen);
 
 /**
  * @brief AEAD set Additonal Data for the Tag Generation.

@@ -96,7 +96,8 @@ AlcpChacha20Poly1305EncryptDemo(
     }
 
     // Chacha20-Poly1305 encrypt
-    err = alcp_cipher_aead_encrypt(&handle, plaintxt, ciphertxt, len);
+    Uint64 encrypt_outlen = 0;
+    err           = alcp_cipher_aead_encrypt(&handle, plaintxt, ciphertxt, len, &encrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: unable encrypt \n");
         return -1;
@@ -151,7 +152,8 @@ AlcpChacha20Poly1305DecryptDemo(const Uint8* ciphertxt,
     }
 
     // Chacha20-Poly1305 decrypt
-    err = alcp_cipher_aead_decrypt(&handle, ciphertxt, plaintxt, len);
+    Uint64 decrypt_outlen = 0;
+    err           = alcp_cipher_aead_decrypt(&handle, ciphertxt, plaintxt, len, &decrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: unable decrypt \n");
         return -1;

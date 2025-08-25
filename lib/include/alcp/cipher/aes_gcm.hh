@@ -34,6 +34,7 @@
 
 #include <cstdint>
 #include <immintrin.h>
+#include <vector>
 
 #ifdef GCM_ALWAYS_COMPUTE
 // 1: always compute, 0: compute, store and load from table
@@ -75,6 +76,15 @@ typedef struct _alc_gcm_ctx
     Int32  m_num_256blks_precomputed;
     Uint64 m_update_counter = 0;
 
+    // Streaming support for partial blocks
+    Uint8  m_partial_buffer[16];        // Buffer for incomplete blocks
+    Uint64 m_partial_buffer_len;        // Current partial data length (0-15)
+    bool   m_has_partial_data;          // Track if we have partial data
+
+    // AAD buffering for multiple setAad calls
+    std::vector<Uint8> m_aad_buffer;    // Vector for accumulated AAD data
+    bool               m_aad_processed; // Track if AAD has been processed
+
     __m128i m_hash_subKey_128;
     __m128i m_gHash_128;
     __m128i m_counter_128;
@@ -105,6 +115,11 @@ class ALCP_API_EXPORT Gcm
         m_gcm_ctx.m_num_256blks_precomputed = 0;
         m_gcm_ctx.m_update_counter          = 0;
 
+        // Initialize streaming fields
+        memset(m_gcm_ctx.m_partial_buffer, 0, 16);
+        m_gcm_ctx.m_partial_buffer_len = 0;
+        m_gcm_ctx.m_has_partial_data = false;
+
         m_gcm_ctx.m_hash_subKey_128 = _mm_setzero_si128();
         m_gcm_ctx.m_gHash_128       = _mm_setzero_si128();
         m_gcm_ctx.m_counter_128     = _mm_setzero_si128();
@@ -118,6 +133,10 @@ class ALCP_API_EXPORT Gcm
 #endif
         m_gcm_ctx.m_tag_128           = _mm_setzero_si128();
         m_gcm_ctx.m_additionalDataLen = 0;
+        
+        // Initialize AAD buffering fields
+        m_gcm_ctx.m_aad_buffer.clear();
+        m_gcm_ctx.m_aad_processed = false;
     }
 
     ~Gcm()
@@ -130,6 +149,7 @@ class ALCP_API_EXPORT Gcm
                    sizeof(Uint64) * MAX_NUM_512_BLKS * 8);
         }
 #endif
+        // AAD buffer cleanup is automatic with std::vector
     }
 
     void setTable(alc_cipher_state_t* pCipherState)
@@ -175,8 +195,11 @@ class ALCP_API_EXPORT GcmAuth
     ~GcmAuth() {}
 
     alc_error_t setAad(const Uint8* pInput, Uint64 aadLen) override;
-    alc_error_t getTag(Uint8* pTag, Uint64 tagLen) override;
     alc_error_t setTagLength(Uint64 tagLen) override;
+
+  protected:
+    // Helper function to process buffered AAD data
+    inline alc_error_t processBufferedAad();
 };
 
 template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
@@ -207,6 +230,7 @@ class GcmT
                         Uint8*       pPlainText,
                         Uint64       len,
                         Uint64*      outlen) override;
+    alc_error_t getTag(Uint8* pTag, Uint64 tagLen) override;
     alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
     {
         return ALC_ERROR_NOT_SUPPORTED;
@@ -232,6 +256,11 @@ class GcmT
     {
         return ALC_ERROR_NOT_SUPPORTED;
     }
+
+  private:
+    // Helper functions for calling encryption/decryption backends
+    alc_error_t encryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64 len);
+    alc_error_t decryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64 len);
 };
 
 } // namespace alcp::cipher
