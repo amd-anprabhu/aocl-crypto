@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2021-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -181,7 +181,7 @@ alcp_rng_supported(const alc_rng_info_p pRngInfo);
  *
  * @param [in]  pRngInfo    Pointer to RNG configuration
  *
- * @return  Uint64      Size of Rng Context
+ * @return  Uint64      Size of RNG context in bytes
  */
 ALCP_API_EXPORT Uint64
 alcp_rng_context_size(const alc_rng_info_p pRngInfo);
@@ -212,10 +212,9 @@ alcp_rng_request(const alc_rng_info_p pRngInfo, alc_rng_handle_p pRngHandle);
  * if hardware RNG requires it and before @ref alcp_rng_finish</b>
  * @endparblock
  *
- * @param [in]  pRngHandle  Pointer to Handle
- * @param [out]  pBuf        Pointer buffer that needs to be filled with random
- *                      numbers
- * @param [in]  size        size of pBuf
+ * @param [in]  pRngHandle  Pointer to handle
+ * @param [out] pBuf        Output buffer to be filled with random numbers
+ * @param [in]  size        Size of pBuf in bytes
  *
  * @return   &nbsp; Error Code for the API called. If alc_error_t
  * is not ALC_ERROR_NONE, an error has occurred and handle will be invalid for
@@ -235,7 +234,7 @@ alcp_rng_gen_random(alc_rng_handle_p pRngHandle,
  * @endparblock
  * @note       Some hardware RNGs require initialization
  *
- * @param [in]  pRngHandle      Pointer to handle returned in alcp_rng_request()
+ * @param [in]  pRngHandle      Pointer to handle returned by alcp_rng_request()
  * @return   &nbsp; Error Code for the API called. If alc_error_t
  * is not ALC_ERROR_NONE, an error has occurred and handle will be invalid for
  * future operations
@@ -245,7 +244,7 @@ ALCP_API_EXPORT alc_error_t
 alcp_rng_init(alc_rng_handle_p pRngHandle);
 
 /**
- * @brief   Seed a PRNG or other if supported
+ * @brief   Seed a PRNG (or other RNG if supported)
  *
  * @parblock <br> &nbsp;
  * <b>This API can be called after @ref alcp_rng_request and @ref alcp_rng_init

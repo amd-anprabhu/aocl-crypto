@@ -19,11 +19,15 @@ Functions
    :project: crypto
 .. doxygenfunction:: alcp_cipher_init
    :project: crypto
+.. doxygenfunction:: alcp_multibuffer_init
+   :project: crypto
 .. doxygenfunction:: alcp_cipher_encrypt
    :project: crypto
 .. doxygenfunction:: alcp_cipher_decrypt
    :project: crypto
 .. doxygenfunction:: alcp_cipher_finish
+   :project: crypto
+.. doxygenfunction:: alcp_cipher_context_copy
    :project: crypto
 .. doxygenfunction:: alcp_cipher_segment_init
    :project: crypto
@@ -38,6 +42,8 @@ Functions
 .. doxygenfunction:: alcp_cipher_aead_context_size
    :project: crypto
 .. doxygenfunction:: alcp_cipher_aead_request
+   :project: crypto
+.. doxygenfunction:: alcp_cipher_aead_request_with_extState
    :project: crypto
 .. doxygenfunction:: alcp_cipher_aead_init
    :project: crypto
@@ -55,14 +61,18 @@ Functions
    :project: crypto
 .. doxygenfunction:: alcp_cipher_aead_finish
    :project: crypto
+.. doxygenfunction:: alcp_flush
+   :project: crypto
+.. doxygenfunction:: alcp_dequeue
+   :project: crypto
 
 ----
 
 Variables
 ---------
-.. doxygenvariable:: alc_cipher_mode_t
+.. doxygentypedef:: alc_cipher_mode_t
    :project: crypto
-.. doxygenvariable:: alc_key_len_t
+.. doxygentypedef:: alc_key_len_t
    :project: crypto
-.. doxygenvariable:: alc_cipher_context_t
+.. doxygentypedef:: alc_cipher_context_t
    :project: crypto

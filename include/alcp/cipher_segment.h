@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -95,9 +95,9 @@ alcp_cipher_segment_request(const alc_cipher_mode_t cipherMode,
  * @note    Error needs to be checked for each call,
  *           valid only if @ref alcp_is_error (ret) is false
  *
- * @note    XTS: Argument currPlainTextLen should be multiple of 16bytes unless
- * it's the last call. By the last call,if there is a paritial block, both
- * partial and a complete block has to be included in the last call to this
+ * @note    XTS: Argument currPlainTextLen should be a multiple of 16 bytes unless
+ * it's the last call. By the last call, if there is a partial block, both a
+ * partial and a complete block have to be included in the last call to this
  * function.
  * @param [in]   pCipherHandle Session handle for future encrypt decrypt
  *                         operation
@@ -123,9 +123,9 @@ alcp_cipher_segment_encrypt_xts(const alc_cipher_handle_p pCipherHandle,
  * @endparblock
  * @note    Error needs to be checked for each call,
  *           valid only if @ref alcp_is_error (ret) is false
- * @note    XTS: Argument currCipherTextLen should be multiple of 16bytes unless
- * it's the last call. By the last call,if there is a paritial block, both
- * partial and a complete block has to be included in the last call to this
+ * @note    XTS: Argument currCipherTextLen should be a multiple of 16 bytes unless
+ * it's the last call. By the last call, if there is a partial block, both a
+ * partial and a complete block have to be included in the last call to this
  * function.
  *
  * @param[in]    pCipherHandle    Session handle for future encrypt decrypt

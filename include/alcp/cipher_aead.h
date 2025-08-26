@@ -51,7 +51,7 @@ EXTERN_C_BEGIN
  * identify the memory to be allocated for context </b>
  * @endparblock
  *
- * @return      Size of Context
+ * @return      Size of context in bytes
  */
 ALCP_API_EXPORT Uint64
 alcp_cipher_aead_context_size(void);
@@ -119,7 +119,7 @@ alcp_cipher_aead_request_with_extState(const alc_cipher_mode_t mode,
  * @param[in] pKey  Key
  * @param[in] keyLen  key Length in bits
  * @param[in] pIv  IV/Nonce
- * @param[in] ivLen  iv Length in bits
+ * @param[in] ivLen  IV length in bytes
  * @return   &nbsp; Error Code for the API called. If alc_error_t
  * is not ALC_ERROR_NONE then an error has occurred and handle will be invalid
  * for future operations
@@ -184,13 +184,13 @@ alcp_cipher_aead_decrypt(const alc_cipher_handle_p pCipherHandle,
                          Uint64*                   outlen);
 
 /**
- * @brief AEAD set Additonal Data for the Tag Generation.
+ * @brief AEAD set Additional Data for the Tag generation.
  * @parblock <br> &nbsp;
  * <b>This AEAD API can be called after @ref alcp_cipher_aead_init.</b>
  *
  * @endparblock
  * @param[in] pCipherHandle Session handle for encrypt/decrypt operation
- * @param[in] pInput    Additional Data in Bytes
+ * @param[in] pInput    Additional Data in bytes
  * @param[in] len       Length in bytes of Additional Data
  * @return   &nbsp; Error Code for the API called. If @ref alc_error_t
  * is not ALC_ERROR_NONE, then an error has occurred and handle will be invalid

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2021-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -39,7 +39,7 @@ EXTERN_C_BEGIN
 /**
  * @defgroup digest Digest API
  * @brief
- * A digest is a one way cryptographic function by which a message of any length
+ * A digest is a one-way cryptographic function by which a message of any length
  * can be mapped into a fixed-length output. It can be used for verifying
  * integrity or passwords.
  * @{
@@ -58,7 +58,7 @@ typedef enum _alc_digest_len
     ALC_DIGEST_LEN_288              = 288, /* for MD5_SHA1 */
     ALC_DIGEST_LEN_224              = 224, /* SHA224, SHA512/224 */
     ALC_DIGEST_LEN_256              = 256, /* MD6, SHA256, SHA512/256 */
-    ALC_DIGEST_LEN_384              = 384, /* SHA348 */
+    ALC_DIGEST_LEN_384              = 384, /* SHA384 */
     ALC_DIGEST_LEN_512              = 512, /* SHA512 */
     ALC_DIGEST_LEN_CUSTOM_SHAKE_128 = 17,  /* anything not covered by above */
     ALC_DIGEST_LEN_CUSTOM_SHAKE_256 = 18,  /* anything not covered by above */
@@ -129,7 +129,7 @@ typedef struct _alc_digest_handle
 } alc_digest_handle_t, *alc_digest_handle_p, AlcDigestHandle, *AlcDigestHandleP;
 
 /**
- * @brief  Returns the context size
+ * @brief  Returns the digest context size
  *
  * @parblock <br> &nbsp;
  * <b>This API should be called before @ref alcp_digest_request to identify the
@@ -138,7 +138,7 @@ typedef struct _alc_digest_handle
  *
  *
  *
- * @return Size of Context
+ * @return Size of context in bytes
  */
 ALCP_API_EXPORT Uint64
 alcp_digest_context_size(void);
@@ -199,7 +199,7 @@ alcp_digest_update(const alc_digest_handle_p p_digest_handle,
                    Uint64                    size);
 
 /**
- * @brief       Finalize the digest with digest copy.
+ * @brief       Finalize the digest and copy the result into the output buffer.
  *
  * @parblock <br> &nbsp;
  * <b>This API can be called only after @ref alcp_digest_update and before @ref
@@ -242,7 +242,7 @@ ALCP_API_EXPORT void
 alcp_digest_finish(const alc_digest_handle_p p_digest_handle);
 
 /**
- * @brief        copies the context from source to destination
+ * @brief        Copies the context from source to destination
  *
  * @parblock <br> &nbsp;
  * <b>This API can be called only after @ref alcp_digest_init and before @ref
@@ -259,7 +259,7 @@ alcp_digest_context_copy(const alc_digest_handle_p pSrcHandle,
                          const alc_digest_handle_p pDestHandle);
 
 /**
- * @brief        Valid only for Shake algorithm for squeezing the digest out.
+ * @brief        Valid only for SHAKE algorithm for squeezing the digest out.
  *               It can be called multiple times. It should not be called with
  * @ref alcp_digest_finalize
  *

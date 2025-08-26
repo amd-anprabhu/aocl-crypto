@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -178,7 +178,7 @@ ALCP_API_EXPORT alc_error_t
 alcp_rsa_request(alc_rsa_handle_p pRsaHandle);
 
 /**
- * @brief Function encrypts text using using public key
+ * @brief Function encrypts text using public key
  * @parblock <br> &nbsp;
  * <b>This API can be called after @ref alcp_rsa_request and before @ref
  alcp_rsa_finish</b>
@@ -204,7 +204,7 @@ alcp_rsa_publickey_encrypt(const alc_rsa_handle_p pRsaHandle,
                            Uint8*                 pEncText);
 
 /**
- * @brief Function encrypts text using using public key and oaep padding
+ * @brief Function encrypts text using public key and OAEP padding
  * @parblock <br> &nbsp;
  * <b>This API can be called after @ref alcp_rsa_request and before @ref
  alcp_rsa_finish</b>
@@ -277,7 +277,7 @@ alcp_rsa_add_mgf(const alc_rsa_handle_p pRsaHandle, alc_digest_mode_t mode);
  *         - pText absolute value should be less than modulus
  *
  * @param [in]  pRsaHandle - Handler of the Context for the session
- * @param [in]  pad        - padding scheme to be used for rsa decrytion
+ * @param [in]  pad        - padding scheme to be used for RSA decryption
  * @param [in]  pEncText   - pointer to encrypted bytes
  * @param [in]  encSize    - pointer to encrypted bytes
  * @param [out] pText      - pointer to decrypted bytes
@@ -459,7 +459,7 @@ alcp_rsa_publickey_verify_hash_pkcs1v15(const alc_rsa_handle_p pRsaHandle,
                                         const Uint8*           pSignedBuff);
 
 /**
- * @brief Function encrypts text using using public key and pkcs padding
+ * @brief Function encrypts text using public key and PKCS padding
  * @parblock <br> &nbsp;
  * <b>This API can be called after @ref alcp_rsa_request and before @ref
  * alcp_rsa_finish</b>
@@ -482,7 +482,7 @@ alcp_rsa_publickey_encrypt_pkcs1v15(const alc_rsa_handle_p pRsaHandle,
                                     const Uint8*           randomPad);
 
 /**
- * @brief Function decrypts encrypted text using private key and pkcs padding
+ * @brief Function decrypts encrypted text using private key and PKCS padding
  * @parblock <br> &nbsp;
  * <b>This API can be called after @ref alcp_rsa_request and
  * before @ref alcp_rsa_finish</b>
