@@ -244,7 +244,9 @@ alcp_cipher_aead_set_aad(const alc_cipher_handle_p pCipherHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "ADLen %6ld", aadLen);
 #endif
-    ALCP_ZERO_LEN_ERR_RET(aadLen);
+    if (aadLen == 0) {
+        return ALC_ERROR_NONE;
+    }
     ALCP_BAD_PTR_ERR_RET(pCipherHandle);
     ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
     ALCP_BAD_PTR_ERR_RET(pInput);
