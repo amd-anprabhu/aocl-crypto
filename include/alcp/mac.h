@@ -139,7 +139,7 @@ alcp_mac_context_size(void);
  * <b>This API must be called before making any other API call</b>
  * @endparblock
  * @note     Error needs to be checked after each call,
- *           valid only if @ref alcp_is_error(ret) is false
+ *           valid only if @ref alcp_is_error (ret) is false
  * @param  [in]  macType     MAC type to use
  * @param [out]  pMacHandle  Library populated session handle for future
  * mac operations.
@@ -156,7 +156,7 @@ alcp_mac_request(alc_mac_handle_p pMacHandle, alc_mac_type_t macType);
  * <b>This API must be called only after @ref alcp_mac_request</b>
  * @endparblock
  * @note     Error needs to be checked after each call,
- *           valid only if @ref alcp_is_error(ret) is false
+ *           valid only if @ref alcp_is_error (ret) is false
  * @param [in]   pMacHandle Session handle for MAC operations
  * @param [in]   key  Pointer to key for MAC operations
  * @param [in]   size Size of key in bytes

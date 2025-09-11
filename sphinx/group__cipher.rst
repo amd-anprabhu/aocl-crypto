@@ -70,9 +70,9 @@ Functions
 
 Variables
 ---------
-.. doxygentypedef:: alc_cipher_mode_t
+.. doxygenvariable:: alc_cipher_mode_t
    :project: crypto
-.. doxygentypedef:: alc_key_len_t
+.. doxygenvariable:: alc_key_len_t
    :project: crypto
-.. doxygentypedef:: alc_cipher_context_t
+.. doxygenvariable:: alc_cipher_context_t
    :project: crypto
