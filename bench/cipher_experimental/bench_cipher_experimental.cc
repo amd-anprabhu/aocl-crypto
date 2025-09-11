@@ -151,7 +151,10 @@ BenchGcmCipherExperimental(benchmark::State&            state,
             return -1;
         }
     }
-
+// if the operation is encrypt we can reuse the same cipher object but for decrypt we need to create a new cipher object
+    if constexpr (encryptor == false) {
+        iTestCipher = std::make_unique<AlcpGcmCipher<false>>();
+    }
     return BenchCipherExperimental<encryptor>(state,
                                               cBlockSize,
                                               std::move(iTestCipher),
