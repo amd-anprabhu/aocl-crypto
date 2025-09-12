@@ -75,20 +75,9 @@ class AesGenericCiphersT
     }
     ~AesGenericCiphersT()
     {
-        if (m_pIvs_aes != nullptr) {
-            // Clean up individual IV buffers
-            // Note: We need to store numBuffers or find another way to know the
-            // count For now, we'll need to add a member variable to track this
-            for (Uint64 i = 0; i < m_numBuffers; ++i) {
-                delete[] m_pIvs_aes[i];
-            }
-            delete[] m_pIvs_aes;
-            m_pIvs_aes = nullptr;
-        }
     }
 
   private:
-    Uint64 m_numBuffers = 0; // Add this to track buffer count
 
   public:
     alc_error_t encrypt(const Uint8* pPlainText,

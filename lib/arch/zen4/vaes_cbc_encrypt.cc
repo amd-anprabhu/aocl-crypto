@@ -154,15 +154,12 @@ EncryptCbc(const Uint8** pPlainText,
         return ALC_ERROR_INVALID_ARG; // Invalid number of rounds
     }
 
-    // Use dynamic allocation to avoid template attribute warnings
-    auto p_in_128_storage    = std::make_unique<const __m128i*[]>(num_buffers);
-    auto p_out_128_storage   = std::make_unique<__m128i*[]>(num_buffers);
-    auto current_ivs_storage = std::make_unique<__m128i[]>(num_buffers);
-    const __m128i**   p_in_128    = p_in_128_storage.get();
-    __m128i**         p_out_128   = p_out_128_storage.get();
-    __m128i*          current_ivs = current_ivs_storage.get();
-    auto              pkey128     = reinterpret_cast<const __m128i*>(pKey);
-    alignas(64) sKeys keys;
+    // Use stack-allocated arrays to avoid per-call heap overhead for small blocks
+    alignas(64) const __m128i* p_in_128[128];
+    alignas(64) __m128i*       p_out_128[128];
+    alignas(64) __m128i        current_ivs[128];
+    auto                       pkey128 = reinterpret_cast<const __m128i*>(pKey);
+    alignas(64) sKeys          keys;
 
     for (int i = 0; i < num_buffers; i++) {
         p_in_128[i]  = reinterpret_cast<const __m128i*>(pPlainText[i]);
@@ -184,6 +181,27 @@ EncryptCbc(const Uint8** pPlainText,
             alcp_load_key_zmm_14rounds(pkey128, keys);
             break;
     }
+    if (blocks == 1) {
+        switch(num_buffers)
+        {
+            case 4:
+                VAES512_ENCRYPT_SWITCH_ROUNDS(VAES512_ENCRYPT_BLOCK_LOOP_1_1, 1);
+                break;
+            case 8:
+                VAES512_ENCRYPT_SWITCH_ROUNDS(VAES512_ENCRYPT_BLOCK_LOOP_2_1, 2);
+                break;
+            case 16:
+                VAES512_ENCRYPT_SWITCH_ROUNDS(VAES512_ENCRYPT_BLOCK_LOOP_4_1, 4);
+                break;
+            case 32:
+                VAES512_ENCRYPT_SWITCH_ROUNDS(VAES512_ENCRYPT_BLOCK_LOOP_8_1, 8);
+                break;
+            case 64:
+                VAES512_ENCRYPT_SWITCH_ROUNDS(VAES512_ENCRYPT_BLOCK_LOOP_16_1, 16);
+                break;
+        }
+    }
+    else {
     switch (num_buffers) {
         case 4:
             VAES512_ENCRYPT_SWITCH_ROUNDS(VAES512_ENCRYPT_BLOCK_LOOP_1, 1);
@@ -201,7 +219,7 @@ EncryptCbc(const Uint8** pPlainText,
             VAES512_ENCRYPT_SWITCH_ROUNDS(VAES512_ENCRYPT_BLOCK_LOOP_16, 16);
             break;
     }
-
+    }
         // Update final IVs in the caller's pIv array if AES_MULTI_UPDATE is
         // defined
 #ifdef AES_MULTI_UPDATE

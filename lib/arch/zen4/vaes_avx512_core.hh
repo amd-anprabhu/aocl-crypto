@@ -316,6 +316,13 @@
         VAES512_UNPACK_TO_LANES_AND_UPDATE_##num_zmm(&p_out_128[0], &p_in_128[0], &current_ivs[0]); \
     }
 
+#define VAES512_ENCRYPT_BLOCK_LOOP_1_1(num_zmm, rounds)                     \
+        { \
+        VAES512_PACK_LANES_TO_ZMM_##num_zmm(&p_in_128[0], &current_ivs[0]);   \
+        AesEncryptNoLoad_##num_zmm##x512Rounds##rounds(zmm0, keys);           \
+        VAES512_UNPACK_TO_LANES_AND_UPDATE_##num_zmm(&p_out_128[0], &p_in_128[0], &current_ivs[0]); \
+    }
+
 #define VAES512_ENCRYPT_BLOCK_LOOP_2(num_zmm, rounds)                     \
     for (Uint64 i = 0; i < blocks; i++) {                                     \
         VAES512_PACK_LANES_TO_ZMM_##num_zmm(&p_in_128[0], &current_ivs[0]);   \
@@ -323,8 +330,22 @@
         VAES512_UNPACK_TO_LANES_AND_UPDATE_##num_zmm(&p_out_128[0], &p_in_128[0], &current_ivs[0]); \
     }
 
+#define VAES512_ENCRYPT_BLOCK_LOOP_2_1(num_zmm, rounds)                     \
+    { \
+        VAES512_PACK_LANES_TO_ZMM_##num_zmm(&p_in_128[0], &current_ivs[0]);   \
+        AesEncryptNoLoad_##num_zmm##x512Rounds##rounds(zmm0, zmm1, keys);     \
+        VAES512_UNPACK_TO_LANES_AND_UPDATE_##num_zmm(&p_out_128[0], &p_in_128[0], &current_ivs[0]); \
+    }
+
 #define VAES512_ENCRYPT_BLOCK_LOOP_4(num_zmm, rounds)                     \
     for (Uint64 i = 0; i < blocks; i++) {                                     \
+        VAES512_PACK_LANES_TO_ZMM_##num_zmm(&p_in_128[0], &current_ivs[0]);   \
+        AesEncryptNoLoad_##num_zmm##x512Rounds##rounds(zmm0, zmm1, zmm2, zmm3, keys); \
+        VAES512_UNPACK_TO_LANES_AND_UPDATE_##num_zmm(&p_out_128[0], &p_in_128[0], &current_ivs[0]); \
+    }
+
+#define VAES512_ENCRYPT_BLOCK_LOOP_4_1(num_zmm, rounds)                     \
+    { \
         VAES512_PACK_LANES_TO_ZMM_##num_zmm(&p_in_128[0], &current_ivs[0]);   \
         AesEncryptNoLoad_##num_zmm##x512Rounds##rounds(zmm0, zmm1, zmm2, zmm3, keys); \
         VAES512_UNPACK_TO_LANES_AND_UPDATE_##num_zmm(&p_out_128[0], &p_in_128[0], &current_ivs[0]); \
@@ -338,6 +359,13 @@
         VAES512_UNPACK_TO_LANES_AND_UPDATE_##num_zmm(&p_out_128[0], &p_in_128[0], &current_ivs[0]); \
     }
 
+#define VAES512_ENCRYPT_BLOCK_LOOP_8_1(num_zmm, rounds)                     \
+    { \
+        VAES512_PACK_LANES_TO_ZMM_##num_zmm(&p_in_128[0], &current_ivs[0]);   \
+        AesEncryptNoLoad_##num_zmm##x512Rounds##rounds(                       \
+            zmm0, zmm1, zmm2, zmm3, zmm4, zmm5, zmm6, zmm7, keys);            \
+        VAES512_UNPACK_TO_LANES_AND_UPDATE_##num_zmm(&p_out_128[0], &p_in_128[0], &current_ivs[0]); \
+    }
 #define VAES512_ENCRYPT_BLOCK_LOOP_16(num_zmm, rounds)                        \
     for (Uint64 i = 0; i < blocks; i++) {                                     \
         VAES512_PACK_LANES_TO_ZMM_##num_zmm(p_in_128, current_ivs);           \
@@ -346,7 +374,14 @@
         VAES512_UNPACK_TO_LANES_AND_UPDATE_##num_zmm(                         \
             &p_out_128[0], &p_in_128[0], &current_ivs[0]);                    \
     }
-
+#define VAES512_ENCRYPT_BLOCK_LOOP_16_1(num_zmm, rounds)                     \
+    { \
+        VAES512_PACK_LANES_TO_ZMM_##num_zmm(p_in_128, current_ivs);           \
+        AesEncryptNoLoad_##num_zmm##x512Rounds##rounds(                       \
+            zmm0,zmm1,zmm2,zmm3,zmm4,zmm5,zmm6,zmm7,zmm8,zmm9,zmm10,zmm11,zmm12,zmm13,zmm14,zmm15, keys); \
+        VAES512_UNPACK_TO_LANES_AND_UPDATE_##num_zmm(                         \
+            &p_out_128[0], &p_in_128[0], &current_ivs[0]);                    \
+    }
 #define VAES512_ENCRYPT_SWITCH_ROUNDS(macro_name, num_zmm)                \
     switch (nRounds) {                                                        \
         case 10:                                                              \

@@ -315,12 +315,17 @@ CipherMultibufferBench(benchmark::State& state,
     }
 
     // initialize the cipher context
+    #ifdef MULTI_INIT_BENCH
+    for (auto _ : state) {
+    #endif
     if (!p_cb->multibufferInit(
             nullptr, 0, iv_pointers.data(), 16, numBuffers)) {
         // multibuffer initialization
         state.SkipWithError("BENCH_INIT_FAILURE");
     }
+    #ifndef MULTI_INIT_BENCH
     for (auto _ : state) {
+    #endif
         if (!p_cb->flush(input_buffer_pointers.data(), numBuffers, blockSize)) {
             state.SkipWithError("BENCH_FLUSH_FAILURE");
         }

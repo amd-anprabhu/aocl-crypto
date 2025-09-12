@@ -50,35 +50,31 @@ AesGenericCiphersT<mode, keyLenBits, arch>::multibufferInit(const Uint8* pKey,
                                                             Uint64        ivLen,
                                                             Uint64 numBuffers)
 {
-    // Store buffer count for destructor
-    m_numBuffers = numBuffers;
 
-    m_pIvs_aes = new Uint8*[numBuffers];
+    if (numBuffers == 0 || ivLen == 0) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+
     if (m_pIvs_aes == nullptr) {
-        return ALC_ERROR_NO_MEMORY;
+        return ALC_ERROR_BAD_STATE;
     }
-
+    if (ivLen > MAX_CIPHER_IV_SIZE || numBuffers > MAX_CIPHER_BUFFER_SIZE) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     for (Uint64 i = 0; i < numBuffers; ++i) {
-        Aes::init(pKey, keyLen, pIv[i], ivLen);
-        // allocate memory for each Iv
-        m_pIvs_aes[i] = new Uint8[ivLen];
-        if (m_pIvs_aes[i] == nullptr) {
-            // Clean up on failure
-            for (Uint64 j = 0; j < i; ++j) {
-                delete[] m_pIvs_aes[j];
-            }
-            delete[] m_pIvs_aes;
-            m_pIvs_aes = nullptr;
-            return ALC_ERROR_NO_MEMORY;
+        if (pIv[i] == nullptr) {
+            return ALC_ERROR_INVALID_ARG;
         }
-        memcpy(m_pIvs_aes[i], m_pIv_aes, ivLen); // copy each IV
+        // Initialize per-buffer IV into internal single-IV storage
+        Aes::init(pKey, keyLen, pIv[i], ivLen);
+
+        // Copy initialized IV into the statically allocated slot
+        memcpy(m_Ivs_aes[i], m_pIv_aes, ivLen);
     }
-    // REMOVED: delete[] m_pIv_aes; // INVALID: m_pIv_aes points to
-    // stack-allocated m_iv_aes
     return ALC_ERROR_NONE;
 }
-// flush function to store the multibuffer data to the memory
 
+// flush function to store the multibuffer data to the memory
 template<alcp::cipher::CipherMode       mode,
          alcp::cipher::CipherKeyLen     keyLenBits,
          alcp::utils::CpuCipherFeatures arch>
@@ -117,97 +113,170 @@ AesGenericCiphersT<mode, keyLenBits, arch>::dequeue(Uint8** pCipherText,
     if (__builtin_expect(arch < CpuCipherFeatures::eVaes512, 0)) {
         return ALC_ERROR_NO_FALLBACK;
     }
-    using EncryptWrapper =
-        std::function<alc_error_t(int bufferIdx, int i, size_t numBuffers)>;
-
-    EncryptWrapper encryptWrapper[3];
-
-    if (mode == CipherMode::eAesCBC) {
-        encryptWrapper[0] = [&](int bufferIdx, int i, size_t numBuffers) {
-            return aesni::EncryptCbc(m_pData_aes[bufferIdx],
-                                     pCipherText[bufferIdx],
-                                     len,
-                                     m_cipher_key_data.m_enc_key,
-                                     getRounds(),
-                                     m_pIvs_aes[bufferIdx]);
-        };
-
-        encryptWrapper[1] = [&](int bufferIdx, int i, size_t numBuffers) {
-            return vaes::EncryptCbc(&m_pData_aes[bufferIdx],
-                                    &pCipherText[bufferIdx],
-                                    len,
-                                    m_cipher_key_data.m_enc_key,
-                                    getRounds(),
-                                    numBuffers,
-                                    &m_pIvs_aes[bufferIdx]);
-        };
-
-        encryptWrapper[2] = [&](int bufferIdx, int i, size_t numBuffers) {
-            return vaes512::EncryptCbc(&m_pData_aes[bufferIdx],
-                                       &pCipherText[bufferIdx],
-                                       len,
-                                       m_cipher_key_data.m_enc_key,
-                                       getRounds(),
-                                       numBuffers,
-                                       &m_pIvs_aes[bufferIdx]);
-        };
-    } else if (mode == CipherMode::eAesCFB) {
-        encryptWrapper[0] = [&](int bufferIdx, int i, size_t numBuffers) {
-            return aesni::EncryptCfb(m_pData_aes[bufferIdx],
-                                     pCipherText[bufferIdx],
-                                     len,
-                                     m_cipher_key_data.m_enc_key,
-                                     getRounds(),
-                                     m_pIvs_aes[bufferIdx]);
-        };
-
-        encryptWrapper[1] = [&](int bufferIdx, int i, size_t numBuffers) {
-            return vaes::EncryptCfb(&m_pData_aes[bufferIdx],
-                                    &pCipherText[bufferIdx],
-                                    len,
-                                    m_cipher_key_data.m_enc_key,
-                                    getRounds(),
-                                    numBuffers,
-                                    &m_pIvs_aes[bufferIdx]);
-        };
-
-        encryptWrapper[2] = [&](int bufferIdx, int i, size_t numBuffers) {
-            return vaes512::EncryptCfb(&m_pData_aes[bufferIdx],
-                                       &pCipherText[bufferIdx],
-                                       len,
-                                       m_cipher_key_data.m_enc_key,
-                                       getRounds(),
-                                       numBuffers,
-                                       &m_pIvs_aes[bufferIdx]);
-        };
-    } else {
-
-        return ALC_ERROR_NOT_SUPPORTED; // Unsupported mode
+    // Direct dispatch, no lambdas or std::function
+    if constexpr (!(mode == CipherMode::eAesCBC || mode == CipherMode::eAesCFB)) {
+        return ALC_ERROR_NOT_SUPPORTED;
     }
 
     // Split up the number of buffers into power of 2
     if (__builtin_expect(numBuffers >= 128, 0)) {
         return ALC_ERROR_INVALID_ARG;
     }
-    int processedBuffers = 0;
-    for (int i = 7; i >= 0; i--) {
-        if (numBuffers & (1ULL << i)) {
-            size_t bufferCount = (1ULL << i);
-
+    // Power-of-two fast path
+    if (__builtin_expect(numBuffers && ((numBuffers & (numBuffers - 1)) == 0), 1)) {
+        int i = __builtin_ctzll(numBuffers);
+        size_t bufferCount = static_cast<size_t>(1ULL << i);
+        if constexpr (mode == CipherMode::eAesCBC) {
             if (i == 0) {
-                err = encryptWrapper[0](processedBuffers, i, bufferCount);
+                err = aesni::EncryptCbc(m_pData_aes[0],
+                                        pCipherText[0],
+                                        len,
+                                        m_cipher_key_data.m_enc_key,
+                                        getRounds(),
+                                        m_Ivs_aes[0]);
             } else if (i == 1) {
-                err = encryptWrapper[1](processedBuffers, i, bufferCount);
+                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
+                for (size_t j = 0; j < bufferCount; ++j) {
+                    ivPtrs[j] = m_Ivs_aes[j];
+                }
+                err = vaes::EncryptCbc(&m_pData_aes[0],
+                                       &pCipherText[0],
+                                       len,
+                                       m_cipher_key_data.m_enc_key,
+                                       getRounds(),
+                                       bufferCount,
+                                       ivPtrs);
             } else {
-                err = encryptWrapper[2](processedBuffers, i, bufferCount);
+                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
+                for (size_t j = 0; j < bufferCount; ++j) {
+                    ivPtrs[j] = m_Ivs_aes[j];
+                }
+                err = vaes512::EncryptCbc(&m_pData_aes[0],
+                                          &pCipherText[0],
+                                          len,
+                                          m_cipher_key_data.m_enc_key,
+                                          getRounds(),
+                                          bufferCount,
+                                          ivPtrs);
             }
-
-            if (err != ALC_ERROR_NONE) {
-                return err;
+        } else {
+            if (i == 0) {
+                err = aesni::EncryptCfb(m_pData_aes[0],
+                                        pCipherText[0],
+                                        len,
+                                        m_cipher_key_data.m_enc_key,
+                                        getRounds(),
+                                        m_Ivs_aes[0]);
+            } else if (i == 1) {
+                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
+                for (size_t j = 0; j < bufferCount; ++j) {
+                    ivPtrs[j] = m_Ivs_aes[j];
+                }
+                err = vaes::EncryptCfb(&m_pData_aes[0],
+                                       &pCipherText[0],
+                                       len,
+                                       m_cipher_key_data.m_enc_key,
+                                       getRounds(),
+                                       bufferCount,
+                                       ivPtrs);
+            } else {
+                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
+                for (size_t j = 0; j < bufferCount; ++j) {
+                    ivPtrs[j] = m_Ivs_aes[j];
+                }
+                err = vaes512::EncryptCfb(&m_pData_aes[0],
+                                          &pCipherText[0],
+                                          len,
+                                          m_cipher_key_data.m_enc_key,
+                                          getRounds(),
+                                          bufferCount,
+                                          ivPtrs);
             }
-
-            processedBuffers += bufferCount;
         }
+        if (err != ALC_ERROR_NONE) {
+            return err;
+        }
+        return ALC_ERROR_NONE;
+    }
+
+    // General path: iterate over set bits from MSB to LSB
+    size_t processedBuffers = 0;
+    Uint64 remaining = numBuffers;
+    while (remaining) {
+        int i = 63 - __builtin_clzll(remaining);
+        size_t bufferCount = static_cast<size_t>(1ULL << i);
+        if constexpr (mode == CipherMode::eAesCBC) {
+            if (i == 0) {
+                err = aesni::EncryptCbc(m_pData_aes[processedBuffers],
+                                        pCipherText[processedBuffers],
+                                        len,
+                                        m_cipher_key_data.m_enc_key,
+                                        getRounds(),
+                                        m_Ivs_aes[processedBuffers]);
+            } else if (i == 1) {
+                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
+                for (size_t j = 0; j < bufferCount; ++j) {
+                    ivPtrs[j] = m_Ivs_aes[processedBuffers + j];
+                }
+                err = vaes::EncryptCbc(&m_pData_aes[processedBuffers],
+                                       &pCipherText[processedBuffers],
+                                       len,
+                                       m_cipher_key_data.m_enc_key,
+                                       getRounds(),
+                                       bufferCount,
+                                       ivPtrs);
+            } else {
+                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
+                for (size_t j = 0; j < bufferCount; ++j) {
+                    ivPtrs[j] = m_Ivs_aes[processedBuffers + j];
+                }
+                err = vaes512::EncryptCbc(&m_pData_aes[processedBuffers],
+                                          &pCipherText[processedBuffers],
+                                          len,
+                                          m_cipher_key_data.m_enc_key,
+                                          getRounds(),
+                                          bufferCount,
+                                          ivPtrs);
+            }
+        } else {
+            if (i == 0) {
+                err = aesni::EncryptCfb(m_pData_aes[processedBuffers],
+                                        pCipherText[processedBuffers],
+                                        len,
+                                        m_cipher_key_data.m_enc_key,
+                                        getRounds(),
+                                        m_Ivs_aes[processedBuffers]);
+            } else if (i == 1) {
+                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
+                for (size_t j = 0; j < bufferCount; ++j) {
+                    ivPtrs[j] = m_Ivs_aes[processedBuffers + j];
+                }
+                err = vaes::EncryptCfb(&m_pData_aes[processedBuffers],
+                                       &pCipherText[processedBuffers],
+                                       len,
+                                       m_cipher_key_data.m_enc_key,
+                                       getRounds(),
+                                       bufferCount,
+                                       ivPtrs);
+            } else {
+                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
+                for (size_t j = 0; j < bufferCount; ++j) {
+                    ivPtrs[j] = m_Ivs_aes[processedBuffers + j];
+                }
+                err = vaes512::EncryptCfb(&m_pData_aes[processedBuffers],
+                                          &pCipherText[processedBuffers],
+                                          len,
+                                          m_cipher_key_data.m_enc_key,
+                                          getRounds(),
+                                          bufferCount,
+                                          ivPtrs);
+            }
+        }
+        if (err != ALC_ERROR_NONE) {
+            return err;
+        }
+        processedBuffers += bufferCount;
+        remaining &= ~(1ULL << i);
     }
     return ALC_ERROR_NONE;
 }
