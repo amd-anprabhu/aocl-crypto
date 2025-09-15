@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,7 +33,8 @@ typedef struct _alc_digest_info
     alc_digest_len_t dt_len;
     /* valid when dgst_len == ALC_DIGEST_LEN_CUSTOM */
     /* length is bits */
-    Uint32            dt_custom_len;
+    Uint32 dt_custom_len;
+
     alc_digest_mode_t dt_mode;
 } alc_digest_info_t, *alc_digest_info_p;
 
@@ -729,8 +730,8 @@ ALCP_Fuzz_Rsa_EncryptDecrypt_PKCS(const Uint8* buf, size_t len, int EncDec)
     BigNum public_key{};
 
     /* Pvt key params */
-    Uint64 size_dp = 128, size_dq = 128, size_p_mod = 128, size_q_mod = 128,
-           size_qinv = 128;
+    const Uint64 size_dp = 128, size_dq = 128, size_p_mod = 128,
+                 size_q_mod = 128, size_qinv = 128;
     std::vector<Uint8> dp(size_dp);
     std::vector<Uint8> dq(size_dq);
     std::vector<Uint8> p_mod(size_p_mod);
@@ -739,6 +740,7 @@ ALCP_Fuzz_Rsa_EncryptDecrypt_PKCS(const Uint8* buf, size_t len, int EncDec)
 
     Uint64 DP_BigNum[size_dp / 8];
     Uint64 DQ_BigNum[size_dp / 8];
+
     Uint64 P_BigNum[size_dp / 8];
     Uint64 Q_BigNum[size_dp / 8];
     Uint64 QINV_BigNum[size_dp / 8];
@@ -848,8 +850,8 @@ ALCP_Fuzz_Rsa_DigestSign(const Uint8* buf, size_t len, int PaddingMode)
     int index = 0, digest_info_size = 0;
 
     /* Pvt key params */
-    Uint64 size_dp = 128, size_dq = 128, size_p_mod = 128, size_q_mod = 128,
-           size_qinv = 128;
+    const Uint64 size_dp = 128, size_dq = 128, size_p_mod = 128,
+                 size_q_mod = 128, size_qinv = 128;
     std::vector<Uint8> dp(size_dp);
     std::vector<Uint8> dq(size_dq);
     std::vector<Uint8> p_mod(size_p_mod);

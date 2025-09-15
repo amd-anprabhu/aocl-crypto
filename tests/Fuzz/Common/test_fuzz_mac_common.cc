@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -145,11 +145,9 @@ ALCP_Fuzz_Mac(_alc_mac_type     mac_type,
     int                                       mac_update_call_cout = id(rng);
 
     /* for HMAC its sha size, for CMAC and Poly1305, its 16 */
-    Uint64 mac_size = 16;
-    if (mac_type == ALC_MAC_HMAC) {
-        mac_size = mac_sha_mode_len_map[mode] / 8;
-    }
-    Uint8 mac[mac_size];
+    Uint64 mac_size =
+        (mac_type == ALC_MAC_HMAC) ? (mac_sha_mode_len_map[mode] / 8) : 16;
+    std::vector<Uint8> mac(mac_size);
 
     std::cout << mac_type_string_map[mac_type]
               << " Running for Input size: " << size_input
@@ -185,7 +183,7 @@ ALCP_Fuzz_Mac(_alc_mac_type     mac_type,
                                 fuzz_key.size(),
                                 &fuzz_input[0],
                                 fuzz_input.size(),
-                                mac,
+                                mac.data(),
                                 mac_size,
                                 macinfo)) {
             goto dealloc;
@@ -195,7 +193,7 @@ ALCP_Fuzz_Mac(_alc_mac_type     mac_type,
                                 fuzz_key.size(),
                                 &fuzz_input[0],
                                 fuzz_input.size(),
-                                mac,
+                                mac.data(),
                                 mac_size,
                                 macinfo)) {
             goto dealloc;
@@ -218,7 +216,7 @@ ALCP_Fuzz_Mac(_alc_mac_type     mac_type,
             std::cout << "Called macupdate for iteration:" << i << std::endl;
         }
         /* finalize */
-        err = alcp_mac_finalize(&handle, mac, mac_size);
+        err = alcp_mac_finalize(&handle, mac.data(), mac_size);
         if (alcp_is_error(err)) {
             std::cout << "Error! alcp_mac_finalize" << std::endl;
             goto dealloc;

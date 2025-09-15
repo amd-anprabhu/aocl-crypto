@@ -72,7 +72,7 @@ ALCP_Fuzz_Ec_x25519(const Uint8* buf, size_t len, bool TestNegLifecycle)
     FuzzedDataProvider stream(buf, len);
 
     /* Fix the key size as 32 */
-    size_t key_size = 32;
+    const size_t key_size = 32;
 
     Uint64 size;
     Uint8  secret_key_peer1[key_size];

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -75,7 +75,7 @@ ALCP_Fuzz_Drbg(_alc_drbg_type DrbgType,
     alc_error_t        err;
     FuzzedDataProvider stream(buf, len);
     size_t             size_output = stream.ConsumeIntegral<Uint16>();
-    Uint8              output[size_output];
+    std::vector<Uint8> output(size_output);
     size_t             size_max_entropy_len = stream.ConsumeIntegral<Uint16>();
     size_t             size_max_nonce_len   = stream.ConsumeIntegral<Uint16>();
     std::vector<Uint8> fuzz_custom_entropy =
