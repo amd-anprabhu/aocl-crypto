@@ -23,6 +23,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+find_package(Threads REQUIRED)
 FUNCTION(ADD_EXAMPLE EXAMPLE_SOURCE)
     # Dynamic Example
     # FIXME: to suppress false warnings from gcc (known issue, re-check with newer gcc versions)
@@ -46,5 +47,5 @@ FUNCTION(ADD_EXAMPLE EXAMPLE_SOURCE)
 
     # Static Example
     add_executable(${EXAMPLE_TARGET}-static ${EXAMPLE_SOURCE})
-    target_link_libraries(${EXAMPLE_TARGET}-static PRIVATE alcp_static)
+    target_link_libraries(${EXAMPLE_TARGET}-static PRIVATE alcp_static Threads::Threads)
 ENDFUNCTION()
