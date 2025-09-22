@@ -38,6 +38,9 @@ namespace alcp::utils {
 alc_error_t
 memlock(const void* mem, Uint64 size)
 {
+    // Workaround for sshd crash.
+    // TODO: FIX by making mlock optional be a build time option.
+    return ALC_ERROR_NONE;
 #ifdef ALCP_BUILD_OS_LINUX
     int err = mlock(mem, size);
     if (err) {
@@ -52,6 +55,8 @@ memlock(const void* mem, Uint64 size)
 alc_error_t
 memunlock(const void* mem, Uint64 size)
 {
+    // TODO: FIX by making munlock optional be a build time option.
+    return ALC_ERROR_NONE;
 #ifdef ALCP_BUILD_OS_LINUX
     int err = munlock(mem, size);
     if (err) {
