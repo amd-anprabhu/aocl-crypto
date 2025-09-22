@@ -1,8 +1,8 @@
 # Instructions to Build/Use OpenSSL plugin
-AOCL Cryptography's OpenSSL compat library works as an OpenSSL Provider which will redirect API calls from within OpenSSL to AOCL-Cryptography. Currently provider only supports OpenSSL versions from 3.1.3 to 3.3.0 .
+AOCL Cryptography's OpenSSL compat library works as an OpenSSL Provider which will redirect API calls from within OpenSSL to AOCL-Cryptography. 
+
 The provider only works when the version of the OpenSSL used to compile provider is greater than or equal to the version of the openssl library currently being loaded. 
- 
-> <span style="color:red">__Note:__</span> Known issue with test_quick_multistream test
+
 
 ## Building
 
@@ -133,3 +133,5 @@ MAC Algorithm | Compiler Option|Default value|
 |HMAC|ALCP_COMPAT_ENABLE_OPENSSL_MAC_HMAC|OFF|
 |CMAC|ALCP_COMPAT_ENABLE_OPENSSL_MAC_CMAC|ON|
 |POLY1305|ALCP_COMPAT_ENABLE_OPENSSL_MAC_POLY1305|ON|
+
+If OpenSSL Cipher Multi Update functionalities are required, ensure to compile with -DALCP_ENABLE_CIPHER_MULTI_UPDATE=ON.
