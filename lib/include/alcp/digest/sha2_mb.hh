@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -27,53 +27,38 @@
  */
 
 #pragma once
-#include "alcp/alcp.h"
-#include "file.hh"
-#include "utils.hh"
-#include <map>
-#include <vector>
 
-namespace alcp::testing {
+#include "alcp/digest.hh"
 
-struct alcp_digest_data_t
+namespace alcp::digest {
+
+template<alc_digest_len_t digest_len>
+class Sha2MB final
 {
-    const Uint8* m_msg     = nullptr;
-    Uint64       m_msg_len = 0;
-    Uint8*       m_digest  = nullptr;
-    Uint8*       m_digest_dup =
-        nullptr; /* digest output read from duplicate handle using the squeeze
-                    api, only for Shake variants */
-    Uint64 m_digest_len = 0;
+    static_assert(ALC_DIGEST_LEN_224 == digest_len
+                  || ALC_DIGEST_LEN_256 == digest_len);
 
-    const Uint8** m_p_msg    = nullptr;
-    Uint8**       m_p_digest = nullptr;
-    Uint64        m_buffers  = 0;
-};
-
-/* add mapping for SHA mode and length */
-extern std::map<alc_digest_len_t, alc_digest_mode_t> sha2_mode_len_map;
-extern std::map<alc_digest_len_t, alc_digest_mode_t> sha3_mode_len_map;
-
-typedef enum
-{
-    SHA2_224 = 0,
-    SHA2_256,
-    SHA2_384,
-    SHA2_512,
-    SHA3_224,
-    SHA3_256,
-    SHA3_384,
-    SHA3_512,
-} record_t;
-class DigestBase
-{
   public:
-    virtual bool init()                                          = 0;
-    virtual bool digest_update(const alcp_digest_data_t& data)   = 0;
-    virtual bool digest_finalize(const alcp_digest_data_t& data) = 0;
-    virtual bool digest_squeeze(const alcp_digest_data_t& data)  = 0;
-    virtual bool context_copy()                                  = 0;
-    virtual void reset()                                         = 0;
+    ALCP_API_EXPORT Sha2MB()  = default;
+    ALCP_API_EXPORT ~Sha2MB() = default;
+
+  public:
+    ALCP_API_EXPORT void        init(void);
+    ALCP_API_EXPORT alc_error_t flush(const Uint8** ppMsgBuf,
+                                      const Uint64  numBuffers,
+                                      const Uint64  msgLen);
+    ALCP_API_EXPORT alc_error_t dequeue(Uint8**      ppDstBuf,
+                                        const Uint64 numBuffers,
+                                        const Uint64 digestLen);
+
+  private:
+    alignas(64) Uint32 m_hash[8]{};
+    const Uint8** m_buffers     = nullptr;
+    Uint64        m_msg_len     = 0;
+    Uint64        m_num_buffers = 0;
 };
 
-} // namespace alcp::testing
+typedef Sha2MB<ALC_DIGEST_LEN_224> Sha224MB;
+typedef Sha2MB<ALC_DIGEST_LEN_256> Sha256MB;
+
+} // namespace alcp::digest

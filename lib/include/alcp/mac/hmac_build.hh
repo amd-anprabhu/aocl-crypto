@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -143,7 +143,9 @@ __hmac_wrapperInit(Context*        ctx,
             break;
         }
         case ALC_SHAKE_128:
-        case ALC_SHAKE_256: {
+        case ALC_SHAKE_256:
+        case ALC_MB_SHA2_224:
+        case ALC_MB_SHA2_256: {
             alc_error_t err = ALC_ERROR_NONE;
             digest          = nullptr;
             err             = ALC_ERROR_NOT_SUPPORTED;

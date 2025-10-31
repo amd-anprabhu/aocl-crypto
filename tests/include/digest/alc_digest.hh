@@ -53,12 +53,14 @@ GetDigestLen(alc_digest_mode_t mode)
         case ALC_SHA2_224:
         case ALC_SHA3_224:
         case ALC_SHA2_512_224:
+        case ALC_MB_SHA2_224:
             len = ALC_DIGEST_LEN_224;
             break;
         case ALC_SHA2_256:
         case ALC_SHA3_256:
         case ALC_SHA2_512_256:
         case ALC_SHAKE_256:
+        case ALC_MB_SHA2_256:
             len = ALC_DIGEST_LEN_256;
             break;
         case ALC_SHA2_384:
@@ -98,6 +100,10 @@ class AlcpDigestBase : public DigestBase
     bool digest_finalize(const alcp_digest_data_t& data);
 
     bool digest_squeeze(const alcp_digest_data_t& data);
+
+    bool digest_flush(const alcp_digest_data_t& data);
+
+    bool digest_dequeue(const alcp_digest_data_t& data);
 
     /* Resets the context back to initial condition, reuse context */
     void reset();

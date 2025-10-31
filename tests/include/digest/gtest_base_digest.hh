@@ -76,6 +76,8 @@ GetDigestStr(alc_digest_mode_t mode)
         case ALC_SHA2_512:
         case ALC_SHA2_512_224:
         case ALC_SHA2_512_256:
+        case ALC_MB_SHA2_224:
+        case ALC_MB_SHA2_256:
             return "SHA";
         case ALC_SHA3_224:
         case ALC_SHA3_256:
@@ -209,6 +211,76 @@ Digest_KAT(alc_digest_mode_t mode, bool ctx_copy, bool test_squeeze)
                     csv,
                     std::string(GetDigestStr(mode) + "_" + SHA3_SHAKE_Len_Str
                                 + "_KAT" + " for duplicate digest")));
+            }
+        }
+    } else if (mode == ALC_MB_SHA2_224 || mode == ALC_MB_SHA2_256) {
+        /* Multibuffer KAT for SHA2-224 / SHA2-256:
+         * For each CSV entry use the same message buffer for all multibuffer
+         * slots. Allocate per-slot digest outputs, flush, dequeue and compare
+         * each slot against the expected digest from the CSV.
+         */
+        const Uint64      buffers    = 16;
+        alc_digest_mode_t sb_mode    = (mode == ALC_MB_SHA2_224) ? ALC_SHA2_224
+                                                                 : ALC_SHA2_256;
+        const Uint64      hash_bytes = GetDigestLen(sb_mode) / 8;
+
+        while (csv.readNext()) {
+            auto msg = csv.getVect("MESSAGE");
+            /* expected digest from CSV */
+            auto expected_digest = csv.getVect("DIGEST");
+
+            /* single message buffer reused across all slots */
+            std::vector<Uint8> msg_buf(msg.begin(), msg.end());
+            const Uint8*       msg_ptr    = nullptr;
+            Uint64             msg_len    = csv.getVect("MESSAGE").size();
+            bool               isMsgEmpty = std::all_of(
+                msg.begin(), msg.end(), [](int i) { return i == 0; });
+            if (msg_len == 0) {
+                msg_ptr = &Temp;
+                msg_len = 0;
+            } else {
+                msg_ptr = &(msg_buf[0]);
+            }
+            if (isMsgEmpty) {
+                msg_len = 0;
+                msg_ptr = &Temp;
+            }
+
+            std::vector<const Uint8*> mb_src(buffers);
+            std::vector<Uint8*>       mb_dst(buffers);
+
+            for (Uint64 i = 0; i < buffers; ++i) {
+                mb_src[i] = msg_ptr;
+                mb_dst[i] = (Uint8*)std::malloc(hash_bytes);
+                ASSERT_NE(mb_dst[i], nullptr);
+            }
+
+            alcp_digest_data_t data{};
+            data.m_p_msg      = mb_src.data();
+            data.m_p_digest   = mb_dst.data();
+            data.m_digest_len = hash_bytes;
+            data.m_msg_len    = msg_len;
+            data.m_buffers    = buffers;
+
+            if (!adb.digest_flush(data)) {
+                std::cout << "Error: Digest flush failed" << std::endl;
+                FAIL();
+            }
+            if (!adb.digest_dequeue(data)) {
+                std::cout << "Error: Digest dequeue failed" << std::endl;
+                FAIL();
+            }
+
+            /* Compare every slot's output with expected digest from CSV */
+            for (Uint64 i = 0; i < buffers; ++i) {
+                EXPECT_EQ(
+                    0,
+                    std::memcmp(mb_dst[i], &(expected_digest[0]), hash_bytes))
+                    << "Multibuffer KAT mismatch at slot " << i;
+            }
+
+            for (Uint64 i = 0; i < buffers; ++i) {
+                std::free(mb_dst[i]);
             }
         }
     } else {
@@ -380,4 +452,122 @@ Digest_Cross(int HashSize, alc_digest_mode_t mode, bool ctx_copy)
     }
 }
 
+void
+Digest_Multibuffer_Cross(int HashSize, alc_digest_mode_t sb_mode)
+{
+
+#ifndef USE_OSSL
+    printErrors("Exiting, OSSL external lib not available");
+    exit(-1);
+#endif
+
+    alc_digest_mode_t mb_mode{};
+    switch (sb_mode) {
+        case ALC_SHA2_224:
+            ASSERT_EQ(HashSize, 224);
+            mb_mode = ALC_MB_SHA2_224;
+            break;
+        case ALC_SHA2_256:
+            ASSERT_EQ(HashSize, 256);
+            mb_mode = ALC_MB_SHA2_256;
+            break;
+        default:
+            std::cout << "Multibuffer is not supported for this mode; skipping "
+                         "test (supported: SHA2-224, SHA2-256)."
+                      << std::endl;
+            return;
+    }
+
+    RngBase                   rb;
+    OpenSSLDigestBase         odb(sb_mode);
+    const std::vector<Uint64> buffer_counts = { 1, 2, 4, 8, 16, 32, 48, 64 };
+    const Uint64              hash_bytes    = HashSize / 8;
+    AlcpDigestBase            adb(mb_mode);
+
+    for (auto buffers : buffer_counts) {
+        for (Uint64 in_len = 0; in_len <= 2048; in_len++) {
+
+            std::vector<std::vector<Uint8>> msgs(buffers);
+            std::vector<const Uint8*>       src(buffers);
+            std::vector<Uint8*>             expected(buffers);
+
+            for (Uint64 i = 0; i < buffers; ++i) {
+                if (in_len == 0) {
+                    msgs[i] = std::vector<Uint8>{ 0 };
+                } else {
+                    msgs[i] = rb.genRandomBytes(in_len);
+                }
+                src[i]      = &(msgs[i][0]);
+                expected[i] = (Uint8*)std::malloc(hash_bytes);
+                ASSERT_NE(expected[i], nullptr);
+            }
+
+            // Calculate the expected value
+            for (Uint64 i = 0; i < buffers; ++i) {
+                alcp_digest_data_t data;
+                data.m_msg        = src[i];
+                data.m_msg_len    = in_len;
+                data.m_digest_len = hash_bytes;
+                data.m_digest     = expected[i];
+
+                if (!odb.init()) {
+                    std::cout << "Error: OpenSSL digest init failed"
+                              << std::endl;
+                    FAIL();
+                }
+                if (!odb.digest_update(data)) {
+                    std::cout << "Error: OpenSSL digest update failed"
+                              << std::endl;
+                    FAIL();
+                }
+                if (!odb.digest_finalize(data)) {
+                    std::cout << "Error: OpenSSL digest finalize failed"
+                              << std::endl;
+                    FAIL();
+                }
+            }
+
+            std::vector<const Uint8*> mb_src(buffers);
+            std::vector<Uint8*>       mb_dst(buffers);
+
+            for (Uint64 i = 0; i < buffers; i++) {
+                mb_src[i] = src[i];
+                mb_dst[i] = (Uint8*)std::malloc(hash_bytes);
+                ASSERT_NE(mb_dst[i], nullptr);
+            }
+
+            alcp_digest_data_t data{};
+            data.m_p_msg      = mb_src.data();
+            data.m_p_digest   = mb_dst.data();
+            data.m_digest_len = hash_bytes;
+            data.m_msg_len    = in_len;
+            data.m_buffers    = buffers;
+
+            // Flush and dequeue
+            if (!adb.digest_flush(data)) {
+                std::cout << "Error: Digest flush failed" << std::endl;
+                FAIL();
+            }
+            if (!adb.digest_dequeue(data)) {
+                std::cout << "Error: Digest dequeue failed" << std::endl;
+                FAIL();
+            }
+
+            // Compare digest bytes
+            for (Uint64 i = 0; i < buffers; i++) {
+                EXPECT_EQ(0, std::memcmp(expected[i], mb_dst[i], hash_bytes))
+                    << "Error\n";
+            }
+
+            // Cleanup
+            for (Uint64 i = 0; i < buffers; ++i) {
+                std::free(mb_dst[i]);
+            }
+            // Free memory allocated for expected values
+            for (Uint64 i = 0; i < buffers; ++i) {
+                std::free(expected[i]);
+            }
+        }
+    }
+}
 #endif

@@ -152,6 +152,24 @@ TEST(DIGEST_SHA3, KAT_512)
     Digest_KAT(ALC_SHA3_512, false, false);
 }
 
+TEST(DIGEST_SHA2_MB, KAT_256)
+
+{
+    if (useipp || useossl || oa_override)
+        GTEST_SKIP()
+            << "IPP/OSSL doesnt have SHA256 multibuffer implemented yet";
+    Digest_KAT(ALC_MB_SHA2_256, false, false);
+}
+
+TEST(DIGEST_SHA2_MB, KAT_224)
+
+{
+    if (useipp || useossl || oa_override)
+        GTEST_SKIP()
+            << "IPP/OSSL doesnt have SHA224 multibuffer implemented yet";
+    Digest_KAT(ALC_MB_SHA2_224, false, false);
+}
+
 int
 main(int argc, char** argv)
 {

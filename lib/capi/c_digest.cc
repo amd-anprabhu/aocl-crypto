@@ -64,6 +64,64 @@ alcp_digest_request(alc_digest_mode_t mode, alc_digest_handle_p pDigestHandle)
 }
 
 alc_error_t
+alcp_digest_flush(const alc_digest_handle_p pDigestHandle,
+                  const Uint8**             ppMsgBuf,
+                  const Uint64              numBuffers,
+                  const Uint64              msgLen)
+{
+#ifdef ALCP_ENABLE_DEBUG_LOGGING
+    ALCP_DEBUG_LOG(
+        LOG_INFO, "numBuffers %6ld, msgLen %6ld", numBuffers, msgLen);
+#endif
+    alc_error_t err = ALC_ERROR_NONE;
+
+    ALCP_BAD_PTR_ERR_RET(pDigestHandle);
+    ALCP_BAD_PTR_ERR_RET(pDigestHandle->context);
+    ALCP_BAD_PTR_ERR_RET(ppMsgBuf);
+    ALCP_ZERO_LEN_ERR_RET(numBuffers);
+    for (Uint64 i = 0; i < numBuffers; i++) {
+        ALCP_BAD_PTR_ERR_RET(ppMsgBuf[i]);
+    }
+
+    auto ctx = static_cast<digest::Context*>(pDigestHandle->context);
+    ALCP_BAD_PTR_ERR_RET(ctx);
+    ALCP_BAD_PTR_ERR_RET(ctx->flush);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_digest);
+
+    err = ctx->flush(ctx->m_digest, ppMsgBuf, numBuffers, msgLen);
+    return err;
+}
+
+alc_error_t
+alcp_digest_dequeue(const alc_digest_handle_p pDigestHandle,
+                    Uint8**                   ppDstBuf,
+                    const Uint64              numBuffers,
+                    const Uint64              digestLen)
+{
+#ifdef ALCP_ENABLE_DEBUG_LOGGING
+    ALCP_DEBUG_LOG(
+        LOG_INFO, "numBuffers %6ld, digestLen %6ld", numBuffers, digestLen);
+#endif
+    alc_error_t err = ALC_ERROR_NONE;
+
+    ALCP_BAD_PTR_ERR_RET(pDigestHandle);
+    ALCP_BAD_PTR_ERR_RET(pDigestHandle->context);
+    ALCP_BAD_PTR_ERR_RET(ppDstBuf);
+    ALCP_ZERO_LEN_ERR_RET(numBuffers);
+    for (Uint64 i = 0; i < numBuffers; i++) {
+        ALCP_BAD_PTR_ERR_RET(ppDstBuf[i]);
+    }
+
+    auto ctx = static_cast<digest::Context*>(pDigestHandle->context);
+    ALCP_BAD_PTR_ERR_RET(ctx);
+    ALCP_BAD_PTR_ERR_RET(ctx->dequeue);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_digest);
+
+    err = ctx->dequeue(ctx->m_digest, ppDstBuf, numBuffers, digestLen);
+    return err;
+}
+
+alc_error_t
 alcp_digest_init(alc_digest_handle_p pDigestHandle)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
@@ -90,6 +148,7 @@ alcp_digest_update(const alc_digest_handle_p pDigestHandle,
 
     auto ctx = static_cast<digest::Context*>(pDigestHandle->context);
     ALCP_BAD_PTR_ERR_RET(ctx);
+    ALCP_BAD_PTR_ERR_RET(ctx->update);
     ALCP_BAD_PTR_ERR_RET(pMsgBuf);
     ALCP_BAD_PTR_ERR_RET(ctx->m_digest);
 
@@ -108,6 +167,7 @@ alcp_digest_finalize(const alc_digest_handle_p pDigestHandle,
 
     auto ctx = static_cast<digest::Context*>(pDigestHandle->context);
     ALCP_BAD_PTR_ERR_RET(ctx);
+    ALCP_BAD_PTR_ERR_RET(ctx->finalize);
     ALCP_BAD_PTR_ERR_RET(buf);
     ALCP_BAD_PTR_ERR_RET(ctx->m_digest);
     return ctx->finalize(ctx->m_digest, buf, size);
@@ -142,6 +202,7 @@ alcp_digest_shake_squeeze(const alc_digest_handle_p pDigestHandle,
 
     auto ctx = static_cast<digest::Context*>(pDigestHandle->context);
     ALCP_BAD_PTR_ERR_RET(ctx);
+    ALCP_BAD_PTR_ERR_RET(ctx->shakeSqueeze);
     ALCP_BAD_PTR_ERR_RET(pBuff);
     ALCP_BAD_PTR_ERR_RET(ctx->m_digest);
 
@@ -170,6 +231,7 @@ alcp_digest_context_copy(const alc_digest_handle_p pSrcHandle,
     auto src_ctx  = static_cast<digest::Context*>(pSrcHandle->context);
     auto dest_ctx = static_cast<digest::Context*>(pDestHandle->context);
     ALCP_BAD_PTR_ERR_RET(src_ctx);
+    ALCP_BAD_PTR_ERR_RET(src_ctx->duplicate);
     ALCP_BAD_PTR_ERR_RET(dest_ctx);
     ALCP_BAD_PTR_ERR_RET(src_ctx->m_digest);
 

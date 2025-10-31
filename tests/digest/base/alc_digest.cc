@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -183,6 +183,37 @@ AlcpDigestBase::digest_squeeze(const alcp_digest_data_t& data)
         std::cout << "Error code in alcp_digest_shake_squeeze:" << err
                   << std::endl;
         return false;
+    }
+    return true;
+}
+
+bool
+AlcpDigestBase::digest_flush(const alcp_digest_data_t& data)
+{
+    alc_error_t err;
+    if (data.m_p_msg != nullptr) {
+        err = alcp_digest_flush(
+            m_handle, data.m_p_msg, data.m_buffers, data.m_msg_len);
+        if (alcp_is_error(err)) {
+            std::cout << "Error code in alcp_digest_flush:" << err << std::endl;
+            return false;
+        }
+    }
+    return true;
+}
+
+bool
+AlcpDigestBase::digest_dequeue(const alcp_digest_data_t& data)
+{
+    alc_error_t err;
+    if (data.m_p_digest != nullptr) {
+        err = alcp_digest_dequeue(
+            m_handle, data.m_p_digest, data.m_buffers, data.m_digest_len);
+        if (alcp_is_error(err)) {
+            std::cout << "Error code in alcp_digest_dequeue:" << err
+                      << std::endl;
+            return false;
+        }
     }
     return true;
 }

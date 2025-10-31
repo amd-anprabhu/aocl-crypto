@@ -106,6 +106,8 @@ typedef enum _alc_digest_mode
     ALC_SHA3_512,
     ALC_SHAKE_128,
     ALC_SHAKE_256,
+    ALC_MB_SHA2_224,
+    ALC_MB_SHA2_256,
 } alc_digest_mode_t,
     *alc_diget_mode_p;
 
@@ -279,6 +281,64 @@ alcp_digest_shake_squeeze(const alc_digest_handle_p pDigestHandle,
                           Uint8*                    pBuff,
                           Uint64                    size);
 
+/**
+ * @brief       Submits multiple input buffers of the same size for multibuffer
+ *              digest processing.
+ *
+ * @parblock <br> &nbsp;
+ * <b>This API is used for multibuffer implementations. It should be called
+ * after @ref alcp_digest_init and before @ref alcp_digest_dequeue.</b>
+ *
+ * Note: alcp_digest_flush does not perform digest computation itself — it only
+ * stages/records the provided buffer addresses and parameters so that the
+ * actual processing can be performed later by @ref alcp_digest_dequeue.
+ * All input buffers must be the same size (msgLen bytes).
+ * @endparblock
+ *
+ * @param [in]  pDigestHandle  Handle created by @ref alcp_digest_request
+ * @param [in]  ppMsgBuf       Array of pointers to input message buffers
+ * @param [in]  numBuffers     Number of input buffers
+ * @param [in]  msgLen         Length of each input message buffer in bytes;
+ *                             all buffers must be this size
+ *
+ * @return      alc_error_t Error code to validate the operation
+ */
+ALCP_API_EXPORT alc_error_t
+alcp_digest_flush(const alc_digest_handle_p pDigestHandle,
+                  const Uint8**             ppMsgBuf,
+                  const Uint64              numBuffers,
+                  const Uint64              msgLen);
+
+/**
+ * @brief       Performs the actual multibuffer digest processing and
+ *              retrieves digests for multiple buffers.
+ *
+ * @parblock <br> &nbsp;
+ * <b>This API is used for multibuffer implementations. It should be called
+ * after @ref alcp_digest_flush (which stages the input buffers) and before
+ * @ref alcp_digest_finish.</b>
+ *
+ * Note: The implementation is expected to perform the digest computation for
+ * the buffers previously staged by @ref alcp_digest_flush. alcp_digest_dequeue
+ * writes each computed digest into the corresponding entry of ppDstBuf.
+ * Each input buffer is assumed to have length msgLen as provided to
+ * alcp_digest_flush.
+ * @endparblock
+ *
+ * @param [in]   pDigestHandle  Handle created by @ref alcp_digest_request
+ * @param [out]  ppDstBuf       Array of pointers to output digest buffers;
+ *                             each entry must have space for digestLen bytes
+ * @param [in]   numBuffers     Number of output buffers (should match the
+ *                             number staged via alcp_digest_flush)
+ * @param [in]   digestLen      Length of each digest buffer in bytes
+ *
+ * @return      alc_error_t Error code to validate the operation
+ */
+ALCP_API_EXPORT alc_error_t
+alcp_digest_dequeue(const alc_digest_handle_p pDigestHandle,
+                    Uint8**                   ppDstBuf,
+                    const Uint64              numBuffers,
+                    const Uint64              digestLen);
 EXTERN_C_END
 
 #endif /* _ALCP_DIGEST_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -51,6 +51,8 @@ std::vector<Int64> digest_block_sizes = {
     16, 64, 256, 1024, 8192, 16384, 32768
 };
 
+std::vector<Int64> digest_buffer_sizes = { 16, 32, 64 };
+
 void inline Digest_Bench(benchmark::State& state,
                          alc_digest_mode_t mode,
                          Uint64            block_size)
@@ -98,6 +100,62 @@ void inline Digest_Bench(benchmark::State& state,
         state.iterations() * block_size, benchmark::Counter::kIsRate);
     state.counters["BlockSize(Bytes)"] = block_size;
     return;
+}
+
+void inline Digest_Multibuffer_Bench(benchmark::State& state,
+                                     alc_digest_mode_t mode,
+                                     Uint64            block_size,
+                                     Uint64            buffers)
+{
+    assert(mode == ALC_MB_SHA2_224 || mode == ALC_MB_SHA2_256);
+
+    alcp_digest_data_t data;
+    data.m_msg_len    = block_size;
+    data.m_digest_len = GetDigestLen(mode) / 8;
+
+    std::vector<std::vector<Uint8>> vec_msg(
+        buffers, std::vector<Uint8>(block_size, 0x01));
+    std::vector<std::vector<Uint8>> vec_digest(
+        buffers, std::vector<Uint8>(data.m_digest_len, 0x0));
+
+    std::vector<const Uint8*> msg_buffer_pointers(buffers);
+    std::vector<Uint8*>       digest_buffer_pointers(buffers);
+    for (Uint64 i = 0; i < buffers; ++i) {
+        msg_buffer_pointers[i]    = vec_msg[i].data();
+        digest_buffer_pointers[i] = vec_digest[i].data();
+    }
+    data.m_p_msg    = msg_buffer_pointers.data();
+    data.m_p_digest = digest_buffer_pointers.data();
+    data.m_buffers  = buffers;
+
+    AlcpDigestBase adb(mode);
+    for (auto _ : state) {
+        if (!adb.digest_flush(data)) {
+            state.SkipWithError("Error in running digest_flush benchmark");
+        }
+        if (!adb.digest_dequeue(data)) {
+            state.SkipWithError("Error in running digest_dequeue benchmark");
+        }
+    }
+
+    state.counters["Speed(Bytes/s)"] = benchmark::Counter(
+        state.iterations() * block_size * buffers, benchmark::Counter::kIsRate);
+    state.counters["BlockSize(Bytes)"] = block_size;
+    state.counters["NumBuffers"]       = buffers;
+}
+
+static void
+BENCH_SHA2_MULTIBUFFER_224(benchmark::State& state)
+{
+    Digest_Multibuffer_Bench(
+        state, ALC_MB_SHA2_224, state.range(0), state.range(1));
+}
+
+static void
+BENCH_SHA2_MULTIBUFFER_256(benchmark::State& state)
+{
+    Digest_Multibuffer_Bench(
+        state, ALC_MB_SHA2_256, state.range(0), state.range(1));
 }
 
 /* add all your new benchmarks here */
@@ -193,6 +251,13 @@ AddBenchmarks()
         BENCHMARK(BENCH_SHA3_512)->ArgsProduct({ digest_block_sizes });
         BENCHMARK(BENCH_SHAKE_128)->ArgsProduct({ digest_block_sizes });
         BENCHMARK(BENCH_SHAKE_256)->ArgsProduct({ digest_block_sizes });
+    }
+
+    if (!useipp && !useossl) {
+        BENCHMARK(BENCH_SHA2_MULTIBUFFER_224)
+            ->ArgsProduct({ digest_block_sizes, digest_buffer_sizes });
+        BENCHMARK(BENCH_SHA2_MULTIBUFFER_256)
+            ->ArgsProduct({ digest_block_sizes, digest_buffer_sizes });
     }
     return 0;
 }

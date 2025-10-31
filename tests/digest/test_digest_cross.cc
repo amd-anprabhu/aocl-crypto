@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -135,6 +135,22 @@ TEST(DIGEST_SHA1, CROSS_160)
     if (useipp || oa_override)
         GTEST_SKIP() << "IPP doesnt have SHA1 implemented yet";
     Digest_Cross(160, ALC_SHA1, false);
+}
+
+TEST(DIGEST_SHA2_MB, CROSS_224)
+{
+    if (useipp || useossl || oa_override)
+        GTEST_SKIP()
+            << "IPP/OSSL doesnt have SHA224 multibuffer implemented yet";
+    Digest_Multibuffer_Cross(224, ALC_SHA2_224);
+}
+
+TEST(DIGEST_SHA2_MB, CROSS_256)
+{
+    if (useipp || useossl || oa_override)
+        GTEST_SKIP()
+            << "IPP/OSSL doesnt have SHA256 multibuffer implemented yet";
+    Digest_Multibuffer_Cross(256, ALC_SHA2_256);
 }
 
 int
