@@ -219,7 +219,9 @@ Digest_KAT(alc_digest_mode_t mode, bool ctx_copy, bool test_squeeze)
          * slots. Allocate per-slot digest outputs, flush, dequeue and compare
          * each slot against the expected digest from the CSV.
          */
-        const Uint64      buffers    = 16;
+        const std::vector<Uint64> buffer_counts = { 1,  2,  3,  4,  5,  6,  7,
+                                                    8,  9,  10, 11, 12, 13, 14,
+                                                    15, 16, 32, 48, 64 };
         alc_digest_mode_t sb_mode    = (mode == ALC_MB_SHA2_224) ? ALC_SHA2_224
                                                                  : ALC_SHA2_256;
         const Uint64      hash_bytes = GetDigestLen(sb_mode) / 8;
@@ -246,41 +248,44 @@ Digest_KAT(alc_digest_mode_t mode, bool ctx_copy, bool test_squeeze)
                 msg_ptr = &Temp;
             }
 
-            std::vector<const Uint8*> mb_src(buffers);
-            std::vector<Uint8*>       mb_dst(buffers);
+            for (auto buffers : buffer_counts) {
+                std::vector<const Uint8*> mb_src(buffers);
+                std::vector<Uint8*>       mb_dst(buffers);
 
-            for (Uint64 i = 0; i < buffers; ++i) {
-                mb_src[i] = msg_ptr;
-                mb_dst[i] = (Uint8*)std::malloc(hash_bytes);
-                ASSERT_NE(mb_dst[i], nullptr);
-            }
+                for (Uint64 i = 0; i < buffers; ++i) {
+                    mb_src[i] = msg_ptr;
+                    mb_dst[i] = (Uint8*)std::malloc(hash_bytes);
+                    ASSERT_NE(mb_dst[i], nullptr);
+                }
 
-            alcp_digest_data_t data{};
-            data.m_p_msg      = mb_src.data();
-            data.m_p_digest   = mb_dst.data();
-            data.m_digest_len = hash_bytes;
-            data.m_msg_len    = msg_len;
-            data.m_buffers    = buffers;
+                alcp_digest_data_t data{};
+                data.m_p_msg      = mb_src.data();
+                data.m_p_digest   = mb_dst.data();
+                data.m_digest_len = hash_bytes;
+                data.m_msg_len    = msg_len;
+                data.m_buffers    = buffers;
 
-            if (!adb.digest_flush(data)) {
-                std::cout << "Error: Digest flush failed" << std::endl;
-                FAIL();
-            }
-            if (!adb.digest_dequeue(data)) {
-                std::cout << "Error: Digest dequeue failed" << std::endl;
-                FAIL();
-            }
+                if (!adb.digest_flush(data)) {
+                    std::cout << "Error: Digest flush failed" << std::endl;
+                    FAIL();
+                }
+                if (!adb.digest_dequeue(data)) {
+                    std::cout << "Error: Digest dequeue failed" << std::endl;
+                    FAIL();
+                }
 
-            /* Compare every slot's output with expected digest from CSV */
-            for (Uint64 i = 0; i < buffers; ++i) {
-                EXPECT_EQ(
-                    0,
-                    std::memcmp(mb_dst[i], &(expected_digest[0]), hash_bytes))
-                    << "Multibuffer KAT mismatch at slot " << i;
-            }
+                /* Compare every slot's output with expected digest from CSV */
+                for (Uint64 i = 0; i < buffers; ++i) {
+                    EXPECT_EQ(0,
+                              std::memcmp(
+                                  mb_dst[i], &(expected_digest[0]), hash_bytes))
+                        << "Multibuffer KAT mismatch at slot " << i
+                        << " for buffers=" << buffers;
+                }
 
-            for (Uint64 i = 0; i < buffers; ++i) {
-                std::free(mb_dst[i]);
+                for (Uint64 i = 0; i < buffers; ++i) {
+                    std::free(mb_dst[i]);
+                }
             }
         }
     } else {
@@ -480,7 +485,9 @@ Digest_Multibuffer_Cross(int HashSize, alc_digest_mode_t sb_mode)
 
     RngBase                   rb;
     OpenSSLDigestBase         odb(sb_mode);
-    const std::vector<Uint64> buffer_counts = { 1, 2, 4, 8, 16, 32, 48, 64 };
+    const std::vector<Uint64> buffer_counts = { 1,  2,  3,  4,  5,  6,  7,
+                                                8,  9,  10, 11, 12, 13, 14,
+                                                15, 16, 32, 48, 64 };
     const Uint64              hash_bytes    = HashSize / 8;
     AlcpDigestBase            adb(mb_mode);
 

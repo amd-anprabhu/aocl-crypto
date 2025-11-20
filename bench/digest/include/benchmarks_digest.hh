@@ -51,7 +51,7 @@ std::vector<Int64> digest_block_sizes = {
     16, 64, 256, 1024, 8192, 16384, 32768
 };
 
-std::vector<Int64> digest_buffer_sizes = { 16, 32, 64 };
+std::vector<Int64> digest_buffer_sizes = { 8, 16, 32 };
 
 void inline Digest_Bench(benchmark::State& state,
                          alc_digest_mode_t mode,

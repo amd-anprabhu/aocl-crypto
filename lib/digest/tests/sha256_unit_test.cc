@@ -284,6 +284,8 @@ TEST(Sha256Test, multibuffer_buffers_missmatch)
               ALC_ERROR_INVALID_ARG);
     EXPECT_EQ(sha256->dequeue(pp_dst, 32, ALC_DIGEST_LEN_256 / 8),
               ALC_ERROR_INVALID_ARG);
+    EXPECT_EQ(sha256->dequeue(pp_dst, 8, ALC_DIGEST_LEN_256 / 8),
+              ALC_ERROR_NONE);
 }
 
 TEST(Sha256Test, multibuffer_invalid_digest)

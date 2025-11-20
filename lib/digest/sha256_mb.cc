@@ -104,9 +104,8 @@ Sha2MB<digest_len>::dequeue(Uint8**      ppDstBuf,
         && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_VL)
         && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW);
 
-    // FIXME: Return an error only when numBuffers > m_num_buffers (set in
-    // flush). Support for arbitrary numbers of buffers should be added.
-    if (__builtin_expect((m_num_buffers == 0) || (numBuffers != m_num_buffers),
+    if (__builtin_expect((m_num_buffers == 0) || (numBuffers == 0)
+                             || (numBuffers > m_num_buffers),
                          0)) {
         return ALC_ERROR_INVALID_ARG;
     }
@@ -128,9 +127,10 @@ Sha2MB<digest_len>::dequeue(Uint8**      ppDstBuf,
         return ALC_ERROR_INVALID_ARG;
     }
 
-    if (avx512_available && !(numBuffers & (16 - 1))) {
-        // FIXME: Add support for arbitrary buffer counts (not just multiplesof
-        // 16)
+    if (avx512_available && numBuffers >= 6) {
+        // NOTE: Multi buffer path is only taken when number of buffers are
+        // >= 6. Because numBuffers=6 is the case when multi buffer
+        // implementation out performs single buffer implementation.
         err = zen4::Sha256Dequeue(
             m_buffers, m_hash, numBuffers, m_msg_len, ppDstBuf, digestLen);
     } else {

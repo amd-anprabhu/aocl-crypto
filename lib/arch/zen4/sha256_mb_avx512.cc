@@ -59,7 +59,8 @@ namespace alcp::digest { namespace zen4 {
         zmm0 = _mm512_add_epi32(zmm0, s1);
     }
 
-    static inline __attribute__((always_inline)) void round(__m512i  WK,
+    static inline __attribute__((always_inline)) void round(__m512i  W0,
+                                                            Uint64   i,
                                                             __m512i  a,
                                                             __m512i  b,
                                                             __m512i  c,
@@ -69,13 +70,16 @@ namespace alcp::digest { namespace zen4 {
                                                             __m512i  g,
                                                             __m512i& h)
     {
+        __m512i K = _mm512_set1_epi32(cRoundConstants_SHA256[i]);
+
         /* T1 = h + Sigma1(e) + Ch(e,f,g) + K + W.
          * Finally, d is set to d + T1.
          * Which is the new value of `e` after rotation in the next round.
          */
         __m512i choice = _mm512_ternarylogic_epi32(e, f, g, 0xCA);
-        __m512i T1     = _mm512_add_epi32(h, WK);
+        __m512i T1     = _mm512_add_epi32(h, W0);
         __m512i S1     = Sigma_1(e);
+        T1             = _mm512_add_epi32(T1, K);
         T1             = _mm512_add_epi32(T1, choice);
         T1             = _mm512_add_epi32(T1, S1);
 #ifdef COMPILER_IS_GCC
@@ -165,9 +169,8 @@ namespace alcp::digest { namespace zen4 {
     static inline void compute_block(__m512i block[SHA256_BLOCK_SIZE_WORDS],
                                      __m512i state[NUM_WORKING_VARIABLES])
     {
-        Uint64  i0 = 0, i1 = 1, i9 = 9, i14 = 14;
-        Uint64  a = 0, b = 1, c = 2, d = 3, e = 4, f = 5, g = 6, h = 7;
-        __m512i K{}, WK{};
+        Uint64 i0 = 0, i1 = 1, i9 = 9, i14 = 14;
+        Uint64 a = 0, b = 1, c = 2, d = 3, e = 4, f = 5, g = 6, h = 7;
 
         /* Rounds 0 - 47
          * Since in each round one word from the message schedule is consumed,
@@ -175,9 +178,8 @@ namespace alcp::digest { namespace zen4 {
          */
         UNROLL_48
         for (Uint64 i = 0; i < ROUNDS_48; i++) {
-            K  = _mm512_set1_epi32(cRoundConstants_SHA256[i]);
-            WK = _mm512_add_epi32(block[i0], K);
-            round(WK,
+            round(block[i0],
+                  i,
                   state[a],
                   state[b],
                   state[c],
@@ -197,9 +199,8 @@ namespace alcp::digest { namespace zen4 {
          */
         UNROLL_16
         for (Uint64 i = 0; i < ROUNDS_16; i++) {
-            K  = _mm512_set1_epi32(cRoundConstants_SHA256[i + ROUNDS_48]);
-            WK = _mm512_add_epi32(block[i], K);
-            round(WK,
+            round(block[i],
+                  i + ROUNDS_48,
                   state[a],
                   state[b],
                   state[c],
@@ -237,33 +238,13 @@ namespace alcp::digest { namespace zen4 {
     }
 
     static inline void finalize(const __m128i** p_p_src,
-                                const Uint64    cLength,
+                                Uint64          residue,
+                                Uint64          cLength,
                                 Uint64          block_offset,
                                 __m512i         block[SHA256_BLOCK_SIZE_WORDS],
                                 __m512i         state[NUM_WORKING_VARIABLES],
                                 Uint32 hash[NUM_WORKING_VARIABLES][MAX_BUFFERS])
     {
-        Uint64 residue = cLength & (SHA256_BLOCK_SIZE_BYTES - 1);
-        partial_load_block(p_p_src,
-                           residue,
-                           block_offset,
-                           block[0],
-                           block[1],
-                           block[2],
-                           block[3],
-                           block[4],
-                           block[5],
-                           block[6],
-                           block[7],
-                           block[8],
-                           block[9],
-                           block[10],
-                           block[11],
-                           block[12],
-                           block[13],
-                           block[14],
-                           block[15]);
-
         /* Add padding. */
 
         /* Append a `1` bit immediately after the last valid byte. */
@@ -307,19 +288,17 @@ namespace alcp::digest { namespace zen4 {
         const __m128i** p_p_src,
         Uint64          next_block_offset)
     {
-        Uint64  i0 = 0, i1 = 1, i9 = 9, i14 = 14;
-        Uint64  a = 0, b = 1, c = 2, d = 3, e = 4, f = 5, g = 6, h = 7;
-        __m512i K{}, WK{};
+        Uint64 i0 = 0, i1 = 1, i9 = 9, i14 = 14;
+        Uint64 a = 0, b = 1, c = 2, d = 3, e = 4, f = 5, g = 6, h = 7;
 
         /* Rounds 0 - 47,
          * Since in each round one word from message schedule is consumed we can
-         * repace it with a new word to be used in subsequent round
+         * replace it with a new word to be used in subsequent round
          */
         UNROLL_48
         for (Uint64 i = 0; i < ROUNDS_48; i++) {
-            K  = _mm512_set1_epi32(cRoundConstants_SHA256[i]);
-            WK = _mm512_add_epi32(block[i0], K);
-            round(WK,
+            round(block[i0],
+                  i,
                   state[a],
                   state[b],
                   state[c],
@@ -334,17 +313,15 @@ namespace alcp::digest { namespace zen4 {
         }
 
         /* Rounds 48 - 63,
-         * And simultaniously load first 16 words of message schedule from next
+         * And simultaneously load first 16 words of message schedule from next
          * block
          */
         UNROLL_4
         for (Uint64 k = 0; k < 4; k++) {
             UNROLL_4
             for (Uint64 i = 0; i < 4; i++) {
-                K = _mm512_set1_epi32(
-                    cRoundConstants_SHA256[k * 4 + i + ROUNDS_48]);
-                WK = _mm512_add_epi32(block[k * 4 + i], K);
-                round(WK,
+                round(block[k * 4 + i],
+                      k * 4 + i + ROUNDS_48,
                       state[a],
                       state[b],
                       state[c],
@@ -377,18 +354,39 @@ namespace alcp::digest { namespace zen4 {
     {
         alc_error_t err = ALC_ERROR_NONE;
 
-        const __m128i** p_p_src = reinterpret_cast<const __m128i**>(ppSrcBuf);
-        __m128i**       p_p_dst = reinterpret_cast<__m128i**>(ppDstBuf);
+        Uint64 blocks = cSize >> 6; /* blocks = cSize/SHA256_BLOCK_SIZE_BYTES */
+        /* residue = cSize % SHA256_BLOCK_SIZE_BYTES */
+        Uint64 residue = cSize & (SHA256_BLOCK_SIZE_BYTES - 1);
+
+        /* buffers to process = smallest multiple of 16 greater than or equal to
+         * cNumBuffers */
+        Uint64 remaining_buffers = ((cNumBuffers + BUFFERS_16 - 1) >> 4) << 4;
+
+        const __m128i* local_src[MAX_BUFFERS];
+        __m128i*       local_dst[MAX_BUFFERS];
+
+        for (Uint64 i = 0; i < cNumBuffers; i++) {
+            local_src[i] = reinterpret_cast<const __m128i*>(ppSrcBuf[i]);
+            local_dst[i] = reinterpret_cast<__m128i*>(ppDstBuf[i]);
+        }
+
+        /* Duplicate last buffer such that we have multiple of 16 buffers to
+         * process */
+        for (Uint64 i = cNumBuffers; i < remaining_buffers; i++) {
+            local_src[i] =
+                reinterpret_cast<const __m128i*>(ppSrcBuf[cNumBuffers - 1]);
+            local_dst[i] =
+                reinterpret_cast<__m128i*>(ppDstBuf[cNumBuffers - 1]);
+        }
+
+        const __m128i** p_p_src = reinterpret_cast<const __m128i**>(local_src);
+        __m128i**       p_p_dst = reinterpret_cast<__m128i**>(local_dst);
 
         __m512i            block[SHA256_BLOCK_SIZE_WORDS]{};
         __m512i            state[NUM_WORKING_VARIABLES]{};
         alignas(64) Uint32 prev[NUM_WORKING_VARIABLES][MAX_BUFFERS];
 
-        Uint64 blocks            = cSize >> 6; // cSize/SHA256_BLOCK_SIZE_BYTES
-        Uint64 remaining_buffers = cNumBuffers;
-
-        while (remaining_buffers) {
-
+        while (remaining_buffers >= BUFFERS_16) {
             broadcast_state(hash,
                             state[0],
                             state[1],
@@ -415,7 +413,7 @@ namespace alcp::digest { namespace zen4 {
                 load_words_4x16_u32(
                     p_p_src, 3, block[12], block[13], block[14], block[15]);
 
-                /* Transpose data so that each vairable has same word but from
+                /* Transpose data so that each variable has same word but from
                  * different instance/buffer */
                 transpose_4x16_u32(block[0], block[1], block[2], block[3]);
                 transpose_4x16_u32(block[4], block[5], block[6], block[7]);
@@ -432,19 +430,27 @@ namespace alcp::digest { namespace zen4 {
                     update_state(state, prev);
                 }
 
-                /* Compute round for last block */
+                /* Compute rounds for last block */
                 compute_block(block, state);
                 update_state(state, prev);
             }
 
-            finalize(
-                p_p_src, cSize, blocks * NUM_XMM_PER_BLOCK, block, state, prev);
+            partial_load_block(
+                p_p_src, residue, blocks * NUM_XMM_PER_BLOCK, block);
+
+            finalize(p_p_src,
+                     residue,
+                     cSize,
+                     blocks * NUM_XMM_PER_BLOCK,
+                     block,
+                     state,
+                     prev);
 
             store(p_p_dst, state, cDigestLen);
 
-            remaining_buffers -= MAX_BUFFERS;
-            p_p_src += MAX_BUFFERS;
-            p_p_dst += MAX_BUFFERS;
+            remaining_buffers -= BUFFERS_16;
+            p_p_src += BUFFERS_16;
+            p_p_dst += BUFFERS_16;
         }
 
         return err;

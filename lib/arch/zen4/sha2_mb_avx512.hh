@@ -53,7 +53,8 @@
 #define SHA256_WORD_SIZE_BYTES  sizeof(Uint32)
 #define SHA256_BLOCK_SIZE_BYTES 64
 #define SHA256_BLOCK_SIZE_WORDS SHA256_BLOCK_SIZE_BYTES / SHA256_WORD_SIZE_BYTES
-#define MAX_BUFFERS             16
+#define BUFFERS_16              16
+#define MAX_BUFFERS             128
 #define ROUNDS                  64
 #define ROUNDS_48               48
 #define ROUNDS_16               16
@@ -171,29 +172,10 @@ namespace alcp::digest { namespace zen4 {
                                                            const __m128i* p1,
                                                            const __m128i* p2,
                                                            const __m128i* p3,
-                                                           __m512i&       zmm)
+                                                           __m512i&       zmm,
+                                                           Uint16 mask = 0xFFFF)
     {
         /* Load data from four instances into one ZMM. */
-        __m128i xmm0 = _mm_lddqu_si128(p0);
-        __m128i xmm1 = _mm_lddqu_si128(p1);
-        __m128i xmm2 = _mm_lddqu_si128(p2);
-        __m128i xmm3 = _mm_lddqu_si128(p3);
-
-        zmm = _mm512_inserti32x4(zmm, xmm0, 0);
-        zmm = _mm512_inserti32x4(zmm, xmm1, 1);
-        zmm = _mm512_inserti32x4(zmm, xmm2, 2);
-        zmm = _mm512_inserti32x4(zmm, xmm3, 3);
-        shuffle_line(zmm);
-    }
-
-    static inline __attribute__((always_inline)) void pack(const __m128i* p0,
-                                                           const __m128i* p1,
-                                                           const __m128i* p2,
-                                                           const __m128i* p3,
-                                                           __m512i&       zmm,
-                                                           Uint16         mask)
-    {
-        /* Partially load data from four instances into one ZMM. */
         __m128i xmm0 = _mm_maskz_loadu_epi8(mask, p0);
         __m128i xmm1 = _mm_maskz_loadu_epi8(mask, p1);
         __m128i xmm2 = _mm_maskz_loadu_epi8(mask, p2);
@@ -240,152 +222,132 @@ namespace alcp::digest { namespace zen4 {
                                            __m512i&        zmm0,
                                            __m512i&        zmm1,
                                            __m512i&        zmm2,
-                                           __m512i&        zmm3)
+                                           __m512i&        zmm3,
+                                           Uint16          mask = 0xFFFF)
     {
         /* Load 4 words from 16 buffers */
         pack(pp_para_src[0] + offset,
              pp_para_src[4] + offset,
              pp_para_src[8] + offset,
              pp_para_src[12] + offset,
-             zmm0);
+             zmm0,
+             mask);
         pack(pp_para_src[1] + offset,
              pp_para_src[5] + offset,
              pp_para_src[9] + offset,
              pp_para_src[13] + offset,
-             zmm1);
+             zmm1,
+             mask);
         pack(pp_para_src[2] + offset,
              pp_para_src[6] + offset,
              pp_para_src[10] + offset,
              pp_para_src[14] + offset,
-             zmm2);
+             zmm2,
+             mask);
         pack(pp_para_src[3] + offset,
              pp_para_src[7] + offset,
              pp_para_src[11] + offset,
              pp_para_src[15] + offset,
-             zmm3);
+             zmm3,
+             mask);
     }
 
-    static inline void partial_load_block(const __m128i** pp_para_src,
-                                          Uint64          res,
-                                          Uint64          offset,
-                                          __m512i&        zmm0,
-                                          __m512i&        zmm1,
-                                          __m512i&        zmm2,
-                                          __m512i&        zmm3,
-                                          __m512i&        zmm4,
-                                          __m512i&        zmm5,
-                                          __m512i&        zmm6,
-                                          __m512i&        zmm7,
-                                          __m512i&        zmm8,
-                                          __m512i&        zmm9,
-                                          __m512i&        zmm10,
-                                          __m512i&        zmm11,
-                                          __m512i&        zmm12,
-                                          __m512i&        zmm13,
-                                          __m512i&        zmm14,
-                                          __m512i&        zmm15)
+    static inline void zero_rows(__m512i block[SHA256_BLOCK_SIZE_WORDS],
+                                 Uint64  p_index)
     {
-        Uint64         partial_row = res ? (res >> 4) + 1 : 0;
-        const __m128i* p[MAX_BUFFERS];
+        switch (p_index) {
+            case 0:
+                block[0] = _mm512_setzero_si512();
+                block[1] = _mm512_setzero_si512();
+                block[2] = _mm512_setzero_si512();
+                block[3] = _mm512_setzero_si512();
+                [[fallthrough]];
+            case 1:
+                block[4] = _mm512_setzero_si512();
+                block[5] = _mm512_setzero_si512();
+                block[6] = _mm512_setzero_si512();
+                block[7] = _mm512_setzero_si512();
+                [[fallthrough]];
+            case 2:
+                block[8]  = _mm512_setzero_si512();
+                block[9]  = _mm512_setzero_si512();
+                block[10] = _mm512_setzero_si512();
+                block[11] = _mm512_setzero_si512();
+                [[fallthrough]];
+            case 3:
+                block[12] = _mm512_setzero_si512();
+                block[13] = _mm512_setzero_si512();
+                /* block[14] and block[15] need not be set to zero as padding
+                 * will be placed in them in the finalize function */
+                break;
+            default:
+                break;
+        }
+    }
+
+    static inline void partial_load_block(
+        const __m128i** pp_para_src,
+        Uint64          res,
+        Uint64          offset,
+        __m512i         block[SHA256_BLOCK_SIZE_WORDS])
+    {
+        /*
+         * +------------+---------+-----------+-------------+-----------+
+         * | res(bytes) | p_index | full rows | partial row | zero rows |
+         * +------------+---------+-----------+-------------+-----------+
+         * | 0          | 0       | -         | -           | 0,1,2,3   |
+         * | 1 - 15     | 1       | -         | 0           | 1,2,3     |
+         * | 16 - 31    | 2       | 0         | 1           | 2,3       |
+         * | 32 - 47    | 3       | 0,1       | 2           | 3         |
+         * | 48 - 63    | 4       | 0,1,2     | 3           | -         |
+         * +------------+---------+-----------+-------------+-----------+
+         */
+        Uint64         p_index = res ? (res >> 4) + 1 : 0;
+        const __m128i* p[BUFFERS_16];
 
         UNROLL_16
-        for (size_t i = 0; i < MAX_BUFFERS; ++i) {
+        for (size_t i = 0; i < BUFFERS_16; ++i) {
             p[i] = pp_para_src[i] + offset;
         }
 
         /* Load full rows */
-        switch (partial_row) {
+        switch (p_index) {
             case 4:
-                pack(p[0] + 2, p[4] + 2, p[8] + 2, p[12] + 2, zmm8);
-                pack(p[1] + 2, p[5] + 2, p[9] + 2, p[13] + 2, zmm9);
-                pack(p[2] + 2, p[6] + 2, p[10] + 2, p[14] + 2, zmm10);
-                pack(p[3] + 2, p[7] + 2, p[11] + 2, p[15] + 2, zmm11);
-                transpose_4x16_u32(zmm8, zmm9, zmm10, zmm11);
+                load_words_4x16_u32(
+                    p, 2, block[8], block[9], block[10], block[11]);
+                transpose_4x16_u32(block[8], block[9], block[10], block[11]);
                 [[fallthrough]];
             case 3:
-                pack(p[0] + 1, p[4] + 1, p[8] + 1, p[12] + 1, zmm4);
-                pack(p[1] + 1, p[5] + 1, p[9] + 1, p[13] + 1, zmm5);
-                pack(p[2] + 1, p[6] + 1, p[10] + 1, p[14] + 1, zmm6);
-                pack(p[3] + 1, p[7] + 1, p[11] + 1, p[15] + 1, zmm7);
-                transpose_4x16_u32(zmm4, zmm5, zmm6, zmm7);
+                load_words_4x16_u32(
+                    p, 1, block[4], block[5], block[6], block[7]);
+                transpose_4x16_u32(block[4], block[5], block[6], block[7]);
                 [[fallthrough]];
             case 2:
-                pack(p[0], p[4], p[8], p[12], zmm0);
-                pack(p[1], p[5], p[9], p[13], zmm1);
-                pack(p[2], p[6], p[10], p[14], zmm2);
-                pack(p[3], p[7], p[11], p[15], zmm3);
-                transpose_4x16_u32(zmm0, zmm1, zmm2, zmm3);
+                load_words_4x16_u32(
+                    p, 0, block[0], block[1], block[2], block[3]);
+                transpose_4x16_u32(block[0], block[1], block[2], block[3]);
                 break;
             default:
                 break;
         }
 
-        /* compute byte mask safely (avoid shifts >= 16) */
-        Uint64 rem_bytes = res & (XMM_SIZE_BYTES - 1);
-        Uint16 mask      = (rem_bytes == 0) ? 0x0000u
-                                            : (Uint16)((1u << rem_bytes) - 1u);
-
         /* Load one partial row */
-        switch (partial_row) {
-            case 4:
-                pack(p[0] + 3, p[4] + 3, p[8] + 3, p[12] + 3, zmm12, mask);
-                pack(p[1] + 3, p[5] + 3, p[9] + 3, p[13] + 3, zmm13, mask);
-                pack(p[2] + 3, p[6] + 3, p[10] + 3, p[14] + 3, zmm14, mask);
-                pack(p[3] + 3, p[7] + 3, p[11] + 3, p[15] + 3, zmm15, mask);
-                transpose_4x16_u32(zmm12, zmm13, zmm14, zmm15);
-                break;
-            case 3:
-                pack(p[0] + 2, p[4] + 2, p[8] + 2, p[12] + 2, zmm8, mask);
-                pack(p[1] + 2, p[5] + 2, p[9] + 2, p[13] + 2, zmm9, mask);
-                pack(p[2] + 2, p[6] + 2, p[10] + 2, p[14] + 2, zmm10, mask);
-                pack(p[3] + 2, p[7] + 2, p[11] + 2, p[15] + 2, zmm11, mask);
-                transpose_4x16_u32(zmm8, zmm9, zmm10, zmm11);
-                break;
-            case 2:
-                pack(p[0] + 1, p[4] + 1, p[8] + 1, p[12] + 1, zmm4, mask);
-                pack(p[1] + 1, p[5] + 1, p[9] + 1, p[13] + 1, zmm5, mask);
-                pack(p[2] + 1, p[6] + 1, p[10] + 1, p[14] + 1, zmm6, mask);
-                pack(p[3] + 1, p[7] + 1, p[11] + 1, p[15] + 1, zmm7, mask);
-                transpose_4x16_u32(zmm4, zmm5, zmm6, zmm7);
-                break;
-            case 1:
-                pack(p[0], p[4], p[8], p[12], zmm0, mask);
-                pack(p[1], p[5], p[9], p[13], zmm1, mask);
-                pack(p[2], p[6], p[10], p[14], zmm2, mask);
-                pack(p[3], p[7], p[11], p[15], zmm3, mask);
-                transpose_4x16_u32(zmm0, zmm1, zmm2, zmm3);
-                break;
-            default:
-                break;
+        if (p_index) {
+            Uint16 mask = 0xFFFF >> (BUFFERS_16 - (res & (BUFFERS_16 - 1)));
+            Uint64 pos  = (p_index - 1) * 4;
+            load_words_4x16_u32(p,
+                                p_index - 1,
+                                block[pos],
+                                block[pos + 1],
+                                block[pos + 2],
+                                block[pos + 3],
+                                mask);
+            transpose_4x16_u32(
+                block[pos], block[pos + 1], block[pos + 2], block[pos + 3]);
         }
 
         /* Zero out remaining rows to avoid stale data in later rounds */
-        switch (partial_row) {
-            case 0:
-                zmm0 = _mm512_setzero_si512();
-                zmm1 = _mm512_setzero_si512();
-                zmm2 = _mm512_setzero_si512();
-                zmm3 = _mm512_setzero_si512();
-                [[fallthrough]];
-            case 1:
-                zmm4 = _mm512_setzero_si512();
-                zmm5 = _mm512_setzero_si512();
-                zmm6 = _mm512_setzero_si512();
-                zmm7 = _mm512_setzero_si512();
-                [[fallthrough]];
-            case 2:
-                zmm8  = _mm512_setzero_si512();
-                zmm9  = _mm512_setzero_si512();
-                zmm10 = _mm512_setzero_si512();
-                zmm11 = _mm512_setzero_si512();
-                [[fallthrough]];
-            case 3:
-                zmm12 = _mm512_setzero_si512();
-                zmm13 = _mm512_setzero_si512();
-                break;
-            default:
-                break;
-        }
+        zero_rows(block, p_index);
     }
 
     static inline void store(__m128i** pp_dst,
@@ -403,7 +365,7 @@ namespace alcp::digest { namespace zen4 {
         transpose_4x16_u32(state[0], state[1], state[2], state[3]);
         transpose_4x16_u32(state[4], state[5], state[6], state[7]);
 
-        __m128i xmm[16];
+        __m128i xmm[BUFFERS_16];
         xmm[0] = _mm512_extracti32x4_epi32(state[0], 0);
         xmm[1] = _mm512_extracti32x4_epi32(state[1], 0);
         xmm[2] = _mm512_extracti32x4_epi32(state[2], 0);
@@ -425,7 +387,7 @@ namespace alcp::digest { namespace zen4 {
         xmm[15] = _mm512_extracti32x4_epi32(state[3], 3);
 
         UNROLL_16
-        for (Uint64 i = 0; i < MAX_BUFFERS; i++) {
+        for (Uint64 i = 0; i < BUFFERS_16; i++) {
             _mm_storeu_si128(pp_dst[i], xmm[i]);
         }
 
@@ -451,15 +413,15 @@ namespace alcp::digest { namespace zen4 {
 
         if (digest_len == SHA256_HASH_SIZE_BYTES) {
             UNROLL_16
-            for (Uint64 i = 0; i < MAX_BUFFERS; i++) {
+            for (Uint64 i = 0; i < BUFFERS_16; i++) {
                 _mm_storeu_si128(pp_dst[i] + 1, xmm[i]);
             }
         } else {
             /* Digest truncation for SHA2_224 variant,
-             * Store only last 3 words from state[4...7]
+             * Store only last 3 words from state[4...6]
              */
             UNROLL_16
-            for (Uint64 i = 0; i < MAX_BUFFERS; i++) {
+            for (Uint64 i = 0; i < BUFFERS_16; i++) {
                 _mm_mask_storeu_epi32(pp_dst[i] + 1, 0b0111, xmm[i]);
             }
         }
