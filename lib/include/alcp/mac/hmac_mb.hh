@@ -28,45 +28,53 @@
 
 #pragma once
 
+#include <memory>
+
 #include "alcp/digest.hh"
 
-namespace alcp::digest {
+namespace alcp::mac {
 
-template<alc_digest_len_t digest_len>
-class Sha2MB final : public IDigest
+class HmacMB final
 {
-    static_assert(ALC_DIGEST_LEN_224 == digest_len
-                  || ALC_DIGEST_LEN_256 == digest_len);
+  public:
+    ALCP_API_EXPORT HmacMB()  = default;
+    ALCP_API_EXPORT ~HmacMB() = default;
 
   public:
-    ALCP_API_EXPORT Sha2MB()  = default;
-    ALCP_API_EXPORT ~Sha2MB() = default;
-
-  public:
-    // IDigest interface implementation
-    ALCP_API_EXPORT void        init(void) override;
-    ALCP_API_EXPORT alc_error_t update(const Uint8* pBuf, Uint64 size) override;
-    ALCP_API_EXPORT alc_error_t finalize(Uint8* pBuf, Uint64 size) override;
-
-    // Multibuffer-specific methods
-    ALCP_API_EXPORT void        set_blocks(Uint64 blocks);
-    ALCP_API_EXPORT void        set_state(const Uint32 state[8]);
+    ALCP_API_EXPORT alc_error_t init(const Uint8*      pKey,
+                                     Uint64            keyLen,
+                                     alc_digest_mode_t digest_mode);
     ALCP_API_EXPORT alc_error_t flush(const Uint8** ppMsgBuf,
                                       const Uint64  numBuffers,
                                       const Uint64  msgLen);
     ALCP_API_EXPORT alc_error_t dequeue(Uint8**      ppDstBuf,
-                                        const Uint64 numBuffers,
-                                        const Uint64 digestLen);
+                                        const Uint64 numBuffers);
 
   private:
-    alignas(64) Uint32 m_hash[8]{};
-    const Uint8** m_buffers     = nullptr;
-    Uint64        m_msg_len     = UINT64_MAX;
-    Uint64        m_num_buffers = 0;
-    Uint64        m_blocks      = UINT64_MAX;
+    template<typename DIGEST_TYPE>
+    alc_error_t precompute_hash();
+
+    template<typename DIGEST_MB_TYPE>
+    alc_error_t process_buffers(Uint8** ppDstBuf, const Uint64 numBuffers);
+
+  private:
+    alc_digest_mode_t    m_digest_mode        = ALC_SHA2_256;
+    const Uint8*         m_key                = nullptr;
+    Uint64               m_key_len            = UINT64_MAX;
+    const Uint8**        m_buffers            = nullptr;
+    Uint64               m_msg_len            = UINT64_MAX;
+    Uint64               m_num_buffers        = 0;
+    Uint64               m_block_size_bytes   = 0;
+    Uint64               m_digest_size_bytes  = 0;
+    static constexpr int cMaxBlockLengthBytes = 144;
+
+    // Pre-computed hash states for optimization
+    alignas(64) Uint32 m_hash_after_ipad[8]{};
+    alignas(64) Uint32 m_hash_after_opad[8]{};
+
+    // Reusable digest objects to avoid repeated allocations
+    std::unique_ptr<alcp::digest::IDigest> m_digest_sb;
+    std::unique_ptr<alcp::digest::IDigest> m_digest_mb;
 };
 
-typedef Sha2MB<ALC_DIGEST_LEN_224> Sha224MB;
-typedef Sha2MB<ALC_DIGEST_LEN_256> Sha256MB;
-
-} // namespace alcp::digest
+} // namespace alcp::mac

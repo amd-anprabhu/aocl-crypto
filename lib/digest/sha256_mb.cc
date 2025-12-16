@@ -64,6 +64,34 @@ Sha2MB<digest_len>::init(void)
 }
 
 template<alc_digest_len_t digest_len>
+void
+Sha2MB<digest_len>::set_blocks(Uint64 blocks)
+{
+    m_blocks = blocks;
+}
+
+template<alc_digest_len_t digest_len>
+void
+Sha2MB<digest_len>::set_state(const Uint32 state[8])
+{
+    memcpy(m_hash, state, 8 * sizeof(Uint32));
+}
+
+template<alc_digest_len_t digest_len>
+alc_error_t
+Sha2MB<digest_len>::update(const Uint8* pBuf, Uint64 size)
+{
+    return ALC_ERROR_NOT_SUPPORTED;
+}
+
+template<alc_digest_len_t digest_len>
+alc_error_t
+Sha2MB<digest_len>::finalize(Uint8* pBuf, Uint64 size)
+{
+    return ALC_ERROR_NOT_SUPPORTED;
+}
+
+template<alc_digest_len_t digest_len>
 alc_error_t
 Sha2MB<digest_len>::flush(const Uint8** ppMsgBuf,
                           const Uint64  numBuffers,
@@ -88,6 +116,12 @@ Sha2MB<digest_len>::flush(const Uint8** ppMsgBuf,
     m_buffers     = ppMsgBuf;
     m_msg_len     = msgLen;
     m_num_buffers = numBuffers;
+
+    // Only calculate m_blocks if not manually set
+    if (m_blocks == UINT64_MAX) {
+        m_blocks = msgLen >> 6; // Calculate blocks from message length
+    }
+
     return err;
 }
 
@@ -131,8 +165,13 @@ Sha2MB<digest_len>::dequeue(Uint8**      ppDstBuf,
         // NOTE: Multi buffer path is only taken when number of buffers are
         // >= 6. Because numBuffers=6 is the case when multi buffer
         // implementation out performs single buffer implementation.
-        err = zen4::Sha256Dequeue(
-            m_buffers, m_hash, numBuffers, m_msg_len, ppDstBuf, digestLen);
+        err = zen4::Sha256Dequeue(m_buffers,
+                                  m_hash,
+                                  numBuffers,
+                                  m_blocks,
+                                  m_msg_len,
+                                  ppDstBuf,
+                                  digestLen);
     } else {
         std::unique_ptr<IDigest> sha2_sb{};
         if constexpr (digest_len == ALC_DIGEST_LEN_224) {
@@ -155,6 +194,8 @@ Sha2MB<digest_len>::dequeue(Uint8**      ppDstBuf,
             }
         }
     }
+    /* Reset blocks to process after dequeue */
+    m_blocks = UINT64_MAX;
 
     return err;
 }

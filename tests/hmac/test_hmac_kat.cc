@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -77,6 +77,23 @@ TEST(HMAC_SHA2, KAT_384)
 TEST(HMAC_SHA2, KAT_512)
 {
     Hmac_KAT(ALC_SHA2_512);
+}
+
+/* HMAC SHA2 Multibuffer tests */
+TEST(HMAC_SHA2_MB, KAT_224)
+{
+    if (useipp || useossl || oa_override)
+        GTEST_SKIP()
+            << "IPP/OSSL doesnt have HMAC SHA224 multibuffer implemented yet";
+    Hmac_KAT(ALC_MB_SHA2_224);
+}
+
+TEST(HMAC_SHA2_MB, KAT_256)
+{
+    if (useipp || useossl || oa_override)
+        GTEST_SKIP()
+            << "IPP/OSSL doesnt have HMAC SHA256 multibuffer implemented yet";
+    Hmac_KAT(ALC_MB_SHA2_256);
 }
 
 int

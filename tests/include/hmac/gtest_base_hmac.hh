@@ -29,6 +29,7 @@
 #pragma once
 
 /* C/C++ Headers */
+#include <cstring>
 #include <iostream>
 #include <string.h>
 #include <vector>
@@ -101,6 +102,85 @@ DigestTypeToStr(alc_digest_mode_t DigestType)
 void
 Hmac_KAT(alc_digest_mode_t HmacDigestMode)
 {
+    // Handle multibuffer modes
+    if (HmacDigestMode == ALC_MB_SHA2_224
+        || HmacDigestMode == ALC_MB_SHA2_256) {
+        alc_digest_mode_t sb_mode =
+            (HmacDigestMode == ALC_MB_SHA2_224) ? ALC_SHA2_224 : ALC_SHA2_256;
+        std::string  HmacType   = DigestTypeToStr(sb_mode);
+        int          HmacSize   = DigestTypeToLenMap[sb_mode];
+        const Uint64 hash_bytes = HmacSize / 8;
+
+        std::string TestDataFile =
+            std::string("dataset_HMAC_" + HmacType + "_"
+                        + std::to_string(HmacSize) + ".csv");
+        Csv csv = Csv(std::move(TestDataFile));
+
+        if (!csv.m_file_exists) {
+            FAIL();
+        }
+
+        alc_mac_info_t info{ { HmacDigestMode } };
+        AlcpHmacBase   ahb;
+
+        const std::vector<Uint64> buffer_counts = { 1,  2,  3,  4,  5,  6,  7,
+                                                    8,  9,  10, 11, 12, 13, 14,
+                                                    15, 16, 32, 48, 64 };
+
+        while (csv.readNext()) {
+            auto msg           = csv.getVect("CIPHERTEXT");
+            auto key           = csv.getVect("KEY");
+            auto expected_hmac = csv.getVect("HMAC");
+
+            for (auto buffers : buffer_counts) {
+                std::vector<const Uint8*> mb_msg(buffers);
+                std::vector<Uint8*>       mb_hmac(buffers);
+
+                for (Uint64 i = 0; i < buffers; ++i) {
+                    mb_msg[i]  = &(msg[0]);
+                    mb_hmac[i] = (Uint8*)std::malloc(hash_bytes);
+                    ASSERT_NE(mb_hmac[i], nullptr);
+                }
+
+                alcp_hmac_data_t data{};
+                data.in.m_p_msg     = mb_msg.data();
+                data.in.m_key       = &(key[0]);
+                data.out.m_p_hmac   = mb_hmac.data();
+                data.in.m_msg_len   = msg.size();
+                data.out.m_hmac_len = hash_bytes;
+                data.in.m_key_len   = key.size();
+                data.in.m_buffers   = buffers;
+
+                if (!ahb.Init(info, key)) {
+                    std::cout << "Error in hmac init function" << std::endl;
+                    FAIL();
+                }
+                if (!ahb.MacFlush(data)) {
+                    std::cout << "Error in Hmac mac_flush" << std::endl;
+                    FAIL();
+                }
+                if (!ahb.MacDequeue(data)) {
+                    std::cout << "Error in Hmac mac_dequeue" << std::endl;
+                    FAIL();
+                }
+
+                for (Uint64 i = 0; i < buffers; ++i) {
+                    EXPECT_EQ(0,
+                              std::memcmp(
+                                  mb_hmac[i], &(expected_hmac[0]), hash_bytes))
+                        << "Multibuffer HMAC KAT mismatch at slot " << i
+                        << " for buffers=" << buffers;
+                }
+
+                for (Uint64 i = 0; i < buffers; ++i) {
+                    std::free(mb_hmac[i]);
+                }
+            }
+        }
+        return;
+    }
+
+    // Original single-buffer code
     alcp_hmac_data_t data{};
 
     std::string        HmacType = DigestTypeToStr(HmacDigestMode);
@@ -171,6 +251,135 @@ Hmac_KAT(alc_digest_mode_t HmacDigestMode)
             csv,
             std::string("HMAC_" + HmacType + "_" + std::to_string(HmacSize)
                         + "_KAT")));
+    }
+}
+
+/* Hmac Multibuffer Cross tests */
+void
+Hmac_Multibuffer_Cross(int HmacSize, alc_digest_mode_t sb_mode)
+{
+#ifndef USE_OSSL
+    std::cout << "Exiting, OSSL external lib not available" << std::endl;
+    exit(-1);
+#endif
+
+    alc_digest_mode_t mb_mode{};
+    switch (sb_mode) {
+        case ALC_SHA2_224:
+            mb_mode = ALC_MB_SHA2_224;
+            break;
+        case ALC_SHA2_256:
+            mb_mode = ALC_MB_SHA2_256;
+            break;
+        default:
+            std::cout << "Multibuffer is not supported for this mode; skipping "
+                         "test (supported: SHA2-224, SHA2-256)."
+                      << std::endl;
+            return;
+    }
+
+    RngBase                   rb;
+    const std::vector<Uint64> buffer_counts = { 1,  2,  3,  4,  5,  6,  7,
+                                                8,  9,  10, 11, 12, 13, 14,
+                                                15, 16, 32, 48, 64 };
+    const Uint64              hash_bytes    = HmacSize / 8;
+
+    alc_mac_info_t mb_info{ { mb_mode } };
+    AlcpHmacBase   ahb_mb;
+
+#ifdef USE_OSSL
+    OpenSSLHmacBase ohb;
+    alc_mac_info_t  sb_info{ { sb_mode } };
+#endif
+
+    for (auto buffers : buffer_counts) {
+        for (Uint64 in_len = 0; in_len <= 1024; in_len++) {
+            for (Uint64 key_len = 1; key_len <= 128; key_len += 16) {
+
+                std::vector<Uint8> key = rb.genRandomBytes(key_len);
+                std::vector<std::vector<Uint8>> msgs(buffers);
+                std::vector<const Uint8*>       src(buffers);
+                std::vector<Uint8*>             expected(buffers);
+
+                for (Uint64 i = 0; i < buffers; ++i) {
+                    if (in_len == 0) {
+                        msgs[i] = std::vector<Uint8>{ 0 };
+                    } else {
+                        msgs[i] = rb.genRandomBytes(in_len);
+                    }
+                    src[i]      = &(msgs[i][0]);
+                    expected[i] = (Uint8*)std::malloc(hash_bytes);
+                    ASSERT_NE(expected[i], nullptr);
+                }
+
+#ifdef USE_OSSL
+                // Calculate expected values using OpenSSL single-buffer
+                for (Uint64 i = 0; i < buffers; ++i) {
+                    alcp_hmac_data_t data{};
+                    data.in.m_msg       = src[i];
+                    data.in.m_msg_len   = in_len;
+                    data.in.m_key       = &(key[0]);
+                    data.in.m_key_len   = key.size();
+                    data.out.m_hmac     = expected[i];
+                    data.out.m_hmac_len = hash_bytes;
+
+                    if (!ohb.Init(sb_info, key)) {
+                        FAIL() << "OpenSSL HMAC init failed";
+                    }
+                    if (!ohb.MacUpdate(data)) {
+                        FAIL() << "OpenSSL HMAC update failed";
+                    }
+                    if (!ohb.MacFinalize(data)) {
+                        FAIL() << "OpenSSL HMAC finalize failed";
+                    }
+                }
+#endif
+
+                // Test with ALCP multibuffer
+                std::vector<const Uint8*> mb_src(buffers);
+                std::vector<Uint8*>       mb_dst(buffers);
+
+                for (Uint64 i = 0; i < buffers; i++) {
+                    mb_src[i] = src[i];
+                    mb_dst[i] = (Uint8*)std::malloc(hash_bytes);
+                    ASSERT_NE(mb_dst[i], nullptr);
+                }
+
+                alcp_hmac_data_t data{};
+                data.in.m_p_msg     = mb_src.data();
+                data.in.m_key       = &(key[0]);
+                data.in.m_key_len   = key.size();
+                data.out.m_p_hmac   = mb_dst.data();
+                data.in.m_msg_len   = in_len;
+                data.out.m_hmac_len = hash_bytes;
+                data.in.m_buffers   = buffers;
+
+                if (!ahb_mb.Init(mb_info, key)) {
+                    FAIL() << "ALCP HMAC MB init failed";
+                }
+                if (!ahb_mb.MacFlush(data)) {
+                    FAIL() << "ALCP HMAC MB flush failed";
+                }
+                if (!ahb_mb.MacDequeue(data)) {
+                    FAIL() << "ALCP HMAC MB dequeue failed";
+                }
+
+                // Compare results
+                for (Uint64 i = 0; i < buffers; i++) {
+                    EXPECT_EQ(0,
+                              std::memcmp(expected[i], mb_dst[i], hash_bytes))
+                        << "Multibuffer HMAC cross test mismatch at slot " << i
+                        << " for buffers=" << buffers << ", msg_len=" << in_len
+                        << ", key_len=" << key_len;
+                }
+
+                // Cleanup
+                for (Uint64 i = 0; i < buffers; ++i) {
+                    std::free(mb_dst[i]);
+                    std::free(expected[i]);
+                }
+            }
+        }
     }
 }
 

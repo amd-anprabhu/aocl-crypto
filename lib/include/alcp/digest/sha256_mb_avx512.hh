@@ -34,7 +34,8 @@ namespace alcp::digest { namespace zen4 {
     alc_error_t Sha256Dequeue(const Uint8** ppSrcBuf,
                               Uint32        state[8],
                               const Uint64  numBuffers,
-                              const Uint64  size,
+                              const Uint64  blocks,
+                              const Uint64  totalMsgLen,
                               Uint8**       ppDstBuf,
                               const Uint64  digestLen);
 }} // namespace alcp::digest::zen4

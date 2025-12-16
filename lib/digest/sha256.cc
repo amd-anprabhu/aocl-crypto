@@ -313,6 +313,13 @@ Sha2<digest_len>::finalize(Uint8* pBuf, Uint64 size)
     return err;
 }
 
+template<alc_digest_len_t digest_len>
+void
+Sha2<digest_len>::get_state(Uint32 state[8]) const
+{
+    memcpy(state, m_hash, 8 * sizeof(Uint32));
+}
+
 template class Sha2<ALC_DIGEST_LEN_224>;
 template class Sha2<ALC_DIGEST_LEN_256>;
 

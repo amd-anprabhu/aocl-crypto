@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -71,6 +71,9 @@ MacBuilder::build(alc_mac_type_t mi_type, Context* ctx)
             break;
         case ALC_MAC_POLY1305:
             err = Poly1305Builder::build(ctx);
+            break;
+        case ALC_MB_MAC_HMAC:
+            err = HmacBuilderMB::build(ctx);
             break;
         default:
             // Unknown MAC Type

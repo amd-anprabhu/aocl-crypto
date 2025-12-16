@@ -55,6 +55,7 @@ typedef enum _alc_mac_type
     ALC_MAC_HMAC,
     ALC_MAC_CMAC,
     ALC_MAC_POLY1305,
+    ALC_MB_MAC_HMAC,
 } alc_mac_type_t;
 
 /**
@@ -81,7 +82,8 @@ typedef struct _alc_hmac_info
  * @struct alc_cmac_info_t
  *
  */
-// NOTE: Mode is currently used for validation, only AES-based CMAC is supported.
+// NOTE: Mode is currently used for validation, only AES-based CMAC is
+// supported.
 typedef struct _alc_cmac_info
 {
     alc_cipher_mode_t ci_mode; /*! Cipher mode (ALC_AES_MODE_CBC) */
@@ -262,6 +264,38 @@ alcp_mac_reset(alc_mac_handle_p pMacHandle);
 ALCP_API_EXPORT alc_error_t
 alcp_mac_context_copy(const alc_mac_handle_p pSrcHandle,
                       const alc_mac_handle_p pDestHandle);
+
+/**
+ * @brief    Flush message buffers for multibuffer MAC processing
+ * @parblock <br> &nbsp;
+ * <b>This API is used for multibuffer MAC operations</b>
+ * @endparblock
+ * @param [in]   pMacHandle   Session handle for MAC operation
+ * @param [in]   ppMsgBuf     Array of pointers to message buffers
+ * @param [in]   numBuffers   Number of buffers
+ * @param [in]   msgLen       Length of each message buffer in bytes
+ * @return   &nbsp; Error Code for the API called
+ */
+ALCP_API_EXPORT alc_error_t
+alcp_mac_flush(alc_mac_handle_p pMacHandle,
+               const Uint8**    ppMsgBuf,
+               Uint64           numBuffers,
+               Uint64           msgLen);
+
+/**
+ * @brief    Dequeue MAC results for multibuffer MAC processing
+ * @parblock <br> &nbsp;
+ * <b>This API is used for multibuffer MAC operations</b>
+ * @endparblock
+ * @param [in]   pMacHandle   Session handle for MAC operation
+ * @param [out]  ppDstBuf     Array of pointers to destination buffers for MACs
+ * @param [in]   numBuffers   Number of buffers
+ * @return   &nbsp; Error Code for the API called
+ */
+ALCP_API_EXPORT alc_error_t
+alcp_mac_dequeue(alc_mac_handle_p pMacHandle,
+                 Uint8**          ppDstBuf,
+                 Uint64           numBuffers);
 
 EXTERN_C_END
 

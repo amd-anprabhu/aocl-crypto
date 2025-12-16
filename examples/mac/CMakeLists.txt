@@ -24,5 +24,6 @@
  # POSSIBILITY OF SUCH DAMAGE.
 
 ADD_EXAMPLE(hmac.c)
+ADD_EXAMPLE(hmac_multibuffer.c)
 ADD_EXAMPLE(cmac.c)
 ADD_EXAMPLE(poly1305.c)

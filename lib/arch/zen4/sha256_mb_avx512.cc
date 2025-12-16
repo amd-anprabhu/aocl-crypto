@@ -348,15 +348,15 @@ namespace alcp::digest { namespace zen4 {
     alc_error_t Sha256Dequeue(const Uint8** ppSrcBuf,
                               Uint32        hash[SHA256_HASH_SIZE_WORDS],
                               const Uint64  cNumBuffers,
-                              const Uint64  cSize,
+                              const Uint64  blocks,
+                              const Uint64  totalMsgLen,
                               Uint8**       ppDstBuf,
                               const Uint64  cDigestLen)
     {
         alc_error_t err = ALC_ERROR_NONE;
 
-        Uint64 blocks = cSize >> 6; /* blocks = cSize/SHA256_BLOCK_SIZE_BYTES */
-        /* residue = cSize % SHA256_BLOCK_SIZE_BYTES */
-        Uint64 residue = cSize & (SHA256_BLOCK_SIZE_BYTES - 1);
+        /* residue = totalMsgLen % SHA256_BLOCK_SIZE_BYTES */
+        Uint64 residue = totalMsgLen & (SHA256_BLOCK_SIZE_BYTES - 1);
 
         /* buffers to process = smallest multiple of 16 greater than or equal to
          * cNumBuffers */
@@ -440,7 +440,7 @@ namespace alcp::digest { namespace zen4 {
 
             finalize(p_p_src,
                      residue,
-                     cSize,
+                     totalMsgLen,
                      blocks * NUM_XMM_PER_BLOCK,
                      block,
                      state,

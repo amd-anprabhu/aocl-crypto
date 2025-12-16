@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -91,6 +91,17 @@ TEST(HMAC_SHA1, CROSS_160)
 TEST(HMAC_MD5, CROSS_128)
 {
     Hmac_Cross(ALC_MD5);
+}
+
+/* HMAC SHA2 Multibuffer Cross tests */
+TEST(HMAC_SHA2_MB, CROSS_224)
+{
+    Hmac_Multibuffer_Cross(224, ALC_SHA2_224);
+}
+
+TEST(HMAC_SHA2_MB, CROSS_256)
+{
+    Hmac_Multibuffer_Cross(256, ALC_SHA2_256);
 }
 
 int

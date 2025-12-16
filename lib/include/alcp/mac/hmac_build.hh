@@ -37,6 +37,7 @@
 #include "alcp/digest/sha3.hh"
 #include "alcp/digest/sha512.hh"
 #include "hmac.hh"
+#include "hmac_mb.hh"
 
 namespace alcp::mac {
 using namespace status;
@@ -234,12 +235,96 @@ HmacBuilder::build(Context* ctx)
     }
     ctx->m_mac = static_cast<void*>(hmac_algo);
 
+    // Set single-buffer function pointers
     ctx->update    = __hmac_wrapperUpdate;
     ctx->finalize  = __hmac_wrapperFinalize;
     ctx->finish    = __hmac_wrapperFinish;
     ctx->reset     = __hmac_wrapperReset;
     ctx->init      = __hmac_wrapperInit;
     ctx->duplicate = __build_with_copy_hmac;
+
+    // Set multibuffer functions to nullptr (not used for single-buffer)
+    ctx->flush   = nullptr;
+    ctx->dequeue = nullptr;
+
+    return err;
+}
+
+// Multibuffer HMAC Builder
+class HmacBuilderMB
+{
+  public:
+    static alc_error_t build(Context* ctx);
+};
+
+static alc_error_t
+__hmac_mb_wrapperInit(Context*        ctx,
+                      const Uint8*    key,
+                      Uint64          size,
+                      alc_mac_info_t* info)
+{
+    alc_digest_mode_t mode = info->hmac.digest_mode;
+
+    // Only support SHA2-224 and SHA2-256 for multibuffer HMAC
+    if (mode != ALC_MB_SHA2_224 && mode != ALC_SHA2_224
+        && mode != ALC_MB_SHA2_256 && mode != ALC_SHA2_256) {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+
+    auto hmac_mb_algo = static_cast<HmacMB*>(ctx->m_mac);
+    hmac_mb_algo->init(key, size, mode);
+
+    return ALC_ERROR_NONE;
+}
+
+static alc_error_t
+__hmac_mb_wrapperFlush(void*         hmac_mb,
+                       const Uint8** ppMsgBuf,
+                       Uint64        numBuffers,
+                       Uint64        msgLen)
+{
+    auto ap = static_cast<HmacMB*>(hmac_mb);
+    return ap->flush(ppMsgBuf, numBuffers, msgLen);
+}
+
+static alc_error_t
+__hmac_mb_wrapperDequeue(void* hmac_mb, Uint8** ppDstBuf, Uint64 numBuffers)
+{
+    auto ap = static_cast<HmacMB*>(hmac_mb);
+    return ap->dequeue(ppDstBuf, numBuffers);
+}
+
+static void
+__hmac_mb_wrapperFinish(void* hmac_mb, void* digest)
+{
+    auto ap = static_cast<HmacMB*>(hmac_mb);
+    delete ap;
+}
+
+alc_error_t
+HmacBuilderMB::build(Context* ctx)
+{
+    alc_error_t err{ ALC_ERROR_NONE };
+
+    auto hmac_mb_algo = new HmacMB();
+    if (hmac_mb_algo == nullptr) {
+        // Out of Memory
+        return ALC_ERROR_NO_MEMORY;
+    }
+
+    ctx->m_mac = static_cast<void*>(hmac_mb_algo);
+
+    // Set multibuffer-specific function pointers
+    ctx->init    = __hmac_mb_wrapperInit;
+    ctx->finish  = __hmac_mb_wrapperFinish;
+    ctx->flush   = __hmac_mb_wrapperFlush;
+    ctx->dequeue = __hmac_mb_wrapperDequeue;
+
+    // Set single-buffer functions to nullptr (not used for multibuffer)
+    ctx->update    = nullptr;
+    ctx->finalize  = nullptr;
+    ctx->duplicate = nullptr;
+    ctx->reset     = nullptr;
 
     return err;
 }

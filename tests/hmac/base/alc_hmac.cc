@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -49,7 +49,14 @@ AlcpHmacBase::Init(const alc_mac_info_t& info, std::vector<Uint8>& Key)
         alcp_mac_finish(m_handle);
     }
 
-    err = alcp_mac_request(m_handle, ALC_MAC_HMAC);
+    // Determine if multibuffer mode based on digest mode
+    alc_mac_type_t mac_type = ALC_MAC_HMAC;
+    if (info.hmac.digest_mode == ALC_MB_SHA2_224
+        || info.hmac.digest_mode == ALC_MB_SHA2_256) {
+        mac_type = ALC_MB_MAC_HMAC;
+    }
+
+    err = alcp_mac_request(m_handle, mac_type);
     if (alcp_is_error(err)) {
         printf("Error code in alcp_mac_request: %10" PRId64 "\n", err);
         return false;
@@ -95,6 +102,31 @@ AlcpHmacBase::MacFinalize(const alcp_hmac_data_t& data)
     err = alcp_mac_finalize(m_handle, data.out.m_hmac, data.out.m_hmac_len);
     if (alcp_is_error(err)) {
         std::cout << "alcp_mac_finalize failed: Err code: " << err << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool
+AlcpHmacBase::MacFlush(const alcp_hmac_data_t& data)
+{
+    alc_error_t err;
+    err = alcp_mac_flush(
+        m_handle, data.in.m_p_msg, data.in.m_buffers, data.in.m_msg_len);
+    if (alcp_is_error(err)) {
+        std::cout << "alcp_mac_flush failed: Err code: " << err << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool
+AlcpHmacBase::MacDequeue(const alcp_hmac_data_t& data)
+{
+    alc_error_t err;
+    err = alcp_mac_dequeue(m_handle, data.out.m_p_hmac, data.in.m_buffers);
+    if (alcp_is_error(err)) {
+        std::cout << "alcp_mac_dequeue failed: Err code: " << err << std::endl;
         return false;
     }
     return true;

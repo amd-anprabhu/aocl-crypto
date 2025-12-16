@@ -72,6 +72,7 @@ alcp_mac_update(alc_mac_handle_p pMacHandle, const Uint8* buff, Uint64 size)
     ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context);
 
     auto p_ctx = static_cast<mac::Context*>(pMacHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(p_ctx->update);
 
     return p_ctx->update(p_ctx->m_mac, buff, size);
 }
@@ -86,6 +87,8 @@ alcp_mac_finalize(alc_mac_handle_p pMacHandle, Uint8* buff, Uint64 size)
     ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context);
 
     auto p_ctx = static_cast<mac::Context*>(pMacHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(p_ctx->finalize);
+
     return p_ctx->finalize(p_ctx->m_mac, buff, size);
 }
 
@@ -115,6 +118,8 @@ alcp_mac_reset(alc_mac_handle_p pMacHandle)
     ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context);
 
     auto p_ctx = static_cast<mac::Context*>(pMacHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(p_ctx->reset);
+
     return p_ctx->reset(p_ctx->m_mac);
 }
 
@@ -155,4 +160,50 @@ alcp_mac_context_copy(const alc_mac_handle_p pSrcHandle,
 
     return mac::MacBuilder::BuildWithCopy(src_ctx, dest_ctx);
 }
+
+alc_error_t
+alcp_mac_flush(alc_mac_handle_p pMacHandle,
+               const Uint8**    ppMsgBuf,
+               Uint64           numBuffers,
+               Uint64           msgLen)
+{
+#ifdef ALCP_ENABLE_DEBUG_LOGGING
+    ALCP_DEBUG_LOG(LOG_DBG, "NumBuffers %6ld, MsgLen %6ld", numBuffers, msgLen);
+#endif
+    ALCP_BAD_PTR_ERR_RET(pMacHandle);
+    ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(ppMsgBuf);
+    ALCP_ZERO_LEN_ERR_RET(numBuffers);
+    for (Uint64 i = 0; i < numBuffers; i++) {
+        ALCP_BAD_PTR_ERR_RET(ppMsgBuf[i]);
+    }
+
+    auto p_ctx = static_cast<mac::Context*>(pMacHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(p_ctx->flush);
+
+    return p_ctx->flush(p_ctx->m_mac, ppMsgBuf, numBuffers, msgLen);
+}
+
+alc_error_t
+alcp_mac_dequeue(alc_mac_handle_p pMacHandle,
+                 Uint8**          ppDstBuf,
+                 Uint64           numBuffers)
+{
+#ifdef ALCP_ENABLE_DEBUG_LOGGING
+    ALCP_DEBUG_LOG(LOG_DBG, "NumBuffers %6ld", numBuffers);
+#endif
+    ALCP_BAD_PTR_ERR_RET(pMacHandle);
+    ALCP_BAD_PTR_ERR_RET(pMacHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(ppDstBuf);
+    ALCP_ZERO_LEN_ERR_RET(numBuffers);
+    for (Uint64 i = 0; i < numBuffers; i++) {
+        ALCP_BAD_PTR_ERR_RET(ppDstBuf[i]);
+    }
+
+    auto p_ctx = static_cast<mac::Context*>(pMacHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(p_ctx->dequeue);
+
+    return p_ctx->dequeue(p_ctx->m_mac, ppDstBuf, numBuffers);
+}
+
 EXTERN_C_END

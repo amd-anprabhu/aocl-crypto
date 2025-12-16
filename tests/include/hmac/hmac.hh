@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -40,14 +40,18 @@ namespace alcp::testing {
  */
 struct alcp_hmac_data_in_t
 {
-    // Input message to generate authentication token on.
+    // Input message to generate authentication token on (single buffer)
     const Uint8* m_msg;
+    // Input messages for multibuffer
+    const Uint8** m_p_msg;
     // Length of the input message
     Uint64 m_msg_len;
     // Key used to create the authentication token
     const Uint8* m_key;
     // Length of the Key
     Uint64 m_key_len;
+    // Number of buffers for multibuffer mode
+    Uint64 m_buffers;
 };
 
 /**
@@ -55,8 +59,10 @@ struct alcp_hmac_data_in_t
  */
 struct alcp_hmac_data_out_t
 {
-    // Output authentication token.
+    // Output authentication token (single buffer)
     Uint8* m_hmac;
+    // Output authentication tokens for multibuffer
+    Uint8** m_p_hmac;
     // Length of the authentication token.
     Uint64 m_hmac_len;
 };
