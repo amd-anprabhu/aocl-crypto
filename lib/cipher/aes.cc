@@ -28,6 +28,10 @@
 
 #include "alcp/cipher/aes.hh"
 #include "alcp/cipher/aesni.hh"
+#include "alcp/cipher/aesni_key_compare.hh"
+#include "alcp/cipher/key_compare.hh"
+#include "alcp/cipher/vaes_key_compare.hh"
+#include "alcp/utils/cpuid.hh"
 
 namespace alcp::cipher {
 
@@ -38,13 +42,36 @@ Aes::setKey(const Uint8* pKey, const Uint64 keyLen)
 
     // keyLen should be checked if its same as keyLen used during create call
     if (keyLen != m_keyLen_in_bytes_aes * 8ULL) {
-        printf("\n setKey failed, keySize invalid");
         return ALC_ERROR_INVALID_SIZE;
+    }
+
+    static bool avx512_available =
+        utils::CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
+        && utils::CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_VL);
+
+    if (m_isKeySet_aes) {
+        int keys_same;
+        if (avx512_available) {
+            keys_same = vaes512::CompareAndStoreKey(
+                pKey, m_original_key, m_keyLen_in_bytes_aes);
+        } else if (utils::CpuId::cpuHasAesni()) {
+            keys_same = aesni::CompareAndStoreKey(
+                pKey, m_original_key, m_keyLen_in_bytes_aes);
+        } else {
+            keys_same =
+                CompareAndStoreKey(pKey, m_original_key, m_keyLen_in_bytes_aes);
+        }
+        if (keys_same) {
+            return ALC_ERROR_NONE;
+        }
+    } else {
+        memcpy(m_original_key, pKey, m_keyLen_in_bytes_aes);
     }
 
     Rijndael::initRijndael(pKey, keyLen);
     getKey();
     m_isKeySet_aes = 1; // FIXME: use enum instead
+
     return e;
 }
 

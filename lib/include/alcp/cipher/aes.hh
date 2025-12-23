@@ -42,9 +42,9 @@
 
 namespace alcp::cipher {
 
-#define ALCP_ENC           1
-#define ALCP_DEC           0
-#define MAX_CIPHER_IV_SIZE (1024 / 8)
+#define ALCP_ENC               1
+#define ALCP_DEC               0
+#define MAX_CIPHER_IV_SIZE     (1024 / 8)
 #define MAX_CIPHER_BUFFER_SIZE (127)
 
 typedef struct alc_cipher_key_data
@@ -77,10 +77,13 @@ class Aes : public Rijndael
     Uint32                             m_isKeySet_aes               = 0;
     Uint32                             m_ivState_aes                = 0;
     Uint32                             m_isEnc_aes                  = ALCP_ENC;
-    Uint64                             m_dataLen                    = 0;
-    const Uint8**                      m_pData_aes                  = nullptr;
-    Uint8                              m_Ivs_aes[MAX_CIPHER_BUFFER_SIZE][MAX_CIPHER_IV_SIZE] = {};
-    Uint8*                             m_pIvs_aes                    = m_Ivs_aes[0];
+
+    // Store original key for comparison to avoid redundant expansion
+    __attribute__((aligned(16))) Uint8 m_original_key[32]        = {};
+    Uint64                             m_dataLen                 = 0;
+    const Uint8**                      m_pData_aes               = nullptr;
+    Uint8  m_Ivs_aes[MAX_CIPHER_BUFFER_SIZE][MAX_CIPHER_IV_SIZE] = {};
+    Uint8* m_pIvs_aes                                            = m_Ivs_aes[0];
 
     // Partial block buffering for outlen support
     __attribute__((aligned(16))) Uint8 m_partial_block[16] = {};
@@ -109,6 +112,7 @@ class Aes : public Rijndael
     {
         utils::memunlock(m_iv_aes, MAX_CIPHER_IV_SIZE);
         std::fill(m_iv_aes, m_iv_aes + MAX_CIPHER_IV_SIZE, 0);
+        std::fill(m_original_key, m_original_key + 32, 0);
     }
 
     // FIXME:
