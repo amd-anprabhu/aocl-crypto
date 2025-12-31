@@ -32,6 +32,8 @@
 
 namespace alcp::digest {
 
+#define MAX_BUFFERS 128
+
 template<alc_digest_len_t digest_len>
 class Sha2MB final : public IDigest
 {

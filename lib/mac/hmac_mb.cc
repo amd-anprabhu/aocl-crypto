@@ -192,7 +192,7 @@ HmacMB::flush(const Uint8** ppMsgBuf,
     alc_error_t err = ALC_ERROR_NONE;
 
     /* Ensure that numBuffers is valid */
-    if (__builtin_expect(numBuffers == 0, 0)) {
+    if (__builtin_expect((numBuffers == 0 || numBuffers > MAX_BUFFERS), 0)) {
         return ALC_ERROR_INVALID_ARG;
     }
 

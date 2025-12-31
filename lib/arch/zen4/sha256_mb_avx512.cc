@@ -215,7 +215,7 @@ namespace alcp::digest { namespace zen4 {
 
     static inline __attribute__((always_inline)) void update_state(
         __m512i state[NUM_WORKING_VARIABLES],
-        Uint32  hash[NUM_WORKING_VARIABLES][MAX_BUFFERS])
+        Uint32  hash[NUM_WORKING_VARIABLES][BUFFERS_16])
     {
         /* This function updates the intermediate hash values as:
          * H[0](i) = a + H[0](i-1)
@@ -243,7 +243,7 @@ namespace alcp::digest { namespace zen4 {
                                 Uint64          block_offset,
                                 __m512i         block[SHA256_BLOCK_SIZE_WORDS],
                                 __m512i         state[NUM_WORKING_VARIABLES],
-                                Uint32 hash[NUM_WORKING_VARIABLES][MAX_BUFFERS])
+                                Uint32 hash[NUM_WORKING_VARIABLES][BUFFERS_16])
     {
         /* Add padding. */
 
@@ -384,7 +384,7 @@ namespace alcp::digest { namespace zen4 {
 
         __m512i            block[SHA256_BLOCK_SIZE_WORDS]{};
         __m512i            state[NUM_WORKING_VARIABLES]{};
-        alignas(64) Uint32 prev[NUM_WORKING_VARIABLES][MAX_BUFFERS];
+        alignas(64) Uint32 prev[NUM_WORKING_VARIABLES][BUFFERS_16];
 
         while (remaining_buffers >= BUFFERS_16) {
             broadcast_state(hash,

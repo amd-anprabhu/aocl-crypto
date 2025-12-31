@@ -99,6 +99,10 @@ Sha2MB<digest_len>::flush(const Uint8** ppMsgBuf,
 {
     alc_error_t err = ALC_ERROR_NONE;
 
+    if (__builtin_expect((numBuffers == 0 || numBuffers > MAX_BUFFERS), 0)) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+
     /* Ensure that message size is <2^64 Bits */
     if (__builtin_expect(msgLen >= (UINT64_MAX / 8), 0)) {
         return ALC_ERROR_INVALID_ARG;
