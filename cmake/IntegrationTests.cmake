@@ -175,7 +175,7 @@ FUNCTION(AES_TEST TYPE MOD)
                                                       ${IPP_LIBS})
     gtest_add_tests(TARGET aes_${MOD}_experimental_${TYPE}
         TEST_SUFFIX .${MOD})
-    gtest_discover_tests(aes_${MOD}_experimental_${TYPE})
+    gtest_discover_tests(aes_${MOD}_experimental_${TYPE} NO_PRETTY_VALUES NO_PRETTY_TYPES)
 ENDFUNCTION()
 
 FUNCTION(LINK_IF_EXISTS SOURCE DESTINATION LINK_TYPE)

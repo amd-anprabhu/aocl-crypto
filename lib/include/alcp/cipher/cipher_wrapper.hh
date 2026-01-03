@@ -201,7 +201,27 @@ namespace vaes512 {
                            const Uint8* pKey,
                            int          nRounds,
                            Uint8*       pIv);
-
+    alc_error_t EncryptCbc(const Uint8** pPlainText,
+                           Uint8**      pCipherText,
+                           Uint64       len,
+                           const Uint8* pKey,
+                           int          nRounds,
+                           int         numBuffers,
+                           Uint8**      pIv);
+    alc_error_t EncryptCfb(const Uint8** pPlainText,
+                           Uint8**      pCipherText,
+                           Uint64       len,
+                           const Uint8* pKey,
+                           int          nRounds,
+                           int         numBuffers,
+                           Uint8**      pIv);
+    alc_error_t EncryptOfb(const Uint8** pPlainText,
+                           Uint8**      pCipherText,
+                           Uint64       len,
+                           const Uint8* pKey,
+                           int          nRounds,
+                           int         numBuffers,
+                           Uint8**      pIv);
     alc_error_t encryptGcm128(const Uint8*   pPlainText,
                               Uint8*         pCipherText,
                               Uint64         len,
@@ -264,7 +284,20 @@ namespace vaes {
                            Uint8*       pEncKey,
                            Uint8*       pDecKey,
                            int          nRounds);
-
+    alc_error_t EncryptCbc(const Uint8** pPlainText,
+                           Uint8**      pCipherText,
+                           Uint64       len,
+                           const Uint8* pKey,
+                           int          nRounds,
+                           int         numBuffers,
+                           Uint8**      pIv);
+    alc_error_t EncryptCfb(const Uint8** pPlainText,
+                           Uint8**      pCipherText,
+                           Uint64       len,
+                           const Uint8* pKey,
+                           int          nRounds,
+                           int         numBuffers,
+                           Uint8**      pIv);
     alc_error_t EncryptXts(const Uint8* pSrc,
                            Uint8*       pDest,
                            Uint64       len,

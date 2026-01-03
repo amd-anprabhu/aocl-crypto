@@ -109,7 +109,7 @@ ALCP_prov_alg_gcm_freectx(void* vctx)
 
     // free alcp
     if (ctx->base.handle.ch_context != NULL) {
-        alcp_cipher_finish(&(ctx->base.handle));
+        alcp_cipher_aead_finish(&(ctx->base.handle));
         OPENSSL_free(ctx->base.handle.ch_context);
         ctx->base.handle.ch_context = NULL;
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -50,18 +50,40 @@ namespace alcp::cipher {
       public:                                                                  \
         CHILD_NEW()                                                            \
             : PARENT(KEYLEN_IN_BYTES)                                          \
-        {}                                                                     \
+        {                                                                      \
+        }                                                                      \
         ~CHILD_NEW() = default;                                                \
                                                                                \
       public:                                                                  \
         alc_error_t encrypt(const Uint8* pPlainText,                           \
                             Uint8*       pCipherText,                          \
-                            Uint64       len) override;                              \
+                            Uint64       len,                                  \
+                            Uint64*      outlen) override;                          \
                                                                                \
         alc_error_t decrypt(const Uint8* pCipherText,                          \
                             Uint8*       pPlainText,                           \
-                            Uint64       len) override;                              \
-        alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }    \
+                            Uint64       len,                                  \
+                            Uint64*      outlen) override;                          \
+        alc_error_t finish(const void*) override                               \
+        {                                                                      \
+            return ALC_ERROR_NONE;                                             \
+        }                                                                      \
+        alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override       \
+        {                                                                      \
+            return ALC_ERROR_NONE;                                             \
+        };                                                                     \
+        alc_error_t flush(const Uint8** pPlainText,                            \
+                          Uint64        numBuffers,                            \
+                          Uint64        len) override                                 \
+        {                                                                      \
+            return ALC_ERROR_NONE;                                             \
+        }                                                                      \
+        alc_error_t dequeue(Uint8** pCipherText,                               \
+                            Uint64  numBuffers,                                \
+                            Uint64  len) override                               \
+        {                                                                      \
+            return ALC_ERROR_NONE;                                             \
+        }                                                                      \
     };
 
 // Macro to generate cipher authentication class
@@ -73,7 +95,8 @@ namespace alcp::cipher {
       public:                                                                  \
         CHILD_NEW(Uint32 keyLen_in_bytes)                                      \
             : PARENT(keyLen_in_bytes)                                          \
-        {}                                                                     \
+        {                                                                      \
+        }                                                                      \
         virtual ~CHILD_NEW() = default;                                        \
                                                                                \
         alc_error_t setAad(const Uint8* pInput, Uint64 aadLen);                \

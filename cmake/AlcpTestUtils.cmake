@@ -1,4 +1,4 @@
-# Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+# Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -43,27 +43,40 @@ function(alcp_add_valgrind_check_test test_name test_binary)
 endfunction(alcp_add_valgrind_check_test)
 
 function(alcp_add_integration_tests test_name test_binary)
+    set(options "")
+    set(oneValueArgs MODE)
+    set(multiValueArgs "")
+    cmake_parse_arguments(PARSE_ARGV 2 ARG "${options}" "${oneValueArgs}" "${multiValueArgs}")
+    
     set(IPP_ARGS "-i")
     set(OPENSSL_ARGS "-o")
-    gtest_discover_tests(${test_name} TARGET ${test_binary})
-    if(ENABLE_TESTS_IPP_API)
-        gtest_discover_tests(${test_name} TARGET ${test_binary} EXTRA_ARGS ${IPP_ARGS} TEST_SUFFIX ".ipp")
-    endif(ENABLE_TESTS_IPP_API)
-    if (ENABLE_TESTS_OPENSSL_API)
-        gtest_discover_tests(${test_name} TARGET ${test_binary} EXTRA_ARGS ${OPENSSL_ARGS} TEST_SUFFIX ".openssl")
-    endif(ENABLE_TESTS_OPENSSL_API)
+    
+    # Check if this is a cipher test by looking for "cipher" in test_name or test_binary
+    string(FIND "${test_name}" "cipher" cipher_pos_name)
+    string(FIND "${test_binary}" "cipher" cipher_pos_binary)
+    
+    if(cipher_pos_name GREATER_EQUAL 0 OR cipher_pos_binary GREATER_EQUAL 0)
+        # This is a cipher test - mode is required
+        if(NOT ARG_MODE)
+            message(FATAL_ERROR "MODE argument is required for cipher tests (test: ${test_name})")
+        endif()
+        
+        # Add tests with mode suffix for cipher tests
+        gtest_discover_tests(${test_name} TARGET ${test_binary} TEST_SUFFIX ".${ARG_MODE}" NO_PRETTY_VALUES NO_PRETTY_TYPES)
+        if(ENABLE_TESTS_IPP_API)
+            gtest_discover_tests(${test_name} TARGET ${test_binary} EXTRA_ARGS ${IPP_ARGS} TEST_SUFFIX ".${ARG_MODE}.ipp" NO_PRETTY_VALUES NO_PRETTY_TYPES)
+        endif(ENABLE_TESTS_IPP_API)
+        if (ENABLE_TESTS_OPENSSL_API)
+            gtest_discover_tests(${test_name} TARGET ${test_binary} EXTRA_ARGS ${OPENSSL_ARGS} TEST_SUFFIX ".${ARG_MODE}.openssl" NO_PRETTY_VALUES NO_PRETTY_TYPES)
+        endif(ENABLE_TESTS_OPENSSL_API)
+    else()
+        # This is a non-cipher test - ignore mode if provided
+        gtest_discover_tests(${test_name} TARGET ${test_binary} NO_PRETTY_VALUES NO_PRETTY_TYPES)
+        if(ENABLE_TESTS_IPP_API)
+            gtest_discover_tests(${test_name} TARGET ${test_binary} EXTRA_ARGS ${IPP_ARGS} TEST_SUFFIX ".ipp" NO_PRETTY_VALUES NO_PRETTY_TYPES)
+        endif(ENABLE_TESTS_IPP_API)
+        if (ENABLE_TESTS_OPENSSL_API)
+            gtest_discover_tests(${test_name} TARGET ${test_binary} EXTRA_ARGS ${OPENSSL_ARGS} TEST_SUFFIX ".openssl" NO_PRETTY_VALUES NO_PRETTY_TYPES)
+        endif(ENABLE_TESTS_OPENSSL_API)
+    endif()
 endfunction(alcp_add_integration_tests)
-
-# for aes ciphers, it needs cipher mode as an extra arg
-# FIXME: merge these two functions at one point
-function(alcp_add_integration_tests_cipher test_name test_binary mode)
-    set(IPP_ARGS "-i")
-    set(OPENSSL_ARGS "-o")
-    gtest_discover_tests(${test_name} TARGET ${test_binary} TEST_SUFFIX ".${mode}")
-    if(ENABLE_TESTS_IPP_API)
-        gtest_discover_tests(${test_name} TARGET ${test_binary} EXTRA_ARGS ${IPP_ARGS} TEST_SUFFIX ".${mode}.ipp")
-    endif(ENABLE_TESTS_IPP_API)
-    if (ENABLE_TESTS_OPENSSL_API)
-        gtest_discover_tests(${test_name} TARGET ${test_binary} EXTRA_ARGS ${OPENSSL_ARGS} TEST_SUFFIX ".${mode}.openssl")
-    endif(ENABLE_TESTS_OPENSSL_API)
-endfunction(alcp_add_integration_tests_cipher)

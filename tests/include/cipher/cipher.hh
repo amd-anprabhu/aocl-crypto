@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,9 +26,9 @@
  *
  */
 #pragma once
-#include "alcp/alcp.h"
 #include "file.hh"
 #include "utils.hh"
+#include <alcp/alcp.h>
 #include <cstring>
 #include <iostream>
 #include <vector>
@@ -52,7 +52,7 @@ GetModeSTR(alc_cipher_mode_t mode);
 // alcp_data_cipher_ex_t
 struct alcp_dc_ex_t
 {
-    const Uint8* m_in;
+     Uint8* m_in;
     Uint64       m_inl;
     Uint8*       m_out;
     Uint64       m_outl;
@@ -115,7 +115,20 @@ class CipherBase
     virtual bool encrypt(alcp_dc_ex_t& data)                  = 0;
     virtual bool decrypt(alcp_dc_ex_t& data)                  = 0;
     virtual bool reset()                                      = 0;
-    virtual ~CipherBase()                                     = default;
+    virtual bool context_copy()                               = 0;
+    virtual bool flush(const Uint8** pPlainText,
+                       Uint64        numBuffers,
+                       Uint64        len)                            = 0;
+    virtual bool dequeue(Uint8** pCipherText,
+                         Uint64  numBuffers,
+                         Uint64  len)                          = 0;
+    virtual bool multibufferInit(const Uint8*  pKey,
+                                 Uint64        keyLen,
+                                 const Uint8** pIv,
+                                 Uint64        ivLen,
+                                 Uint64        numBuffers)           = 0;
+
+    virtual ~CipherBase() = default;
 };
 
 class CipherAeadBase : public CipherBase
@@ -133,6 +146,7 @@ class CipherTesting
   public:
     CipherTesting() {}
     CipherTesting(CipherBase* impl);
+
     /**
      * @brief Encrypts data and puts in data.out, expects data.out to already
      * have valid memory pointer with appropriate size
@@ -146,22 +160,86 @@ class CipherTesting
     bool testingEncrypt(alcp_dc_ex_t& data, const std::vector<Uint8> key);
 
     /**
+     * @brief Tests the encryption operation with context copying capability.
+     *
+     * @param data - Structure containing input/output buffers, IVs, and other
+     *              cipher-specific parameters required for encryption
+     * @param key - Key used for encryption, provided as a vector of bytes
+     * @return true - If encryption with context copying succeeds
+     * @return false - If encryption or context copying fails
+     */
+    bool testingEncryptCtxCopy(alcp_dc_ex_t&            data,
+                               const std::vector<Uint8> key);
+
+    /**
+     * @brief Tests the decryption operation with context copying capability.
+     *
+     * @param data - Structure containing input/output buffers, IVs, tags, and
+     * other cipher-specific parameters required for decryption
+     * @param key - Key used for decryption, provided as a vector of bytes
+     * @return true - If decryption with context copying succeeds
+     * @return false - If decryption or context copying fails
+     */
+    bool testingDecryptCtxCopy(alcp_dc_ex_t&            data,
+                               const std::vector<Uint8> key);
+
+    /**
      * @brief Decrypts data and puts in data.out, expects data.out to already
      * have valid memory point with appropriate size
      *
-     * @param data - Everything that should go in or out of the cipher expect
+     * @param data - Everything that should go in or out of the cipher except
      * the key
-     * @param key - Key ysed to decrypt, should be std::vector
+     * @param key - Key used to decrypt, should be std::vector
      * @return true
      * @return false
      */
     bool testingDecrypt(alcp_dc_ex_t& data, const std::vector<Uint8> key);
+
     /**
      * @brief Set CipherBase pimpl
      *
      * @param impl - Object of class extended from CipherBase
      */
     void setcb(CipherBase* impl);
+
+    /**
+     * @brief Initializes multi-buffer cipher operation.
+     *
+     * @param key - Pointer to the key used for encryption/decryption
+     * @param keySize - Size of the key in bits
+     * @param ivPointers - Array of pointers to IVs for each buffer
+     * @param ivSize - Size of each IV in bytes
+     * @param numBuffers - Number of buffers for multi-buffer operation
+     * @return true - If initialization succeeds
+     * @return false - If initialization fails
+     */
+    bool multibufferInit(const Uint8*  key,
+                         size_t        keySize,
+                         const Uint8** ivPointers,
+                         size_t        ivSize,
+                         int           numBuffers);
+
+    /**
+     * @brief Processes input buffers for encryption/decryption.
+     *
+     * @param inputPointers - Array of pointers to input buffers
+     * @param numBuffers - Number of buffers
+     * @param bufferSize - Size of each buffer in bytes
+     * @return true - If flush succeeds
+     * @return false - If flush fails
+     */
+    bool flush(const Uint8** inputPointers, int numBuffers, int bufferSize);
+
+    /**
+     * @brief Retrieves processed output buffers.
+     *
+     * @param outputPointers - Array of pointers to output buffers
+     * @param numBuffers - Number of buffers
+     * @param bufferSize - Size of each buffer in bytes
+     * @return true - If dequeue succeeds
+     * @return false - If dequeue fails
+     */
+    bool dequeue(Uint8** outputPointers, int numBuffers, int bufferSize);
 };
 
 } // namespace alcp::testing

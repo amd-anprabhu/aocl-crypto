@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -178,7 +178,6 @@ namespace framework {
             if (write_mode)
                 oFile->close();
         }
-        // FIXME: Implement Partial File Read
     };
 
     /**
@@ -252,8 +251,6 @@ namespace framework {
                 return true;
             }
         }
-
-        // FIXME: Implement Vectorization of Param Values
     };
 
     template<typename T>
@@ -333,7 +330,8 @@ namespace crypto {
                 return std::vector<Uint8>(0);
             }
 
-            err = aead->encrypt(getPtr(in), getPtr(out), in.size());
+            Uint64 outlen = 0;
+            err = aead->encrypt(getPtr(in), getPtr(out), in.size(), &outlen);
             if (err != ALC_ERROR_NONE) {
                 printf("Error: Unable to Encrypt \n");
                 delete alcpCipher;
@@ -373,7 +371,8 @@ namespace crypto {
                 return std::vector<Uint8>(0);
             }
 
-            err = aead->decrypt(getPtr(in), getPtr(out), in.size());
+            Uint64 outlen = 0;
+            err = aead->decrypt(getPtr(in), getPtr(out), in.size(), &outlen);
             if (err != ALC_ERROR_NONE) {
                 printf("Error: Unable to Encrypt \n");
                 delete alcpCipher;

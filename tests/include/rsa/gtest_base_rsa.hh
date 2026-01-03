@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -191,7 +191,7 @@ Rsa_KAT(std::string             RsaAlgo,
     while (csv.readNext()) {
         /* input text to be loaded */
         std::vector<Uint8> input_data = csv.getVect("INPUT");
-        /*FIXME: reading expected encrypted data is currently only for
+        /* reading expected encrypted data is currently only for
          * non-padded modes */
         std::vector<Uint8> encrypted_data_expected =
             csv.getVect("ENCRYPTEDDATA");
@@ -368,12 +368,10 @@ Rsa_Cross(std::string             RsaAlgo,
           const alc_digest_info_t dinfo,
           const alc_digest_info_t mgfinfo)
 {
-    alcp_rsa_data_t   data_main{}, data_ext{};
-    int               ret_val_main = 0, ret_val_ext = 0;
-    AlcpRsaBase       arb;
-    alc_drbg_handle_t handle{};
-    alc_drbg_info_t   drbg_info{};
-    alc_error_t       err = ALC_ERROR_NONE;
+    alcp_rsa_data_t data_main{}, data_ext{};
+    int             ret_val_main = 0, ret_val_ext = 0;
+    AlcpRsaBase     arb;
+    RngBase         rngb;
 
     // FIXME: Better use unique pointer here
     RsaBase *rb_main = {}, *rb_ext = {};
@@ -399,7 +397,8 @@ Rsa_Cross(std::string             RsaAlgo,
 #else
     if ((useipp == false && useossl == false) || useossl == true) {
         printErrors("No Lib Selected. OpenSSL also not available");
-        FAIL() << "OpenSSL not available, cannot proceed with defaults!";
+        FAIL() << "OpenSSL not available, cannot proceed with "
+                  "defaults!";
     }
 #endif
 #ifdef USE_IPP
@@ -427,7 +426,8 @@ Rsa_Cross(std::string             RsaAlgo,
     rb_main->m_rsa_algo = rb_ext->m_rsa_algo = RsaAlgo;
     rb_main->m_padding_mode = rb_ext->m_padding_mode = padding_mode;
     if (padding_mode != ALCP_TEST_RSA_NO_PADDING) {
-        /* input size should be 0 to m_key_size - 2 * m_hash_len - 2*/
+        /* input size should be 0 to m_key_size - 2 * m_hash_len
+         * - 2*/
         if (KeySize == 128) {
             InputSize_Max = 62;
         } else
@@ -446,8 +446,9 @@ Rsa_Cross(std::string             RsaAlgo,
         exit(-1);
     }
 
-    /* use ctr-drbg to randomize the input buffer */
-    /* TO DO: maybe parameterize the DRBG type, and params in future? */
+/* use ctr-drbg to randomize the input buffer */
+/* FIXME: Not using CTR DRBG due to a known issue when using openssl 3.5.0 */
+#if 0
     drbg_info.di_algoinfo.ctr_drbg.di_keysize              = 128;
     drbg_info.di_algoinfo.ctr_drbg.use_derivation_function = true;
     drbg_info.di_type                                      = ALC_DRBG_CTR;
@@ -462,8 +463,7 @@ Rsa_Cross(std::string             RsaAlgo,
 
     err = alcp_drbg_supported(&drbg_info);
     if (alcp_is_error(err)) {
-        std::cout << "Hardware Rng support failed. Falling Back to System Rng"
-                  << std::endl;
+        std::cout << "Hardware Rng support failed. Falling Back to System Rng " << std::endl;
 
         // Fall back to OS RNG if hardware rng rdrand instruction is not
         // supported.
@@ -493,19 +493,27 @@ Rsa_Cross(std::string             RsaAlgo,
         FAIL();
     }
 #endif
+#endif
 
     int InputSize = 0;
     for (int i = loop_start; i < InputSize_Max; i++) {
-        /* For non-padded mode, input len will always be KeySize */
-        /* over-allocating this to test the misaligned pointers */
+        /* For non-padded mode, input len will always be KeySize
+         */
+        /* over-allocating this to test the misaligned pointers
+         */
         if (padding_mode == ALCP_TEST_RSA_NO_PADDING) {
             InputSize = InputSize_Max + 1;
         } else {
             InputSize = i + 1;
         }
         std::vector<Uint8> input_data(InputSize);
+        /* fill input data with random bytes */
+        rngb.genRandomBytes(input_data.size());
 
         /* shuffle input vector after each iterations */
+        /* FIXME: Not using CTR DRBG due to a known issue when
+         * using openssl 3.5.0 */
+#if 0
         err = alcp_drbg_randomize(&handle,
                                   &(input_data[0]),
                                   input_data.size(),
@@ -517,7 +525,7 @@ Rsa_Cross(std::string             RsaAlgo,
                       << std::endl;
             FAIL();
         }
-
+#endif
         /* set test data for each lib */
         std::vector<Uint8> encrypted_data_main(KeySize);
         std::vector<Uint8> decrypted_data_main(KeySize);
@@ -571,6 +579,11 @@ Rsa_Cross(std::string             RsaAlgo,
 
         /* set seed and label for padding mode */
         std::vector<Uint8> seed(rb_main->m_hash_len);
+        rngb.genRandomBytes(seed.size());
+
+        /* FIXME: Not using CTR DRBG due to a known issue when
+         * using openssl 3.5.0 */
+#if 0
         if (padding_mode == 1) {
             /* shuffle seed data after each iterations */
             err = alcp_drbg_randomize(
@@ -581,11 +594,17 @@ Rsa_Cross(std::string             RsaAlgo,
                 FAIL();
             }
         }
+#endif
 
         data_main.m_pseed = data_ext.m_pseed = &(seed[0]);
 
         /* label length should vary */
         std::vector<Uint8> label(i * KeySize);
+        rngb.genRandomBytes(label.size());
+
+        /* FIXME: Not using CTR DRBG due to a known issue when
+         * using openssl 3.5.0 */
+#if 0
         err = alcp_drbg_randomize(
             &handle, &(label[0]), label.size(), cSecurityStrength, NULL, 0);
         if (alcp_is_error(err)) {
@@ -593,6 +612,7 @@ Rsa_Cross(std::string             RsaAlgo,
                       << std::endl;
             FAIL();
         }
+#endif
         data_main.m_label = data_ext.m_label = &(label[0]);
         data_main.m_label_size = data_ext.m_label_size = label.size();
 
@@ -662,9 +682,10 @@ Rsa_Cross(std::string             RsaAlgo,
                           << LibStrExt << std::endl;
                 FAIL();
             }
-            /* check if signature generated by both libraries are same */
-            /* this check is not valid for PSS mode where signature will always
-             * be non-deterministic */
+            /* check if signature generated by both libraries
+             * are same */
+            /* this check is not valid for PSS mode where
+             * signature will always be non-deterministic */
             if (padding_mode == ALCP_TEST_RSA_PADDING_PKCS) {
                 EXPECT_TRUE(ArraysMatch(
                     signature_data_main, signature_data_ext, KeySize));
@@ -690,7 +711,8 @@ Rsa_Cross(std::string             RsaAlgo,
                           << std::endl;
                 FAIL();
             }
-            /* check if signature generated by both libraries are same */
+            /* check if signature generated by both libraries
+             * are same */
             EXPECT_TRUE(
                 ArraysMatch(signature_data_main, signature_data_ext, KeySize));
         } else if (RsaAlgo.compare("EncryptDecrypt") == 0) {
@@ -736,7 +758,8 @@ Rsa_Cross(std::string             RsaAlgo,
             if (padding_mode == ALCP_TEST_RSA_PADDING_OAEP
                 || padding_mode == ALCP_TEST_RSA_PADDING_PKCS) {
                 input_data.resize(KeySize);
-                /* compare decrypted output for ext lib vs original input */
+                /* compare decrypted output for ext lib vs
+                 * original input */
                 EXPECT_TRUE(ArraysMatch(decrypted_data_main, input_data, i));
                 EXPECT_TRUE(ArraysMatch(decrypted_data_ext, input_data, i));
                 EXPECT_TRUE(
@@ -745,7 +768,8 @@ Rsa_Cross(std::string             RsaAlgo,
                  * verification*/
                 input_data.resize(i);
             } else {
-                /* For non-padded mode, input len will always be KeySize */
+                /* For non-padded mode, input len will always be
+                 * KeySize */
                 EXPECT_TRUE(ArraysMatch(
                     decrypted_data_main, input_data, InputSize_Max));
                 EXPECT_TRUE(
@@ -761,11 +785,16 @@ Rsa_Cross(std::string             RsaAlgo,
         }
     }
 
+    /* FIXME: Not using CTR DRBG due to a known issue when using
+     * openssl 3.5.0
+     */
+#if 0
     alcp_drbg_finish(&handle);
     if (handle.ch_context) {
         free(handle.ch_context);
         handle.ch_context = nullptr;
     }
+#endif
 
     return;
 }

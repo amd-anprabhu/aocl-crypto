@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -78,8 +78,11 @@ ippsAES_GCMEncrypt(const Ipp8u*      pSrc,
     (reinterpret_cast<ipp_wrp_aes_aead_ctx*>(pState))->is_encrypt = true;
 
     // GCM Encrypt
-    err = alcp_cipher_aead_encrypt(
-        &(context_aead->handle), (Uint8*)pSrc, (Uint8*)pDst, len);
+    {
+        Uint64 outlen = 0;
+        err           = alcp_cipher_aead_encrypt(
+            &(context_aead->handle), (Uint8*)pSrc, (Uint8*)pDst, len, &outlen);
+    }
     if (alcp_is_error(err)) {
         return ippStsErr;
     }
@@ -102,8 +105,11 @@ ippsAES_GCMDecrypt(const Ipp8u*      pSrc,
     (reinterpret_cast<ipp_wrp_aes_aead_ctx*>(pState))->is_encrypt = false;
 
     // GCM Decrypt
-    err = alcp_cipher_aead_decrypt(
-        &(context_aead->handle), (Uint8*)pSrc, (Uint8*)pDst, len);
+    {
+        Uint64 outlen = 0;
+        err           = alcp_cipher_aead_decrypt(
+            &(context_aead->handle), (Uint8*)pSrc, (Uint8*)pDst, len, &outlen);
+    }
     if (alcp_is_error(err)) {
         return ippStsErr;
     }

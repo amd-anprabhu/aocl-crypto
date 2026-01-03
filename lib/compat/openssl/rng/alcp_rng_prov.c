@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -105,7 +105,7 @@ ALCP_prov_rng_set_ctx_params(void* vctx, const OSSL_PARAM params[])
 {
     ENTER();
     EXIT();
-    return 0;
+    return 1;
 }
 
 int

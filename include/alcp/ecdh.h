@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -40,7 +40,7 @@ EXTERN_C_BEGIN
  */
 
 /**
- * @brief Function sets input privateKey
+ * @brief Set the input private key for ECDH
  * @parblock <br> &nbsp;
  * <b>This API can be called after @ref alcp_ec_request and before @ref
  * alcp_ec_finish</b>
@@ -55,14 +55,14 @@ ALCP_API_EXPORT alc_error_t
 alcp_ec_set_privatekey(const alc_ec_handle_p pEcHandle, const Uint8* pPrivKey);
 
 /**
- * @brief Function generates public key using input privateKey generated
- * public key is shared with the peer.
+ * @brief Generate a public key from the input private key
+ * The generated public key is shared with the peer.
  * @parblock <br> &nbsp;
  * <b>This API can be called after @ref alcp_ec_request and before @ref
  * alcp_ec_finish</b>
  * @endparblock
  * @param [in] pEcHandle - Handler of the Context for the session
- * @param [out] pPublicKey - pointer to Output Publickey generated
+ * @param [out] pPublicKey - Pointer to output public key generated
  * @param [in] pPrivKey - pointer to Input privateKey used for generating
  * publicKey
  * @return Error Code for the API called . if alc_error_t is not zero then an
@@ -74,8 +74,7 @@ alcp_ec_get_publickey(const alc_ec_handle_p pEcHandle,
                       const Uint8*          pPrivKey);
 
 /**
- * @brief Function compute secret key with publicKey from remotePeer and
- * local privatekey.
+ * @brief Compute the shared secret using the peer public key and local private key
  * @parblock <br> &nbsp;
  * <b>This API can be called after @ref alcp_ec_request and before @ref
  * alcp_ec_finish</b>
@@ -104,9 +103,9 @@ alcp_ec_get_secretkey(const alc_ec_handle_p pEcHandle,
  *
  * @note       Must be called to ensure memory allotted (if any) is cleaned.
  *
- * @param [in] pEcHandle The handle that was returned as part of call
- *                       together alcp_ec_request(), once this function
- *                       is called. The handle will not be valid for future
+ * @param [in] pEcHandle The handle that was returned by alcp_ec_request().
+ *                       Once this function is called, the handle will not be
+ *                       valid for future calls.
  *
  * @return      None
  */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -91,7 +91,7 @@ ecdh_Bench(benchmark::State& state, alc_ec_info_t info, ecdh_bench_opt opt)
     IPPEcdhBase ieb_peer1(info);
     IPPEcdhBase ieb_peer2(info);
     if (useipp == true) {
-        // FIXME : skip bench if not running on avx512 architecture
+        // skip bench if IPP and non-avx512 architecture
         if (!CpuId::cpuHasAvx512(alcp::utils::Avx512Flags::AVX512_F)) {
             state.SkipWithError(
                 "IPP Ecdh multi-buffer implementations arent supported "

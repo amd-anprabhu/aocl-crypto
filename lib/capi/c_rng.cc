@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -60,7 +60,7 @@ alcp_rng_supported(const alc_rng_info_p pRngInfo)
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    ALCP_BAD_PTR_ERR_RET(pRngInfo, error);
+    ALCP_BAD_PTR_ERR_RET(pRngInfo);
     alc_error_t error = ALC_ERROR_NONE;
 
     bool rd_rand_available = CpuId::cpuHasRdRand();
@@ -102,7 +102,12 @@ alcp_rng_request(const alc_rng_info_p pRngInfo, alc_rng_handle_p pHandle)
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
     alc_error_t error = ALC_ERROR_NOT_SUPPORTED;
-    auto        ctx   = static_cast<alcp::rng::Context*>(pHandle->rh_context);
+
+    /* check if pHandle->rh_context is not nullptr */
+    ALCP_BAD_PTR_ERR_RET(pHandle);
+    ALCP_BAD_PTR_ERR_RET(pHandle->rh_context);
+
+    auto ctx = static_cast<alcp::rng::Context*>(pHandle->rh_context);
 
     new (ctx) alcp::rng::Context;
     /*
@@ -110,9 +115,7 @@ alcp_rng_request(const alc_rng_info_p pRngInfo, alc_rng_handle_p pHandle)
      * code
      */
 
-    ALCP_BAD_PTR_ERR_RET(pRngInfo, error);
-    ALCP_BAD_PTR_ERR_RET(pHandle, error);
-    ALCP_BAD_PTR_ERR_RET(pHandle->rh_context, error);
+    ALCP_BAD_PTR_ERR_RET(pRngInfo);
 
     switch (pRngInfo->ri_type) {
         case ALC_RNG_TYPE_DISCRETE:
@@ -142,20 +145,19 @@ alcp_rng_gen_random(alc_rng_handle_p pRngHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "OutputBuff size %6ld", size);
 #endif
-    ALCP_BAD_PTR_ERR_RET(pRngHandle, error);
-    ALCP_BAD_PTR_ERR_RET(pRngHandle->rh_context, error);
-
-    alc_error_t err = ALC_ERROR_NONE;
+    ALCP_BAD_PTR_ERR_RET(pRngHandle);
+    ALCP_BAD_PTR_ERR_RET(pRngHandle->rh_context);
 
     if (size == 0) {
-        return err;
+        /* FIXME: this should call ALCP_ZERO_LEN_ERR_RET?*/
+        return ALC_ERROR_EXISTS;
     }
 
-    ALCP_BAD_PTR_ERR_RET(buf, err);
+    ALCP_BAD_PTR_ERR_RET(buf);
 
     alcp::rng::Context* ctx = (alcp::rng::Context*)pRngHandle->rh_context;
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rng, error);
-    ALCP_BAD_PTR_ERR_RET(ctx->read_random, error);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rng);
+    ALCP_BAD_PTR_ERR_RET(ctx->read_random);
     return ctx->read_random(ctx->m_rng, buf, size);
 }
 
@@ -165,11 +167,11 @@ alcp_rng_reseed(alc_rng_handle_p pRngHandle)
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    ALCP_BAD_PTR_ERR_RET(pRngHandle, error);
-    ALCP_BAD_PTR_ERR_RET(pRngHandle->rh_context, error);
+    ALCP_BAD_PTR_ERR_RET(pRngHandle);
+    ALCP_BAD_PTR_ERR_RET(pRngHandle->rh_context);
     alcp::rng::Context* ctx = (alcp::rng::Context*)pRngHandle->rh_context;
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rng, error);
-    ALCP_BAD_PTR_ERR_RET(ctx->reseed, error);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rng);
+    ALCP_BAD_PTR_ERR_RET(ctx->reseed);
     return ctx->reseed(ctx->m_rng);
 }
 
@@ -179,11 +181,11 @@ alcp_rng_finish(alc_rng_handle_p pRngHandle)
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
-    ALCP_BAD_PTR_ERR_RET(pRngHandle, error);
-    ALCP_BAD_PTR_ERR_RET(pRngHandle->rh_context, error);
+    ALCP_BAD_PTR_ERR_RET(pRngHandle);
+    ALCP_BAD_PTR_ERR_RET(pRngHandle->rh_context);
     alcp::rng::Context* ctx = (alcp::rng::Context*)pRngHandle->rh_context;
-    ALCP_BAD_PTR_ERR_RET(ctx->m_rng, error);
-    ALCP_BAD_PTR_ERR_RET(ctx->finish, error);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_rng);
+    ALCP_BAD_PTR_ERR_RET(ctx->finish);
     ctx->finish(ctx->m_rng);
 
     ctx->~Context();

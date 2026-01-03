@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -58,6 +58,15 @@ alcp_prov_digest_newctx(void* vprovctx, alc_digest_mode_t mode)
             OPENSSL_clear_free(dig_ctx->handle.context, size);
             OPENSSL_clear_free(dig_ctx, sizeof(*dig_ctx));
             return 0;
+        }
+        if (mode == ALC_SHAKE_128 || mode == ALC_SHAKE_256) {
+#if OPENSSL_API_LEVEL >= 30400
+            dig_ctx->shake_digest_size = SIZE_MAX;
+#else
+            dig_ctx->shake_digest_size = (mode == ALC_SHAKE_128)
+                                             ? (ALC_DIGEST_LEN_128 / 8)
+                                             : (ALC_DIGEST_LEN_256 / 8);
+#endif
         }
     }
     EXIT();
@@ -122,8 +131,17 @@ alcp_prov_digest_get_params(OSSL_PARAM    params[],
     OSSL_PARAM* param = NULL;
     OSSL_PARAM_LOCATE_SET_SIZE(
         params, OSSL_DIGEST_PARAM_BLOCK_SIZE, param, blockSize);
+#if OPENSSL_API_LEVEL >= 30400
+    if (flags & ALCP_FLAG_XOF) {
+        OSSL_PARAM_LOCATE_SET_SIZE(params, OSSL_DIGEST_PARAM_SIZE, param, 0);
+    } else {
+        OSSL_PARAM_LOCATE_SET_SIZE(
+            params, OSSL_DIGEST_PARAM_SIZE, param, digestSize);
+    }
+#else
     OSSL_PARAM_LOCATE_SET_SIZE(
         params, OSSL_DIGEST_PARAM_SIZE, param, digestSize);
+#endif
     OSSL_PARAM_LOCATE_SET_INT(
         params, OSSL_DIGEST_PARAM_XOF, param, ((flags & ALCP_FLAG_XOF) != 0));
     OSSL_PARAM_LOCATE_SET_INT(params,

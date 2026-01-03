@@ -102,7 +102,6 @@ BenchGcmCipherExperimental(benchmark::State&            state,
     alignas(16) Uint8 iv[16];
     alignas(16) Uint8 ad[16];
     alignas(16) Uint8 tag[16];
-    // FIXME: Tkey might be needed for XTS
 
     alc_test_gcm_init_data_t dataInit;
     dataInit.m_iv      = iv;
@@ -128,8 +127,7 @@ BenchGcmCipherExperimental(benchmark::State&            state,
 
     if constexpr (encryptor == false) { // Decrypt
         // Create a vaid data for decryption (mainly tag and ct)
-        std::unique_ptr<ITestCipher> iTestCipher =
-            std::make_unique<AlcpGcmCipher<true>>();
+        iTestCipher = std::make_unique<AlcpGcmCipher<true>>();
         bool no_err = true;
         no_err &= iTestCipher->init(&dataInit);
         if (no_err == false) {
@@ -153,7 +151,10 @@ BenchGcmCipherExperimental(benchmark::State&            state,
             return -1;
         }
     }
-
+// if the operation is encrypt we can reuse the same cipher object but for decrypt we need to create a new cipher object
+    if constexpr (encryptor == false) {
+        iTestCipher = std::make_unique<AlcpGcmCipher<false>>();
+    }
     return BenchCipherExperimental<encryptor>(state,
                                               cBlockSize,
                                               std::move(iTestCipher),
@@ -181,8 +182,6 @@ BenchXtsCipherExperimental(benchmark::State&            state,
     for (Uint32 i = 0; i < keylen / 8 * 2; i++) {
         key[i] = i;
     }
-
-    // FIXME: Tkey might be needed for XTS
 
     alc_test_xts_init_data_t dataInit;
     dataInit.m_iv      = iv;

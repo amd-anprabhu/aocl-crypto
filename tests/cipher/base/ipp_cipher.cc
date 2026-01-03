@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -218,6 +218,39 @@ bool
 IPPCipherBase::reset()
 {
     return true;
+}
+
+bool
+IPPCipherBase::context_copy()
+{
+    return true;
+}
+
+bool
+IPPCipherBase::flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len)
+{
+    // This function is not implemented in IPP
+    std::cout << "IPPCipherBase::flush is not implemented." << std::endl;
+    return false;
+}
+bool
+IPPCipherBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len)
+{
+    // This function is not implemented in IPP
+    std::cout << "IPPCipherBase::dequeue is not implemented." << std::endl;
+    return false;
+}
+bool
+IPPCipherBase::multibufferInit(const Uint8*  pKey,
+                               Uint64        keyLen,
+                               const Uint8** pIv,
+                               Uint64        ivLen,
+                               Uint64        numBuffers)
+{
+    // This function is not implemented in IPP
+    std::cout << "IPPCipherBase::multibufferInit is not implemented."
+              << std::endl;
+    return false;
 }
 
 } // namespace alcp::testing

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -171,7 +171,8 @@ aclp_aes_encrypt_demo(
 {
     alc_error_t err;
 
-    err = alcp_cipher_encrypt(&handle, plaintxt, ciphertxt, len);
+    Uint64 encrypt_outlen = 0;
+    err = alcp_cipher_encrypt(&handle, plaintxt, ciphertxt, len, &encrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: unable encrypt \n");
         return;
@@ -186,7 +187,8 @@ aclp_aes_decrypt_demo(
 {
     alc_error_t err;
 
-    err = alcp_cipher_decrypt(&handle, ciphertxt, plaintxt, len);
+    Uint64 decrypt_outlen = 0;
+    err = alcp_cipher_decrypt(&handle, ciphertxt, plaintxt, len, &decrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: unable decrypt \n");
         return;
@@ -338,9 +340,6 @@ main(void)
                                             8192, 16384, 32768 };
 
         for (int keySizeItr = 0; keySizeItr < 3; keySizeItr++) {
-            if ((m == ALC_AES_MODE_XTS) && (keySizeItr > 0)) {
-                continue;
-            }
             for (int i = 0; i < MAX_TEST_CASE; i++) {
                 int inputLen = testblkSizes[i];
                 printf(" \n");

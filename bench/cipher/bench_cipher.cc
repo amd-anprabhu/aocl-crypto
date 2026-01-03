@@ -29,7 +29,9 @@
 #include "benchmarks_cipher.hh"
 #include "cipher/cipher.hh"
 #include "gbench_base.hh"
+#include <iostream>
 #include <memory>
+#include <vector>
 
 #define MAX_BLOCK_SIZE 32768
 #define MAX_KEY_SIZE   256
@@ -52,20 +54,40 @@ CipherAeadBench(benchmark::State& state,
         return -1;
     }
     // Allocate with 512 bit alignment
-    alignas(64) Uint8              vec_in_arr[MAX_BLOCK_SIZE]  = {};
-    alignas(64) Uint8              vec_out_arr[MAX_BLOCK_SIZE] = {};
-    alignas(16) Uint8              tag_buffer[16]              = {};
-    alignas(16) Uint8              key[MAX_KEY_SIZE / 8]       = {};
-    alignas(16) Uint8              iv[16]                      = {};
-    alignas(16) Uint8              ad[16]                      = {};
-    alignas(16) Uint8              tag[16]                     = {};
-    alignas(16) Uint8              tkey[MAX_KEY_SIZE / 8]      = {};
-    alcp::testing::CipherAeadBase* p_cb                        = nullptr;
+    /* this is to avoid large stack use(MAX_BLOCK_SIZE),reported by Coverity
+     */
+#ifdef _WIN32
+    auto vec_in_arr = std::unique_ptr<Uint8[], decltype(&_aligned_free)>(
+        static_cast<Uint8*>(
+            _aligned_malloc(MAX_BLOCK_SIZE * sizeof(Uint8), 64)),
+        _aligned_free);
+    auto vec_out_arr = std::unique_ptr<Uint8[], decltype(&_aligned_free)>(
+        static_cast<Uint8*>(
+            _aligned_malloc(MAX_BLOCK_SIZE * sizeof(Uint8), 64)),
+        _aligned_free);
+#else
+    auto vec_in_arr = std::unique_ptr<Uint8[], decltype(&std::free)>(
+        static_cast<Uint8*>(
+            std::aligned_alloc(64, MAX_BLOCK_SIZE * sizeof(Uint8))),
+        std::free);
+    auto vec_out_arr = std::unique_ptr<Uint8[], decltype(&std::free)>(
+        static_cast<Uint8*>(
+            std::aligned_alloc(64, MAX_BLOCK_SIZE * sizeof(Uint8))),
+        std::free);
+#endif
+
+    alignas(16) Uint8              tag_buffer[16]         = {};
+    alignas(16) Uint8              key[MAX_KEY_SIZE / 8]  = {};
+    alignas(16) Uint8              iv[16]                 = {};
+    alignas(16) Uint8              ad[16]                 = {};
+    alignas(16) Uint8              tag[16]                = {};
+    alignas(16) Uint8              tkey[MAX_KEY_SIZE / 8] = {};
+    alcp::testing::CipherAeadBase* p_cb                   = nullptr;
 
     alcp::testing::alcp_dc_ex_t data;
-    data.m_in      = vec_in_arr;
+    data.m_in      = vec_in_arr.get();
     data.m_inl     = cBlockSize;
-    data.m_out     = vec_out_arr;
+    data.m_out     = vec_out_arr.get();
     data.m_outl    = cBlockSize;
     data.m_iv      = iv;
     data.m_ivl     = 12;
@@ -128,8 +150,8 @@ CipherAeadBench(benchmark::State& state,
         if (!p_cb->encrypt(data)) {
             state.SkipWithError("AEAD : BENCH_ENC_FAILURE");
         }
-        data.m_in  = vec_out_arr;
-        data.m_out = vec_in_arr;
+        data.m_in  = vec_out_arr.get();
+        data.m_out = vec_in_arr.get();
         // TAG is the IV
         // cb->init(key, keylen);
         if (alcpMode == ALC_AES_MODE_SIV) {
@@ -228,6 +250,140 @@ CipherBench(benchmark::State& state,
     return 0;
 }
 
+/* Multibuffer Benchmarks */
+int
+CipherMultibufferBench(benchmark::State& state,
+                       Uint64            blockSize,
+                       encrypt_t         enc,
+                       alc_cipher_mode_t alcpMode,
+                       size_t            keylen,
+                       Uint64            numBuffers)
+{
+    // Dynamic allocation better for larger sizes
+    std::vector<std::vector<Uint8>> vec_in(numBuffers,
+                                           std::vector<Uint8>(blockSize, 0x01));
+    std::vector<std::vector<Uint8>> vec_out(
+        numBuffers, std::vector<Uint8>(blockSize, 0x21));
+    alignas(16)
+        Uint8 iv[16] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                         0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F };
+    std::vector<std::vector<Uint8>> ivs(numBuffers,
+                                        std::vector<Uint8>(iv, iv + 16));
+    std::vector<const Uint8*>       iv_pointers(numBuffers);
+    for (Uint64 i = 0; i < numBuffers; ++i) {
+        std::next_permutation(ivs[i].begin(), ivs[i].end());
+        iv_pointers[i] = ivs[i].data();
+    }
+    std::unique_ptr<Uint8[]> tag_buffer = std::make_unique<Uint8[]>(16);
+
+    alignas(16) Uint8          key[MAX_KEY_SIZE / 8]  = {};
+    alignas(16) Uint8          tkey[MAX_KEY_SIZE / 8] = {};
+    alcp::testing::CipherBase* p_cb;
+
+    alcp::testing::AlcpCipherBase acb = alcp::testing::AlcpCipherBase(
+        alcpMode, iv, 12, &key[0], keylen, tkey, blockSize);
+
+    p_cb = &acb;
+#ifdef USE_IPP
+    alcp::testing::IPPCipherBase icb = alcp::testing::IPPCipherBase(
+        alcpMode, iv, 12, &key[0], keylen, tkey, blockSize);
+    if (useipp) {
+        p_cb = &icb;
+    }
+#endif
+#ifdef USE_OSSL
+    alcp::testing::OpenSSLCipherBase ocb = alcp::testing::OpenSSLCipherBase(
+        alcpMode, iv, 12, &key[0], keylen, tkey, blockSize);
+    if (useossl) {
+        p_cb = &ocb;
+    }
+#endif
+    alcp::testing::alcp_dc_ex_t data;
+    // assign the input and output vectors to the data structure
+    data.m_inl   = blockSize;
+    data.m_outl  = blockSize;
+    data.m_iv    = iv;
+    data.m_ivl   = 16;
+    data.m_tkey  = tkey;
+    data.m_tkeyl = 16;
+
+    std::vector<const Uint8*> input_buffer_pointers(numBuffers);
+    std::vector<Uint8*>       output_buffer_pointers(numBuffers);
+    for (Uint64 i = 0; i < numBuffers; ++i) {
+        input_buffer_pointers[i]  = vec_in[i].data();
+        output_buffer_pointers[i] = vec_out[i].data();
+    }
+
+    // initialize the cipher context
+    #ifdef MULTI_INIT_BENCH
+    for (auto _ : state) {
+    #endif
+    if (!p_cb->multibufferInit(
+            nullptr, 0, iv_pointers.data(), 16, numBuffers)) {
+        // multibuffer initialization
+        state.SkipWithError("BENCH_INIT_FAILURE");
+    }
+    #ifndef MULTI_INIT_BENCH
+    for (auto _ : state) {
+    #endif
+        if (!p_cb->flush(input_buffer_pointers.data(), numBuffers, blockSize)) {
+            state.SkipWithError("BENCH_FLUSH_FAILURE");
+        }
+
+        if (!p_cb->dequeue(
+                output_buffer_pointers.data(), numBuffers, blockSize)) {
+            state.SkipWithError("BENCH_DEQUEUE_FAILURE");
+        }
+    }
+    state.counters["Speed(Bytes/s)"] =
+        benchmark::Counter(state.iterations() * blockSize * numBuffers,
+                           benchmark::Counter::kIsRate);
+    state.counters["BlockSize(Bytes)"] = blockSize;
+    state.counters["NumBuffers"]       = numBuffers;
+
+    return 0;
+}
+
+/* Multibuffer benchmark functions for different modes and key sizes */
+static void
+BENCH_AES_MULTIBUFFER_CBC_128(benchmark::State& state)
+{
+    benchmark::DoNotOptimize(CipherMultibufferBench(
+        state, state.range(0), ENCRYPT, ALC_AES_MODE_CBC, 128, state.range(1)));
+}
+static void
+BENCH_AES_MULTIBUFFER_CBC_192(benchmark::State& state)
+{
+    benchmark::DoNotOptimize(CipherMultibufferBench(
+        state, state.range(0), ENCRYPT, ALC_AES_MODE_CBC, 192, state.range(1)));
+}
+
+static void
+BENCH_AES_MULTIBUFFER_CBC_256(benchmark::State& state)
+{
+    benchmark::DoNotOptimize(CipherMultibufferBench(
+        state, state.range(0), ENCRYPT, ALC_AES_MODE_CBC, 256, state.range(1)));
+}
+
+static void
+BENCH_AES_MULTIBUFFER_CFB_128(benchmark::State& state)
+{
+    benchmark::DoNotOptimize(CipherMultibufferBench(
+        state, state.range(0), ENCRYPT, ALC_AES_MODE_CFB, 128, state.range(1)));
+}
+static void
+BENCH_AES_MULTIBUFFER_CFB_192(benchmark::State& state)
+{
+    benchmark::DoNotOptimize(CipherMultibufferBench(
+        state, state.range(0), ENCRYPT, ALC_AES_MODE_CFB, 192, state.range(1)));
+}
+
+static void
+BENCH_AES_MULTIBUFFER_CFB_256(benchmark::State& state)
+{
+    benchmark::DoNotOptimize(CipherMultibufferBench(
+        state, state.range(0), ENCRYPT, ALC_AES_MODE_CFB, 256, state.range(1)));
+}
 // 128 bit key size
 
 /**
@@ -635,6 +791,10 @@ AddBenchmarks()
         blocksizes.resize(1);
         blocksizes[0] = block_size;
     }
+
+    /* Define number of buffers to test */
+    std::vector<Int64> num_buffers = { 4, 8, 16, 32, 64 };
+
     /* IPPCP doesnt have Chacha20 stream cipher variant yet */
     if (!useipp) {
         BENCHMARK(BENCH_CHACHA20_ENCRYPT_256)->ArgsProduct({ blocksizes });
@@ -643,6 +803,20 @@ AddBenchmarks()
             ->ArgsProduct({ blocksizes });
         BENCHMARK(BENCH_CHACHA20_POLY1305_DECRYPT_256)
             ->ArgsProduct({ blocksizes });
+
+        /* IPPCP Multibuffer benchmarks are not yet enabled */
+        BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_128)
+            ->ArgsProduct({ blocksizes, num_buffers });
+        BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_192)
+            ->ArgsProduct({ blocksizes, num_buffers });
+        BENCHMARK(BENCH_AES_MULTIBUFFER_CBC_256)
+            ->ArgsProduct({ blocksizes, num_buffers });
+        BENCHMARK(BENCH_AES_MULTIBUFFER_CFB_128)
+            ->ArgsProduct({ blocksizes, num_buffers });
+        BENCHMARK(BENCH_AES_MULTIBUFFER_CFB_192)
+            ->ArgsProduct({ blocksizes, num_buffers });
+        BENCHMARK(BENCH_AES_MULTIBUFFER_CFB_256)
+            ->ArgsProduct({ blocksizes, num_buffers });
     }
     BENCHMARK(BENCH_AES_ENCRYPT_CBC_128)->ArgsProduct({ blocksizes });
     BENCHMARK(BENCH_AES_ENCRYPT_CTR_128)->ArgsProduct({ blocksizes });
@@ -696,13 +870,19 @@ AddBenchmarks()
     BENCHMARK(BENCH_AES_DECRYPT_CCM_192)->ArgsProduct({ blocksizes });
 
 #ifdef MULTI_INIT_BENCH
-    //Multi-Init Benchmarks
-    BENCHMARK(BENCH_AES_ENCRYPT_GCM_MULTI_INIT_128)->ArgsProduct({ blocksizes });
-    BENCHMARK(BENCH_AES_DECRYPT_GCM_MULTI_INIT_128)->ArgsProduct({ blocksizes });
-    BENCHMARK(BENCH_AES_ENCRYPT_GCM_MULTI_INIT_192)->ArgsProduct({ blocksizes });
-    BENCHMARK(BENCH_AES_DECRYPT_GCM_MULTI_INIT_192)->ArgsProduct({ blocksizes });
-    BENCHMARK(BENCH_AES_ENCRYPT_GCM_MULTI_INIT_256)->ArgsProduct({ blocksizes });
-    BENCHMARK(BENCH_AES_DECRYPT_GCM_MULTI_INIT_256)->ArgsProduct({ blocksizes });
+    // Multi-Init Benchmarks
+    BENCHMARK(BENCH_AES_ENCRYPT_GCM_MULTI_INIT_128)
+        ->ArgsProduct({ blocksizes });
+    BENCHMARK(BENCH_AES_DECRYPT_GCM_MULTI_INIT_128)
+        ->ArgsProduct({ blocksizes });
+    BENCHMARK(BENCH_AES_ENCRYPT_GCM_MULTI_INIT_192)
+        ->ArgsProduct({ blocksizes });
+    BENCHMARK(BENCH_AES_DECRYPT_GCM_MULTI_INIT_192)
+        ->ArgsProduct({ blocksizes });
+    BENCHMARK(BENCH_AES_ENCRYPT_GCM_MULTI_INIT_256)
+        ->ArgsProduct({ blocksizes });
+    BENCHMARK(BENCH_AES_DECRYPT_GCM_MULTI_INIT_256)
+        ->ArgsProduct({ blocksizes });
 #endif
 
     return 0;

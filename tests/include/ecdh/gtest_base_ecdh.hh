@@ -100,7 +100,7 @@ ecdh_KAT(alc_ec_info_t info)
     IPPEcdhBase ieb_peer1(info);
     IPPEcdhBase ieb_peer2(info);
     if (useipp == true) {
-        // FIXME : skip test if not running on avx512 architecture
+        // skip test if not running on avx512 architecture
         if (!CpuId::cpuHasAvx512(alcp::utils::Avx512Flags::AVX512_F)) {
             std::cout
                 << "IPP Ecdh multi-buffer implementations arent supported "
@@ -155,7 +155,6 @@ ecdh_KAT(alc_ec_info_t info)
             FAIL();
         }
 
-        // FIXME: Generate public key should be following a setPrivateKey
         if (!eb_peer1->GeneratePublicKey(data_peer1)) {
             std::cout << "Error in ECDH Generate public key" << std::endl;
             FAIL();
@@ -223,7 +222,7 @@ ecdh_KAT_p256(alc_ec_info_t info)
     IPPEcdhBase ieb_peer1(info);
     // IPPEcdhBase ieb_peer2(info);
     if (useipp == true) {
-        // FIXME : skip test if not running on avx512 architecture
+        // skip test if not running on avx512 architecture
         if (!CpuId::cpuHasAvx512(alcp::utils::Avx512Flags::AVX512_F)) {
             std::cout
                 << "IPP Ecdh multi-buffer implementations arent supported "
@@ -339,7 +338,7 @@ ecdh_Cross(alc_ec_info_t info)
     IPPEcdhBase ieb_peer1(info);
     IPPEcdhBase ieb_peer2(info);
     if (useipp == true) {
-        // FIXME : skip test if not running on avx512 architecture
+        // skip test if not running on avx512 architecture
         if (!CpuId::cpuHasAvx512(alcp::utils::Avx512Flags::AVX512_F)) {
             std::cout
                 << "IPP Ecdh multi-buffer implementations arent supported "

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -107,7 +107,9 @@ alcp_prov_mac_final(void* vctx, Uint8* out, Uint64* outl, Uint64 outsize)
     return 1;
 }
 
+#ifdef ALCP_COMPAT_ENABLE_OPENSSL_MAC
 static const char MAC_DEF_PROP[] = "provider=alcp,fips=no";
+#endif
 
 extern const OSSL_DISPATCH alcp_cmac_functions[];
 extern const OSSL_DISPATCH alcp_hmac_functions[];

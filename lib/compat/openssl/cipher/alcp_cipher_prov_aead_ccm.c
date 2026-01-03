@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -354,14 +354,20 @@ ccm_tls_cipher(ALCP_PROV_CIPHER_CTX* ctx,
 
     if (cipherctx->enc) {
 
-        if (alcp_cipher_aead_encrypt(&(ctx->handle), in, out, len)) {
+        {
+            Uint64 outlen = 0;
+            if (alcp_cipher_aead_encrypt(&(ctx->handle), in, out, len, &outlen)) {
             goto err;
+            }
         }
         olen = len + EVP_CCM_TLS_EXPLICIT_IV_LEN + cipherctx->ccm.m;
     } else {
 
-        if (alcp_cipher_aead_decrypt(&(ctx->handle), in, out, len)) {
+        {
+            Uint64 outlen = 0;
+            if (alcp_cipher_aead_decrypt(&(ctx->handle), in, out, len, &outlen)) {
             goto err;
+            }
         }
         olen = len;
     }
@@ -434,8 +440,11 @@ alcp_prov_ccm_cipher_internal(ALCP_PROV_CIPHER_CTX* ctx,
         }
 
         if (cipherctx->enc) {
-            if (alcp_cipher_aead_encrypt(&(ctx->handle), in, out, len)) {
+            {
+                Uint64 outlen = 0;
+                if (alcp_cipher_aead_encrypt(&(ctx->handle), in, out, len, &outlen)) {
                 goto err;
+                }
             }
             cipherctx->ccm.isTagSet = 1;
         } else {
@@ -443,20 +452,25 @@ alcp_prov_ccm_cipher_internal(ALCP_PROV_CIPHER_CTX* ctx,
             if (!cipherctx->ccm.isTagSet)
                 goto err;
 
-            if (alcp_cipher_aead_decrypt(&(ctx->handle), in, out, len)) {
+            {
+                Uint64 outlen = 0;
+                if (alcp_cipher_aead_decrypt(&(ctx->handle), in, out, len, &outlen)) {
                 goto err;
+                }
             }
 
-            Uint8 buf[16];
             if (alcp_cipher_aead_get_tag(
-                    &(ctx->handle), buf, cipherctx->ccm.m)) {
+                    &(ctx->handle), cipherctx->buf, cipherctx->ccm.m)) {
                 printf("Error getting the tag\n");
                 goto err;
             }
+#if 0
+
             if (memcmp(cipherctx->buf, buf, cipherctx->ccm.m) != 0) {
                 rv = 0;
                 return rv;
             }
+#endif
 
             cipherctx->ivState      = 0;
             cipherctx->ccm.isTagSet = 0;

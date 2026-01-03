@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -96,7 +96,8 @@ AlcpChacha20Poly1305EncryptDemo(
     }
 
     // Chacha20-Poly1305 encrypt
-    err = alcp_cipher_aead_encrypt(&handle, plaintxt, ciphertxt, len);
+    Uint64 encrypt_outlen = 0;
+    err           = alcp_cipher_aead_encrypt(&handle, plaintxt, ciphertxt, len, &encrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: unable encrypt \n");
         return -1;
@@ -150,10 +151,9 @@ AlcpChacha20Poly1305DecryptDemo(const Uint8* ciphertxt,
         return -1;
     }
 
-    // FIXME: init call needs to be added to set key and iv.
-
     // Chacha20-Poly1305 decrypt
-    err = alcp_cipher_aead_decrypt(&handle, ciphertxt, plaintxt, len);
+    Uint64 decrypt_outlen = 0;
+    err           = alcp_cipher_aead_decrypt(&handle, ciphertxt, plaintxt, len, &decrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: unable decrypt \n");
         return -1;

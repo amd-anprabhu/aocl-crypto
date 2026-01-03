@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -79,9 +79,9 @@ alcp_ec_request(const alc_ec_info_p pEcInfo, alc_ec_handle_p pEcHandle)
 #endif
     alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pEcHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pEcInfo, err);
-    ALCP_BAD_PTR_ERR_RET(pEcHandle->context, err);
+    ALCP_BAD_PTR_ERR_RET(pEcHandle);
+    ALCP_BAD_PTR_ERR_RET(pEcInfo);
+    ALCP_BAD_PTR_ERR_RET(pEcHandle->context);
 
     auto ctx = static_cast<ec::Context*>(pEcHandle->context);
 
@@ -100,11 +100,10 @@ alcp_ec_set_privatekey(const alc_ec_handle_p pEcHandle,
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pEcHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pEcHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pPrivateKey,
-                         err); // privateKey can be internal generated after
-                               // adding DRBG and key managment function.
+    ALCP_BAD_PTR_ERR_RET(pEcHandle);
+    ALCP_BAD_PTR_ERR_RET(pEcHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pPrivateKey);
+
     auto ctx = static_cast<ec::Context*>(pEcHandle->context);
 
     ctx->status = ctx->setPrivateKey(ctx->m_ec, pPrivateKey);
@@ -121,12 +120,10 @@ alcp_ec_get_publickey(const alc_ec_handle_p pEcHandle,
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pEcHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pEcHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pPublicKey, err);
-    ALCP_BAD_PTR_ERR_RET(pPrivKey,
-                         err); // privateKey can be internal generated after
-                               // adding DRBG and key managment function.
+    ALCP_BAD_PTR_ERR_RET(pEcHandle);
+    ALCP_BAD_PTR_ERR_RET(pEcHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pPublicKey);
+    ALCP_BAD_PTR_ERR_RET(pPrivKey);
 
     auto ctx = static_cast<ec::Context*>(pEcHandle->context);
 
@@ -145,17 +142,17 @@ alcp_ec_get_secretkey(const alc_ec_handle_p pEcHandle,
     ALCP_DEBUG_LOG(LOG_INFO);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
-    ALCP_BAD_PTR_ERR_RET(pEcHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pEcHandle->context, err);
-    ALCP_BAD_PTR_ERR_RET(pSecretKey, err);
-    ALCP_BAD_PTR_ERR_RET(pPublicKey, err);
-    ALCP_BAD_PTR_ERR_RET(pKeyLength, err);
+    ALCP_BAD_PTR_ERR_RET(pEcHandle);
+    ALCP_BAD_PTR_ERR_RET(pEcHandle->context);
+    ALCP_BAD_PTR_ERR_RET(pSecretKey);
+    ALCP_BAD_PTR_ERR_RET(pPublicKey);
+    ALCP_BAD_PTR_ERR_RET(pKeyLength);
 
     auto ctx = static_cast<ec::Context*>(pEcHandle->context);
 
     ctx->status =
         ctx->getSecretKey(ctx->m_ec, pSecretKey, pPublicKey, pKeyLength);
-
+    /* FIXME: this should be corrected */
     return ctx->status.ok() ? err : ALC_ERROR_GENERIC;
 }
 

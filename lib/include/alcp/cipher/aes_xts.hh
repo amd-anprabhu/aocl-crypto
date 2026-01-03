@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -97,6 +97,14 @@ class ALCP_API_EXPORT Xts
                      const Uint8* pIv,
                      Uint64       ivLen) override;
 
+    // alc_error_t encrypt(const Uint8* pPlainText,
+    //                     Uint8*       pCipherText,
+    //                     Uint64       len,
+    //                     Uint64*      outlen) override
+    // {
+    //     return ALC_ERROR_NOT_SUPPORTED;
+    // }
+
     void tweakBlockSet(Uint64 aesBlockId);
 
   private:
@@ -119,17 +127,44 @@ class XtsT
   public:
     XtsT()
         : Xts((static_cast<Uint32>(keyLenBits)) / 8, CipherMode::eAesXTS)
-    {}
+    {
+    }
     ~XtsT() = default;
 
   public:
     alc_error_t encrypt(const Uint8* pPlainText,
                         Uint8*       pCipherText,
-                        Uint64       len) override;
+                        Uint64       len,
+                        Uint64*      outlen) override;
     alc_error_t decrypt(const Uint8* pCipherText,
                         Uint8*       pPlainText,
-                        Uint64       len) override;
+                        Uint64       len,
+                        Uint64*      outlen) override;
     alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
+    alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+    alc_error_t flush(const Uint8** pPlainText,
+                      Uint64        numBuffers,
+                      Uint64        len) override
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+    alc_error_t dequeue(Uint8** pCipherText,
+                        Uint64  numBuffers,
+                        Uint64  len) override
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+    alc_error_t multibufferInit(const Uint8*  pKey,
+                                Uint64        keyLen,
+                                const Uint8** pIv,
+                                Uint64        ivLen,
+                                Uint64        numBuffers) override
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
 };
 
 /* iCipherSeg classes */
@@ -141,7 +176,8 @@ class XtsBlockT
   public:
     XtsBlockT()
         : Xts((static_cast<Uint32>(keyLenBits)) / 8, CipherMode::eAesXTS)
-    {}
+    {
+    }
     ~XtsBlockT() = default;
 
   public:
@@ -155,9 +191,17 @@ class XtsBlockT
     alc_error_t encrypt(const Uint8* pPlainText,
                         Uint8*       pCipherText,
                         Uint64       len) override;
+    alc_error_t encrypt(const Uint8* pPlainText,
+                        Uint8*       pCipherText,
+                        Uint64       len,
+                        Uint64*      outlen) override;
     alc_error_t decrypt(const Uint8* pCipherText,
                         Uint8*       pPlainText,
                         Uint64       len) override;
+    alc_error_t decrypt(const Uint8* pCipherText,
+                        Uint8*       pPlainText,
+                        Uint64       len,
+                        Uint64*      outlen) override;
     alc_error_t encryptSegment(const Uint8* pSrc,
                                Uint8*       pDest,
                                Uint64       currSrcLen,
@@ -167,6 +211,30 @@ class XtsBlockT
                                Uint64       currSrcLen,
                                Uint64       startBlockNum) override;
     alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
+    alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+    alc_error_t flush(const Uint8** pPlainText,
+                      Uint64        numBuffers,
+                      Uint64        len) override
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+    alc_error_t dequeue(Uint8** pCipherText,
+                        Uint64  numBuffers,
+                        Uint64  len) override
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+    alc_error_t multibufferInit(const Uint8*  pKey,
+                                Uint64        keyLen,
+                                const Uint8** pIv,
+                                Uint64        ivLen,
+                                Uint64        numBuffers) override
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
 };
 
 } // namespace alcp::cipher

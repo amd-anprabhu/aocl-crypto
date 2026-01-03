@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -82,7 +82,10 @@ ippsAES_SIVEncrypt(const Ipp8u* pSrc,
     }
 
     // IV is not needed for encrypt, but still should not be NullPtr
-    err = alcp_cipher_aead_encrypt(&handle, pSrc, pDst, len);
+    {
+        Uint64 outlen = 0;
+        err           = alcp_cipher_aead_encrypt(&handle, pSrc, pDst, len, &outlen);
+    }
     if (alcp_is_error(err)) {
         printf("Error: unable to encrypt \n");
         return ippStsErr;
@@ -155,7 +158,10 @@ ippsAES_SIVDecrypt(const Ipp8u* pSrc,
     }
 
     // IV is not needed for encrypt, but still should not be NullPtr
-    err = alcp_cipher_aead_decrypt(&handle, pSrc, pDst, len);
+    {
+        Uint64 outlen = 0;
+        err           = alcp_cipher_aead_decrypt(&handle, pSrc, pDst, len, &outlen);
+    }
     if (alcp_is_error(err)) {
         printf("Error: Tag Verification Failed \n");
         *pAuthPassed = false;
@@ -210,8 +216,11 @@ ippsAES_S2V_CMAC(const Ipp8u* pKey,
     // IV is not needed for encrypt, but still should not be NullPtr
     {
         std::vector<Uint8> fakeDest = std::vector<Uint8>(ADlen[numAD - 1]);
-        err                         = alcp_cipher_aead_encrypt(
-            &handle, AD[numAD - 1], &fakeDest[0], fakeDest.size());
+        {
+            Uint64 outlen = 0;
+            err           = alcp_cipher_aead_encrypt(
+                &handle, AD[numAD - 1], &fakeDest[0], fakeDest.size(), &outlen);
+        }
         if (alcp_is_error(err)) {
             printf("Error: unable to encrypt \n");
             return ippStsErr;

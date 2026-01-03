@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -71,17 +71,36 @@ class AesGenericCiphersT
   public:
     AesGenericCiphersT()
         : AesGenericInit((static_cast<Uint32>(keyLenBits)) / 8, mode)
-    {}
-    ~AesGenericCiphersT() = default;
+    {
+    }
+    ~AesGenericCiphersT()
+    {
+    }
+
+  private:
 
   public:
     alc_error_t encrypt(const Uint8* pPlainText,
                         Uint8*       pCipherText,
-                        Uint64       len) override;
+                        Uint64       len,
+                        Uint64*      outlen) override;
     alc_error_t decrypt(const Uint8* pCipherText,
                         Uint8*       pPlainText,
-                        Uint64       len) override;
+                        Uint64       len,
+                        Uint64*      outlen) override;
+    alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override;
     alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
+    alc_error_t flush(const Uint8** pPlainText,
+                      Uint64        numBuffers,
+                      Uint64        len) override;
+    alc_error_t dequeue(Uint8** pCipherText,
+                        Uint64  numBuffers,
+                        Uint64  len) override;
+    alc_error_t multibufferInit(const Uint8*  pKey,
+                                Uint64        keyLen,
+                                const Uint8** pIv,
+                                Uint64        ivLen,
+                                Uint64        numBuffers) override;
 };
 
 } // namespace alcp::cipher

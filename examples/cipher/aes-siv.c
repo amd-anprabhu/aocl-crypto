@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -131,7 +131,6 @@ encrypt_demo(const Uint8* plaintxt,
         return close_demo_session_exit(); // Error condtion
     }
 
-    // FIXME: Try making IV nullptr
     err = alcp_cipher_aead_init(&handle, pKey, key_len, iv, iv_len);
     if (alcp_is_error(err)) {
         printf("Error: Unable to init \n");
@@ -144,7 +143,8 @@ encrypt_demo(const Uint8* plaintxt,
         return close_demo_session_exit();
     }
 
-    err = alcp_cipher_aead_encrypt(&handle, plaintxt, ciphertxt, len);
+    Uint64 encrypt_outlen = 0;
+    err           = alcp_cipher_aead_encrypt(&handle, plaintxt, ciphertxt, len, &encrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: Unable to Encrypt \n");
         return close_demo_session_exit();
@@ -202,7 +202,8 @@ decrypt_demo(const Uint8* ciphertxt,
     }
 
     // Decrypt the ciphertext with the initialized key and iv
-    err = alcp_cipher_aead_decrypt(&handle, ciphertxt, plaintxt, len);
+    Uint64 decrypt_outlen = 0;
+    err           = alcp_cipher_aead_decrypt(&handle, ciphertxt, plaintxt, len, &decrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: unable decrypt \n");
         return close_demo_session_exit();

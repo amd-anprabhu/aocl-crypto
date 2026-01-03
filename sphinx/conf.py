@@ -25,6 +25,11 @@
 ###############################################################################
 
 # Configuration file for the Sphinx documentation builder.
+from importlib import metadata as _metadata
+from packaging import version as _version
+
+rocm_version = _metadata.version('rocm-docs-core')
+expected_rocm_version = "1.0.0"
 
 # Project information 
 project = 'AOCL-Cryptography'
@@ -56,9 +61,6 @@ myst_enable_extensions = ["html_admonition",
                         "linkify", 
                         "attrs_inline"
                         ]
-breathe_projects = { "aocl-crypto": "build/doxygen/xml" }
-breathe_default_project = "aocl-crypto"
-
 myst_title_to_header = True
 myst_heading_anchors = 3
 suppress_warnings = ["myst.header", "myst.xref_missing"]
@@ -66,5 +68,10 @@ suppress_warnings = ["myst.header", "myst.xref_missing"]
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['templates']
 
+if(_version.parse(rocm_version) < _version.parse(expected_rocm_version)):
+    print("Detected ROCm version: " + rocm_version + " < " + expected_rocm_version)
+    print("Falling back to older templates.")
+    templates_path = ['fallback_templates']
+    
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False

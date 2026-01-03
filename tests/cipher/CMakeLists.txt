@@ -1,4 +1,4 @@
- # Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ # Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions are met:
@@ -66,7 +66,7 @@ FUNCTION(KAT_CIPHER MOD)
     TARGET_INCLUDE_DIRECTORIES(${TEST_EXE} PRIVATE ${ALCP_INCLUDES} ${EXTRA_INCLUDES})
     TARGET_COMPILE_OPTIONS(${TEST_EXE} PUBLIC ${ALCP_WARNINGS})
     TARGET_LINK_LIBRARIES(${TEST_EXE} ${LIBS})
-    alcp_add_integration_tests_cipher(${TEST_EXE} ${TEST_EXE} ${MOD})
+    alcp_add_integration_tests(${TEST_EXE} ${TEST_EXE} ${MOD})
     # Due to known issues, skipping tests with valgrind
     # for more details refer https://ontrack-internal.amd.com/browse/CPUPL-4109
     IF(ALCP_MEMCHECK_VALGRIND)
@@ -81,7 +81,7 @@ FUNCTION(CROSS_CIPHER MOD)
     TARGET_INCLUDE_DIRECTORIES(${TEST_EXE} PRIVATE ${ALCP_INCLUDES} ${EXTRA_INCLUDES})
     TARGET_COMPILE_OPTIONS(${TEST_EXE} PUBLIC ${ALCP_WARNINGS})
     TARGET_LINK_LIBRARIES(${TEST_EXE} ${LIBS})
-    alcp_add_integration_tests_cipher(${TEST_EXE} ${TEST_EXE} ${MOD})
+    alcp_add_integration_tests(${TEST_EXE} ${TEST_EXE} ${MOD})
     # Due to known issues, skipping tests with valgrind
     # for more details refer https://ontrack-internal.amd.com/browse/CPUPL-4109
     IF(ALCP_MEMCHECK_VALGRIND)
@@ -111,3 +111,14 @@ CROSS_CIPHER(ccm)
 CROSS_CIPHER(siv)
 CROSS_CIPHER(chacha20)
 CROSS_CIPHER(chacha20-poly1305)
+
+# Test for multibuffer
+set(TEST_EXE test_multibuffer_cross)
+ADD_EXECUTABLE(${TEST_EXE} test_multibuffer_cross.cc ${ALC_BASE_FILES} ${EXTRA_SOURCES})
+TARGET_INCLUDE_DIRECTORIES(${TEST_EXE} PRIVATE ${ALCP_INCLUDES} ${EXTRA_INCLUDES})
+TARGET_COMPILE_OPTIONS(${TEST_EXE} PUBLIC ${ALCP_WARNINGS})
+TARGET_LINK_LIBRARIES(${TEST_EXE} ${LIBS})
+alcp_add_integration_tests(${TEST_EXE} ${TEST_EXE} "test_multibuffer_cross")
+IF(ALCP_MEMCHECK_VALGRIND)
+    message(WARNING "Due to known issues, skipping cipher tests with valgrind")
+ENDIF()

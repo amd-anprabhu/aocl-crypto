@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -369,6 +369,11 @@ alc_error_t
 __build_with_copy_rsa(Context* srcCtx, Context* destCtx)
 {
     using namespace digest;
+
+    if (srcCtx->m_rsa == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+
     memcpy(destCtx, srcCtx, sizeof(Context));
 
     auto rsa_algo  = new Rsa(*reinterpret_cast<Rsa*>(srcCtx->m_rsa));

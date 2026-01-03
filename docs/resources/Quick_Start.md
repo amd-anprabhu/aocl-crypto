@@ -31,8 +31,8 @@ What is given above should be sufficient for most users but if your OS did not c
 There are mainly two repositories which are needed, one being `aocl-crypto` and the other which is a dependency named `aocl-utils`. `AOCL-Utils` provide the means to correctly identify the CPU. This is a necessary dependency to ensure optimal performance of `AOCL-Crypto`. Both of these repositories can be cloned with below command
 
 ```bash
-git clone https://github.com/amd/aocl-crypto.git -b dev
-git clone https://github.com/amd/aocl-utils.git  -b dev
+git clone https://github.com/amd/aocl-crypto.git -b amd-main
+git clone https://github.com/amd/aocl-utils.git  -b amd-main
 ```
 
 Please ensure that you are running the above commands from a directory where you have write access.
@@ -138,7 +138,7 @@ To end with, here is a script which runs everything. Feel free to save this scri
 # Global Variables to be modifed depending on repo location
 AOCL_CRYPTO_REPO="https://github.com/amd/aocl-crypto.git"
 AOCL_UTILS_REPO="https://github.com/amd/aocl-utils.git"
-AOCL_BRANCH="dev"
+AOCL_BRANCH="amd-main"
 
 # Function to exit with an error if some execution failed
 quit_if_status_not_zero(){

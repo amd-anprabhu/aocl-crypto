@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -70,7 +70,7 @@ class ALCP_API_EXPORT Drbg : public IDrbg
 
     alc_error_t randomize(Uint8 p_Output[], size_t length);
 
-    // FIXME: Predicition resistance is to be added
+    // TODO: Predicition resistance is to be added
     alc_error_t randomize(Uint8        p_Output[],
                           const size_t cOutputLength,
                           int          securityStrength,

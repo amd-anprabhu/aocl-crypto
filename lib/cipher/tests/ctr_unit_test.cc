@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -47,7 +47,7 @@ std::vector<Uint8> key = { 0x78, 0xfd, 0x59, 0x2e, 0x80, 0x4d, 0x37, 0x66,
                            0x60, 0x8c, 0x99, 0x4d, 0xe7, 0x5c, 0x06, 0xb5 };
 const string cCipher   = "aes-ctr-128"; // Needs to be modified base on the key
 std::vector<Uint8> iv  = { 0xde, 0x6b, 0x64, 0x30, 0x9d, 0x76, 0xa8, 0x43,
-                          0x79, 0x28, 0x19, 0xc2, 0x56, 0x40, 0xc9, 0x3b };
+                           0x79, 0x28, 0x19, 0xc2, 0x56, 0x40, 0xc9, 0x3b };
 std::vector<Uint8> plainText = {
     0x2d, 0xdd, 0xc7, 0x13, 0xfd, 0x52, 0x75, 0xbc, 0x83, 0x76, 0x81, 0x24,
     0xee, 0x38, 0x10, 0x6f, 0x2a, 0x97, 0x62, 0xb9, 0xc1, 0x69, 0x5a, 0x5d,
@@ -206,7 +206,8 @@ TEST(CTR, BasicEncryption)
 
     EXPECT_FALSE(alcp_is_error(err));
 
-    err = ctr->encrypt(&plainText[0], &output[0], plainText.size());
+    Uint64 outlen = 0;
+    err = ctr->encrypt(&plainText[0], &output[0], plainText.size(), &outlen);
 
     if (alcp_is_error(err)) {
         std::cout << "Encrypt failed!" << std::endl;
@@ -239,7 +240,8 @@ TEST(CTR, BasicDecryption)
 
     EXPECT_FALSE(alcp_is_error(err));
 
-    err = ctr->decrypt(&cipherText[0], &output[0], cipherText.size());
+    Uint64 outlen = 0;
+    err = ctr->decrypt(&cipherText[0], &output[0], cipherText.size(), &outlen);
 
     if (alcp_is_error(err)) {
         std::cout << "Decrypt failed!" << std::endl;
@@ -273,9 +275,11 @@ TEST(CTR, MultiUpdateEncryption)
         alc_error_t err = ctr->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
         for (Uint64 i = 0; i < plainText.size() / 16; i++) {
-            err = ctr->encrypt(&plainText[0] + i * 16,
+            Uint64 outlen = 0;
+            err           = ctr->encrypt(&plainText[0] + i * 16,
                                &output[0] + i * 16,
-                               16); // 16 byte chunks
+                               16,
+                               &outlen); // 16 byte chunks
             if (alcp_is_error(err)) {
                 std::cout << "Encrypt failed!" << std::endl;
             }
@@ -311,8 +315,9 @@ TEST(CTR, MultiUpdateDecryption)
         }
 
         for (Uint64 i = 0; i < plainText.size() / 16; i++) {
-            err =
-                ctr->decrypt(&cipherText[0] + i * 16, &output[0] + i * 16, 16);
+            Uint64 outlen = 0;
+            err           = ctr->decrypt(
+                &cipherText[0] + i * 16, &output[0] + i * 16, 16, &outlen);
             if (alcp_is_error(err)) {
                 std::cout << "Decrypt failed!" << std::endl;
             }
@@ -328,9 +333,9 @@ TEST(CTR, MultiUpdateDecryption)
 TEST(CTR, RandomEncryptDecryptTest)
 {
     Uint8        key_256[32] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-                          0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-                          0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-                          0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe };
+                                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe };
     const Uint64 cTextSize   = 100000;
     std::vector<Uint8> plain_text_vect(cTextSize);
     std::vector<Uint8> cipher_text_vect(cTextSize);
@@ -373,8 +378,11 @@ TEST(CTR, RandomEncryptDecryptTest)
 
             EXPECT_FALSE(alcp_is_error(err));
 
-            err = ctr->encrypt(
-                &plainTextVect[0], &cipher_text_vect[0], plainTextVect.size());
+            Uint64 outlen = 0;
+            err           = ctr->encrypt(&plainTextVect[0],
+                               &cipher_text_vect[0],
+                               plainTextVect.size(),
+                               &outlen);
 
             if (alcp_is_error(err)) {
                 std::cout << "Encrypt failed!" << std::endl;
@@ -390,8 +398,11 @@ TEST(CTR, RandomEncryptDecryptTest)
 
             EXPECT_FALSE(alcp_is_error(err));
 
-            err = ctr->decrypt(
-                &cipher_text_vect[0], &plainTextOut[0], plainTextVect.size());
+            Uint64 outlen2 = 0;
+            err            = ctr->decrypt(&cipher_text_vect[0],
+                               &plainTextOut[0],
+                               plainTextVect.size(),
+                               &outlen2);
 
             if (alcp_is_error(err)) {
                 std::cout << "Decrypt failed!" << std::endl;

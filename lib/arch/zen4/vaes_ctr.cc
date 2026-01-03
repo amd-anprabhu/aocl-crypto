@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -193,41 +193,23 @@ ctrBlk128(const __m512i* p_in_x,
         p_out_x += 1;
     }
 
-    // residual block=1 when factor = 2, load and store only lower half.
-    for (; blocks != 0; blocks--) {
-        a1 = alcp_loadu_128(p_in_x);
+    if (res || blocks) {
+        Uint64 mask = 0xFFFFFFFFFFFFFFFF >> ((3 - blocks) * 16 + (16 - res));
+        a1          = _mm512_maskz_loadu_epi8(mask, p_in_x);
 
         // re-arrange as per spec
         b1 = alcp_shuffle_epi8(c1, swap_ctr);
 
         AesEncryptNoLoad_1x512Rounds10(b1, keys);
-
         a1 = alcp_xor(b1, a1);
 
         // increment counter
-        c1 = alcp_add_epi64(c1, one_lo);
-
-        alcp_storeu_128(p_out_x, a1);
-        p_in_x  = (__m512i*)(((__uint128_t*)p_in_x) + 1);
-        p_out_x = (__m512i*)(((__uint128_t*)p_out_x) + 1);
-    }
-
-    if (res) {
-        // Create mask to load bytes
-        Uint64 mask = 0xFFFF >> (16 - res);
-        // Mask load bytes
-        alcp_setzero(a1);
-        a1 = _mm512_mask_loadu_epi8(a1, mask, p_in_x);
-
-        // re-arrange as per spec
-        b1 = alcp_shuffle_epi8(c1, swap_ctr);
-
-        AesEncryptNoLoad_1x512Rounds10(b1, keys);
-
-        a1 = alcp_xor(b1, a1);
-
-        // increment counter
-        c1 = alcp_add_epi64(c1, one_lo);
+        for (Uint64 i = 0; i < blocks; i++) {
+            c1 = alcp_add_epi64(c1, one_lo);
+        }
+        if (res) {
+            c1 = alcp_add_epi64(c1, one_lo);
+        }
 
         _mm512_mask_storeu_epi8(p_out_x, mask, a1);
     }
@@ -346,41 +328,23 @@ ctrBlk192(const __m512i* p_in_x,
         p_out_x += 1;
     }
 
-    // residual block=1 when factor = 2, load and store only lower half.
-    for (; blocks != 0; blocks--) {
-        a1 = alcp_loadu_128(p_in_x);
+    if (res || blocks) {
+        Uint64 mask = 0xFFFFFFFFFFFFFFFF >> ((3 - blocks) * 16 + (16 - res));
+        a1          = _mm512_maskz_loadu_epi8(mask, p_in_x);
 
         // re-arrange as per spec
         b1 = alcp_shuffle_epi8(c1, swap_ctr);
 
         AesEncryptNoLoad_1x512Rounds12(b1, keys);
-
         a1 = alcp_xor(b1, a1);
 
         // increment counter
-        c1 = alcp_add_epi64(c1, one_lo);
-
-        alcp_storeu_128(p_out_x, a1);
-        p_in_x  = (__m512i*)(((__uint128_t*)p_in_x) + 1);
-        p_out_x = (__m512i*)(((__uint128_t*)p_out_x) + 1);
-    }
-
-    if (res) {
-        // Create mask to load bytes
-        Uint64 mask = 0xFFFF >> (16 - res);
-        // Mask load bytes
-        alcp_setzero(a1);
-        a1 = _mm512_mask_loadu_epi8(a1, mask, p_in_x);
-
-        // re-arrange as per spec
-        b1 = alcp_shuffle_epi8(c1, swap_ctr);
-
-        AesEncryptNoLoad_1x512Rounds10(b1, keys);
-
-        a1 = alcp_xor(b1, a1);
-
-        // increment counter
-        c1 = alcp_add_epi64(c1, one_lo);
+        for (Uint64 i = 0; i < blocks; i++) {
+            c1 = alcp_add_epi64(c1, one_lo);
+        }
+        if (res) {
+            c1 = alcp_add_epi64(c1, one_lo);
+        }
 
         _mm512_mask_storeu_epi8(p_out_x, mask, a1);
     }
@@ -499,41 +463,23 @@ ctrBlk256(const __m512i* p_in_x,
         p_out_x += 1;
     }
 
-    // residual block=1 when factor = 2, load and store only lower half.
-    for (; blocks != 0; blocks--) {
-        a1 = alcp_loadu_128(p_in_x);
+    if (res || blocks) {
+        Uint64 mask = 0xFFFFFFFFFFFFFFFF >> ((3 - blocks) * 16 + (16 - res));
+        a1          = _mm512_maskz_loadu_epi8(mask, p_in_x);
 
         // re-arrange as per spec
         b1 = alcp_shuffle_epi8(c1, swap_ctr);
 
         AesEncryptNoLoad_1x512Rounds14(b1, keys);
-
         a1 = alcp_xor(b1, a1);
 
         // increment counter
-        c1 = alcp_add_epi64(c1, one_lo);
-
-        alcp_storeu_128(p_out_x, a1);
-        p_in_x  = (__m512i*)(((__uint128_t*)p_in_x) + 1);
-        p_out_x = (__m512i*)(((__uint128_t*)p_out_x) + 1);
-    }
-
-    if (res) {
-        // Create mask to load bytes
-        Uint64 mask = 0xFFFF >> (16 - res);
-        // Mask load bytes
-        alcp_setzero(a1);
-        a1 = _mm512_mask_loadu_epi8(a1, mask, p_in_x);
-
-        // re-arrange as per spec
-        b1 = alcp_shuffle_epi8(c1, swap_ctr);
-
-        AesEncryptNoLoad_1x512Rounds10(b1, keys);
-
-        a1 = alcp_xor(b1, a1);
-
-        // increment counter
-        c1 = alcp_add_epi64(c1, one_lo);
+        for (Uint64 i = 0; i < blocks; i++) {
+            c1 = alcp_add_epi64(c1, one_lo);
+        }
+        if (res) {
+            c1 = alcp_add_epi64(c1, one_lo);
+        }
 
         _mm512_mask_storeu_epi8(p_out_x, mask, a1);
     }

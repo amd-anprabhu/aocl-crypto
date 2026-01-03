@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -50,12 +50,12 @@ using namespace Au;
 #endif
 
 /* runtime env for forcing cpuid */
-#define ALCP_ENABLE_INSTR_ZEN5    5
-#define ALCP_ENABLE_INSTR_ZEN4    4
-#define ALCP_ENABLE_INSTR_ZEN3    3
-#define ALCP_ENABLE_INSTR_ZEN2    2
-#define ALCP_ENABLE_INSTR_ZEN     1
-#define ALCP_ENABLE_INSTR_INVALID -1
+#define AOCL_ENABLE_INSTR_ZEN5    5
+#define AOCL_ENABLE_INSTR_ZEN4    4
+#define AOCL_ENABLE_INSTR_ZEN3    3
+#define AOCL_ENABLE_INSTR_ZEN2    2
+#define AOCL_ENABLE_INSTR_ZEN     1
+#define AOCL_ENABLE_INSTR_INVALID -1
 
 // FIXME: Memory Allocations for static variables
 std::unique_ptr<CpuId::Impl> CpuId::pImpl = std::make_unique<CpuId::Impl>();
@@ -77,7 +77,17 @@ class CpuId::Impl
     /* force to which arch? */
     int AlcpForcedArch = 0;
 
+    /* cached CPU architecture detection results */
+    bool zen1_flag = false;
+    bool zen2_flag = false;
+    bool zen3_flag = false;
+    bool zen4_flag = false;
+    bool zen5_flag = false;
+    const char* actual_cpu_arch = "Unknown";
+    bool cpu_detection_done = false;
+
     void get_alcp_enabled_instr();
+    void detect_cpu_architecture();
 
     // Genoa functions
     /**
@@ -274,13 +284,15 @@ CpuId::Impl::Impl()
     }
 #endif
 #endif
-
+    /* detect cpu arch  */
+    detect_cpu_architecture();
     /* read environment variable to force cpu arch */
     get_alcp_enabled_instr();
+    
     try {
-        if (AlcpForcedArch == ALCP_ENABLE_INSTR_INVALID)
+        if (AlcpForcedArch == AOCL_ENABLE_INSTR_INVALID)
             throw "Invalid option passed to environment variable "
-                  "ALCP_ENABLE_INSTRUCTIONS "
+                  "AOCL_ENABLE_INSTRUCTION "
                   "(Supported values: ZEN/ZEN2/ZEN3/ZEN4/ZEN5)";
     } catch (const char* exc) {
         std::cerr << exc << std::endl;
@@ -298,42 +310,96 @@ CpuId::Impl::Impl()
 }
 
 /**
- * @brief Reads the environment variable `ALCP_ENABLE_INSTRUCTIONS` to determine
+ * @brief Reads the environment variable `AOCL_ENABLE_INSTRUCTION` to determine
  * the enabled CPU instructions.
  *
  * This function sets the `AlcpForcedArch` variable based on the value of the
  * environment variable. It also disables certain CPU features based on the
  * selected architecture. If the environment variable is not set or has an
- * invalid value, it returns ALCP_ENABLE_INSTR_INVALID
+ * invalid value, it returns AOCL_ENABLE_INSTR_INVALID
  */
 void
 CpuId::Impl::get_alcp_enabled_instr()
 {
-    const char* ALCP_Enable_Inst = std::getenv("ALCP_ENABLE_INSTRUCTIONS");
+    const char* AOCL_Enable_Inst = std::getenv("AOCL_ENABLE_INSTRUCTION");
 
-    if (ALCP_Enable_Inst != NULL) {
-        if (strcmp(ALCP_Enable_Inst, "ZEN5") == 0) {
-            AlcpForcedArch = ALCP_ENABLE_INSTR_ZEN5;
-        } else if (strcmp(ALCP_Enable_Inst, "ZEN4") == 0) {
-            AlcpForcedArch = ALCP_ENABLE_INSTR_ZEN4;
-        } else if (strcmp(ALCP_Enable_Inst, "ZEN3") == 0) {
+    if (AOCL_Enable_Inst != NULL) {
+        if (!cpu_detection_done) {
+            detect_cpu_architecture();
+        }
+        
+        std::printf("Detected CPU architecture: %s\n", actual_cpu_arch);
+        std::printf("AOCL_ENABLE_INSTRUCTION environment variable detected: %s\n", AOCL_Enable_Inst);
+        
+        if (strcmp(AOCL_Enable_Inst, "ZEN5") == 0) {
+            std::printf("Forcing CPU architecture to ZEN5\n");
+            AlcpForcedArch = AOCL_ENABLE_INSTR_ZEN5;
+        } else if (strcmp(AOCL_Enable_Inst, "ZEN4") == 0) {
+            std::printf("Forcing CPU architecture to ZEN4\n");
+            AlcpForcedArch = AOCL_ENABLE_INSTR_ZEN4;
+        } else if (strcmp(AOCL_Enable_Inst, "ZEN3") == 0) {
+            std::printf("Forcing CPU architecture to ZEN3\n");
             cpuid_disable_avx512 = true;
-            AlcpForcedArch       = ALCP_ENABLE_INSTR_ZEN3;
-        } else if (strcmp(ALCP_Enable_Inst, "ZEN2") == 0) {
+            AlcpForcedArch       = AOCL_ENABLE_INSTR_ZEN3;
+        } else if (strcmp(AOCL_Enable_Inst, "ZEN2") == 0) {
+            std::printf("Forcing CPU architecture to ZEN2\n");
             cpuid_disable_avx512 = true;
             cpuid_disable_vaes   = true;
-            AlcpForcedArch       = ALCP_ENABLE_INSTR_ZEN2;
-        } else if ((strcmp(ALCP_Enable_Inst, "ZEN") == 0)
-                   || (strcmp(ALCP_Enable_Inst, "ZEN1") == 0)) {
+            AlcpForcedArch       = AOCL_ENABLE_INSTR_ZEN2;
+        } else if ((strcmp(AOCL_Enable_Inst, "ZEN") == 0)
+                   || (strcmp(AOCL_Enable_Inst, "ZEN1") == 0)) {
+            std::printf("Forcing CPU architecture to ZEN1\n");
             cpuid_disable_avx512 = true;
             cpuid_disable_vaes   = true;
-            AlcpForcedArch       = ALCP_ENABLE_INSTR_ZEN;
+            AlcpForcedArch       = AOCL_ENABLE_INSTR_ZEN;
         } else {
-            AlcpForcedArch = ALCP_ENABLE_INSTR_INVALID; /* never come here */
+            std::printf("Invalid AOCL_ENABLE_INSTRUCTION value: %s\n", AOCL_Enable_Inst);
+            AlcpForcedArch = AOCL_ENABLE_INSTR_INVALID; /* never come here */
         }
     }
     AlcpEnableInstructionSet = true;
     return;
+}
+
+/**
+ * @brief Detects and caches the CPU architecture once during initialization
+ * 
+ * This function performs the actual CPU detection and stores the results
+ * in member variables to avoid repeated detection calls.
+ */
+void
+CpuId::Impl::detect_cpu_architecture()
+{
+    if (cpu_detection_done) {
+        return; // Already detected
+    }
+
+#ifdef ALCP_ENABLE_AOCL_UTILS
+    zen1_flag = Impl::m_cpu->isUarch(EUarch::Zen);
+    zen2_flag = Impl::m_cpu->isUarch(EUarch::Zen2);
+    zen3_flag = Impl::m_cpu->isUarch(EUarch::Zen3);
+    zen4_flag = Impl::m_cpu->isUarch(EUarch::Zen4);
+    zen5_flag = Impl::m_cpu->isUarch(EUarch::Zen5);
+#else
+    // Default dispatch is to Zen2
+    // If this condition is setup, you can never force it to zen3 or zen4
+    // We need cpuid to verify it can actually run on the machine
+    zen1_flag = false;
+    zen2_flag = true;
+    zen3_flag = false;
+    zen4_flag = false;
+    zen5_flag = false;
+#endif
+
+    // Determine actual CPU architecture for logging
+    if (zen5_flag) actual_cpu_arch = "ZEN5";
+    else if (zen4_flag) actual_cpu_arch = "ZEN4";
+    else if (zen3_flag) actual_cpu_arch = "ZEN3";
+    else if (zen2_flag) actual_cpu_arch = "ZEN2";
+    else if (zen1_flag) actual_cpu_arch = "ZEN1";
+    else actual_cpu_arch = "Unknown";
+    
+    cpu_detection_done = true;
 }
 
 bool
@@ -602,59 +668,61 @@ CpuId::Impl::cpuIsZen5()
 bool
 CpuId::Impl::ensureCpuArch(CpuZenVer cpuZenVer)
 {
-#ifdef ALCP_ENABLE_AOCL_UTILS
-    bool zen1_flag = Impl::m_cpu->isUarch(EUarch::Zen);
-    bool zen2_flag = Impl::m_cpu->isUarch(EUarch::Zen2);
-    bool zen3_flag = Impl::m_cpu->isUarch(EUarch::Zen3);
-    bool zen4_flag = Impl::m_cpu->isUarch(EUarch::Zen4);
-    bool zen5_flag = Impl::m_cpu->isUarch(EUarch::Zen5);
-#else
-    // Default dispatch is to Zen2
-    // If this condition is setup, you can never force it to zen3 or zen4
-    // We need cpuid to verify it can actually run on the machine
-    bool zen1_flag = false;
-    bool zen2_flag = true;
-    bool zen3_flag = false;
-    bool zen4_flag = false;
-    bool zen5_flag = false;
-#endif
-    /* FIXME: we should raise an error message if invalid arch upgrade is done
-     * from the user, and fall back to the lower supported arch */
     if (AlcpEnableInstructionSet) {
-        if (AlcpForcedArch == ALCP_ENABLE_INSTR_ZEN5) {
+        if (AlcpForcedArch == AOCL_ENABLE_INSTR_ZEN5) {
             if (zen5_flag) {
                 return (cpuZenVer == CpuZenVer::ZEN5
                         || cpuZenVer == CpuZenVer::ZEN4
                         || cpuZenVer == CpuZenVer::ZEN3
                         || cpuZenVer == CpuZenVer::ZEN2
                         || cpuZenVer == CpuZenVer::ZEN);
+            } else {
+                std::fprintf(stderr, "ERROR: Forward compatibility issue - ZEN5 instruction set requested but target CPU is %s\n", actual_cpu_arch);
+                std::fprintf(stderr, "Cannot run ZEN5 optimized code on %s architecture\n", actual_cpu_arch);
+                std::exit(-1);
             }
-        } else if (AlcpForcedArch == ALCP_ENABLE_INSTR_ZEN4) {
+        } else if (AlcpForcedArch == AOCL_ENABLE_INSTR_ZEN4) {
             if (zen4_flag || zen5_flag) {
                 return (cpuZenVer == CpuZenVer::ZEN4
                         || cpuZenVer == CpuZenVer::ZEN3
                         || cpuZenVer == CpuZenVer::ZEN2
                         || cpuZenVer == CpuZenVer::ZEN);
+            } else {
+                std::fprintf(stderr, "ERROR: Forward compatibility issue - ZEN4 instruction set requested but target CPU is %s\n", actual_cpu_arch);
+                std::fprintf(stderr, "Cannot run ZEN4 optimized code on %s architecture\n", actual_cpu_arch);
+                std::exit(-1);
             }
-        } else if (AlcpForcedArch == ALCP_ENABLE_INSTR_ZEN3) {
+        } else if (AlcpForcedArch == AOCL_ENABLE_INSTR_ZEN3) {
             if (zen3_flag || zen4_flag || zen5_flag) {
                 return (cpuZenVer == CpuZenVer::ZEN3
                         || cpuZenVer == CpuZenVer::ZEN2
                         || cpuZenVer == CpuZenVer::ZEN);
+            } else {
+                std::fprintf(stderr, "ERROR: Forward compatibility issue - ZEN3 instruction set requested but target CPU is %s\n", actual_cpu_arch);
+                std::fprintf(stderr, "Cannot run ZEN3 optimized code on %s architecture\n", actual_cpu_arch);
+                std::exit(-1);
             }
-        } else if (AlcpForcedArch == ALCP_ENABLE_INSTR_ZEN2) {
+        } else if (AlcpForcedArch == AOCL_ENABLE_INSTR_ZEN2) {
             if (zen2_flag || zen3_flag || zen4_flag || zen5_flag) {
                 return (cpuZenVer == CpuZenVer::ZEN2
                         || cpuZenVer == CpuZenVer::ZEN);
+            } else {
+                std::fprintf(stderr, "ERROR: Forward compatibility issue - ZEN2 instruction set requested but target CPU is %s\n", actual_cpu_arch);
+                std::fprintf(stderr, "Cannot run ZEN2 optimized code on %s architecture\n", actual_cpu_arch);
+                std::exit(-1);
             }
-        } else if (AlcpForcedArch == ALCP_ENABLE_INSTR_ZEN) {
+        } else if (AlcpForcedArch == AOCL_ENABLE_INSTR_ZEN) {
             if (zen1_flag || zen2_flag || zen3_flag || zen4_flag || zen5_flag) {
                 return (cpuZenVer == CpuZenVer::ZEN);
+            } else {
+                std::fprintf(stderr, "ERROR: Forward compatibility issue - ZEN1 instruction set requested but target CPU is %s\n", actual_cpu_arch);
+                std::fprintf(stderr, "Cannot run ZEN1 optimized code on %s architecture\n", actual_cpu_arch);
+                std::exit(-1);
             }
         } else {
             /* should not come here!*/
-            if (AlcpForcedArch == ALCP_ENABLE_INSTR_INVALID) {
-                std::cout << "Invalid option!" << std::endl;
+            if (AlcpForcedArch == AOCL_ENABLE_INSTR_INVALID) {
+                std::fprintf(stderr, "ERROR: Invalid AOCL_ENABLE_INSTRUCTION option detected!\n");
             }
         }
     }

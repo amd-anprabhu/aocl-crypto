@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,7 +33,8 @@ namespace alcp::testing {
 AlcpCipherBase::AlcpCipherBase(const alc_cipher_mode_t cMode, const Uint8* iv)
     : m_mode{ cMode }
     , m_iv{ iv }
-{}
+{
+}
 
 /* xts */
 AlcpCipherBase::AlcpCipherBase(const alc_cipher_mode_t cMode,
@@ -58,6 +59,13 @@ AlcpCipherBase::~AlcpCipherBase()
             free(m_handle->ch_context);
         }
         delete m_handle;
+    }
+    if (m_handle_dup != nullptr) {
+        alcp_cipher_finish(m_handle_dup);
+        if (m_handle_dup->ch_context != NULL) {
+            free(m_handle_dup->ch_context);
+        }
+        delete m_handle_dup;
     }
 }
 
@@ -153,8 +161,10 @@ bool
 AlcpCipherBase::encrypt(alcp_dc_ex_t& data)
 {
     alc_error_t err;
+    Uint64      outlen = 0;
 
-    err = alcp_cipher_encrypt(m_handle, data.m_in, data.m_out, data.m_inl);
+    err = alcp_cipher_encrypt(
+        m_handle, data.m_in, data.m_out, data.m_inl, &outlen);
     if (alcp_is_error(err)) {
         goto enc_out;
     }
@@ -169,8 +179,10 @@ bool
 AlcpCipherBase::decrypt(alcp_dc_ex_t& data)
 {
     alc_error_t err;
+    Uint64      outlen = 0;
 
-    err = alcp_cipher_decrypt(m_handle, data.m_in, data.m_out, data.m_inl);
+    err = alcp_cipher_decrypt(
+        m_handle, data.m_in, data.m_out, data.m_inl, &outlen);
     if (alcp_is_error(err)) {
         goto dec_out;
     }
@@ -187,4 +199,74 @@ AlcpCipherBase::reset()
     return true;
 }
 
+bool
+AlcpCipherBase::context_copy()
+{
+    alc_error_t err;
+
+    if (m_handle_dup != nullptr) {
+        alcp_cipher_finish(m_handle_dup);
+        free(m_handle_dup->ch_context);
+        delete m_handle_dup;
+        m_handle_dup = nullptr;
+    }
+    m_handle_dup             = new alc_cipher_handle_t;
+    m_handle_dup->ch_context = malloc(alcp_cipher_context_size());
+
+    err = alcp_cipher_context_copy(m_handle, m_handle_dup);
+    if (alcp_is_error(err)) {
+        std::cout << "Error code in alcp_cipher_context_copy:" << err
+                  << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool
+AlcpCipherBase::flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len)
+{
+    // use alcp_flush to flush to plaintext buffer
+    alc_error_t err;
+    err = alcp_flush(m_handle, pPlainText, numBuffers, len);
+    if (alcp_is_error(err)) {
+        std::cout << "Error code in alcp_cipher_flush:" << err << std::endl;
+        return false;
+    }
+    return true;
+}
+
+bool
+AlcpCipherBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len)
+{
+    // use alcp_dequeue to dequeue from ciphertext buffer
+    alc_error_t err;
+    err = alcp_dequeue(m_handle, pCipherText, numBuffers, len);
+    if (alcp_is_error(err)) {
+        if (err == ALC_ERROR_NO_FALLBACK) {
+            std::cout << "Not supported on non-avx512 architectures" << std::endl;
+        } else {
+            std::cout << "Error code in alcp_cipher_dequeue:" << err
+                      << std::endl;
+        }
+        return false;
+    }
+    return true;
+}
+
+bool
+AlcpCipherBase::multibufferInit(const Uint8*  pKey,
+                                Uint64        keyLen,
+                                const Uint8** pIv,
+                                Uint64        ivLen,
+                                Uint64        numBuffers)
+{
+    alc_error_t err;
+    err = alcp_multibuffer_init(m_handle, pKey, keyLen, pIv, ivLen, numBuffers);
+    if (alcp_is_error(err)) {
+        std::cout << "Error code in alcp_cipher_multibuffer_init:" << err
+                  << std::endl;
+        return false;
+    }
+    return true;
+}
 } // namespace alcp::testing

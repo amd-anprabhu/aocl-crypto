@@ -1,6 +1,6 @@
 # AOCL Cryptography Library Build
 
-AOCL-Cryptography uses CMAKE as a build system generator and supports make and Ninja build systems. This document explains the different build flags which can be used to disable/enable specific features for the project. For a quick start into AOCL-Cryptography, please refer to [AOCL-Cryptography Linux Quick Starter](./docs/resources/Quick_Start.md).
+AOCL-Cryptography uses CMake as a build system generator and supports make and Ninja build systems. This document explains the different build flags which can be used to disable/enable specific features for the project. For a quick start into AOCL-Cryptography, please refer to [AOCL-Cryptography Linux Quick Starter](./docs/resources/Quick_Start.md).
 
 #### Build
 `Run from build directory`
@@ -46,7 +46,7 @@ ALCP_ENABLE_EXAMPLES is ON by default
 
 #### Enable AOCL-UTILS
 
-To enable aocl utils checks, append `-DAOCL_UTILS_INSTALL_DIR=path/to/aocl/utils/source` and `-DENABLE_AOCL_UTILS=ON` to the cmake configuration command.
+To enable AOCL utils checks, append `-DAOCL_UTILS_INSTALL_DIR=path/to/aocl/utils/source` and `-DENABLE_AOCL_UTILS=ON` to the cmake configuration command.
 ```bash
 $ cmake -DENABLE_AOCL_UTILS=ON -DAOCL_UTILS_INSTALL_DIR=path/to/aocl/utils/source ../
 ```
@@ -73,7 +73,7 @@ To enable sanitizers (asan, tsan etc), append `-DALCP_SANITIZE=ON` to the cmake 
 ```sh
 $ cmake -DALCP_SANITIZE=ON ../
 ```
-ENABLE_AOCL_UTILS is OFF by default
+ALCP_SANITIZE is OFF by default
 
 #### For Compiling with Valgrind Memcheck
 
@@ -154,9 +154,9 @@ If this option is enabled it will dynamically select between gcc/clang for compi
 ```sh
 $ cmake -DALCP_ENABLE_DYNAMIC_COMPILER_PICK=ON  ../ 
 ```
-ALCP_ENABLE_DYNAMIC_COMPILER_PICK is on by default 
+ALCP_ENABLE_DYNAMIC_COMPILER_PICK is ON by default 
 
-### To disable assembly implementation and use intrinsics Kernels
+### To disable assembly implementation and use intrinsics kernels
 ```sh
 $ cmake -DALCP_DISABLE_ASSEMBLY=ON  ../ 
 ```
@@ -166,11 +166,12 @@ ALCP_DISABLE_ASSEMBLY is OFF by default
 These are flags to enable/disable optional features as required.
 
 1. "ALCP_ENABLE_GCM_ALWAYS_COMPUTE_TABLE" is ON by default, which precomputes table for every encrypt/decrypt update without storage. 
-	- To disable GCM Always compute subkeys hash table, use ` -DALCP_ENABLE_GCM_ALWAYS_COMPUTE_TABLE=OFF`.
-		- When disabled, stored precomputed subkeys table are used for next encrypt/decrypt calls if there is no change in key or iv. 
-	- ` -DALCP_ENABLE_GCM_ALWAYS_COMPUTE_TABLE=ON` (default behavior) is better for improving the application performance 
-	- ` -DALCP_ENABLE_GCM_ALWAYS_COMPUTE_TABLE=OFF` will improve performance in OpenSSL speed and microbenchmarks.
+	- To disable GCM Always compute subkeys hash table, use `-DALCP_ENABLE_GCM_ALWAYS_COMPUTE_TABLE=OFF`.
+		- When disabled, stored precomputed subkeys table is used for next encrypt/decrypt calls if there is no change in key or iv. 
+	- `-DALCP_ENABLE_GCM_ALWAYS_COMPUTE_TABLE=ON` (default behavior) is better for improving the application performance 
+	- `-DALCP_ENABLE_GCM_ALWAYS_COMPUTE_TABLE=OFF` will improve performance in OpenSSL speed and microbenchmarks.
 
 2. To enable multi update feature for all supported ciphers append `-DALCP_ENABLE_CIPHER_MULTI_UPDATE=ON` to build flags. 
 3. To Enable CCM multi update feature append flag `-DALCP_ENABLE_CCM_MULTI_UPDATE=ON` to build flags. 
 4. To Enable OFB multi update feature append flag `-DALCP_ENABLE_OFB_MULTI_UPDATE=ON` to build flags.
+5. To Enable CBC in-place buffer support append flag `-DALCP_ENABLE_CBC_INPLACE_BUFFER=ON` to build flags.

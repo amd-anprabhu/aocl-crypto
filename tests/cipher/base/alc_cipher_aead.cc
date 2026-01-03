@@ -35,7 +35,8 @@ AlcpCipherAeadBase::AlcpCipherAeadBase(const alc_cipher_mode_t cMode,
                                        const Uint8*            iv)
     : m_mode{ cMode }
     , m_iv{ iv }
-{}
+{
+}
 
 AlcpCipherAeadBase::AlcpCipherAeadBase(const alc_cipher_mode_t cMode,
                                        const Uint8*            iv,
@@ -43,7 +44,8 @@ AlcpCipherAeadBase::AlcpCipherAeadBase(const alc_cipher_mode_t cMode,
     : m_mode{ cMode }
     , m_iv{ iv }
     , m_pState{ pCipherState }
-{}
+{
+}
 
 AlcpCipherAeadBase::AlcpCipherAeadBase(const alc_cipher_mode_t cMode,
                                        const Uint8*            iv,
@@ -233,8 +235,12 @@ AlcpCipherAeadBase::alcpChachaPolyModeToFuncCall(alcp_dc_ex_t& aead_data)
     }
 
     if constexpr (enc) {
-        err = alcp_cipher_aead_encrypt(
-            m_handle, aead_data.m_in, aead_data.m_out, aead_data.m_inl);
+        Uint64 outlen = 0;
+        err           = alcp_cipher_aead_encrypt(m_handle,
+                                       aead_data.m_in,
+                                       aead_data.m_out,
+                                       aead_data.m_inl,
+                                       &outlen);
         if (alcp_is_error(err)) {
             std::cout << __func__ << ":Err:alcp_cipher_aead_encrypt"
                       << std::endl;
@@ -249,8 +255,12 @@ AlcpCipherAeadBase::alcpChachaPolyModeToFuncCall(alcp_dc_ex_t& aead_data)
             return false;
         }
     } else {
-        err = alcp_cipher_aead_decrypt(
-            m_handle, aead_data.m_in, aead_data.m_out, aead_data.m_inl);
+        Uint64 outlen = 0;
+        err           = alcp_cipher_aead_decrypt(m_handle,
+                                       aead_data.m_in,
+                                       aead_data.m_out,
+                                       aead_data.m_inl,
+                                       &outlen);
         if (alcp_is_error(err)) {
             std::cout << __func__ << ":Err:alcp_cipher_aead_decrypt"
                       << std::endl;
@@ -293,8 +303,12 @@ AlcpCipherAeadBase::alcpGCMModeToFuncCall(alcp_dc_ex_t& aead_data)
     }
 
     if constexpr (enc) {
-        err = alcp_cipher_aead_encrypt(
-            m_handle, aead_data.m_in, aead_data.m_out, aead_data.m_inl);
+        Uint64 outlen = 0;
+        err           = alcp_cipher_aead_encrypt(m_handle,
+                                       aead_data.m_in,
+                                       aead_data.m_out,
+                                       aead_data.m_inl,
+                                       &outlen);
         if (alcp_is_error(err)) {
             printf("Encrypt Error\n");
             return false;
@@ -306,8 +320,12 @@ AlcpCipherAeadBase::alcpGCMModeToFuncCall(alcp_dc_ex_t& aead_data)
             return false;
         }
     } else {
-        err = alcp_cipher_aead_decrypt(
-            m_handle, aead_data.m_in, aead_data.m_out, aead_data.m_inl);
+        Uint64 outlen = 0;
+        err           = alcp_cipher_aead_decrypt(m_handle,
+                                       aead_data.m_in,
+                                       aead_data.m_out,
+                                       aead_data.m_inl,
+                                       &outlen);
         if (alcp_is_error(err)) {
             printf("Decrypt Error\n");
             return false;
@@ -377,11 +395,16 @@ AlcpCipherAeadBase::alcpCCMModeToFuncCall(alcp_dc_ex_t& aead_data)
 
     if constexpr (enc) {
         if (aead_data.m_inl) {
-            err = alcp_cipher_aead_encrypt(
-                m_handle, aead_data.m_in, aead_data.m_out, aead_data.m_inl);
+            Uint64 outlen = 0;
+            err           = alcp_cipher_aead_encrypt(m_handle,
+                                           aead_data.m_in,
+                                           aead_data.m_out,
+                                           aead_data.m_inl,
+                                           &outlen);
         } else {
-            Uint8 a;
-            err = alcp_cipher_aead_encrypt(m_handle, &a, &a, 0);
+            Uint8  a;
+            Uint64 outlen = 0;
+            err = alcp_cipher_aead_encrypt(m_handle, &a, &a, 0, &outlen);
         }
         if (alcp_is_error(err)) {
             printf("Encrypt Update Error\n");
@@ -398,11 +421,16 @@ AlcpCipherAeadBase::alcpCCMModeToFuncCall(alcp_dc_ex_t& aead_data)
         }
     } else {
         if (aead_data.m_inl) {
-            err = alcp_cipher_aead_decrypt(
-                m_handle, aead_data.m_in, aead_data.m_out, aead_data.m_inl);
+            Uint64 outlen = 0;
+            err           = alcp_cipher_aead_decrypt(m_handle,
+                                           aead_data.m_in,
+                                           aead_data.m_out,
+                                           aead_data.m_inl,
+                                           &outlen);
         } else {
-            Uint8 a;
-            err = alcp_cipher_aead_decrypt(m_handle, &a, &a, 0);
+            Uint8  a;
+            Uint64 outlen = 0;
+            err = alcp_cipher_aead_decrypt(m_handle, &a, &a, 0, &outlen);
         }
         if (alcp_is_error(err)) {
             printf("Decrypt Error\n");
@@ -441,8 +469,12 @@ AlcpCipherAeadBase::alcpSIVModeToFuncCall(alcp_dc_ex_t& aead_data)
     }
 
     if constexpr (enc) {
-        err = alcp_cipher_aead_encrypt(
-            m_handle, aead_data.m_in, aead_data.m_out, aead_data.m_inl);
+        Uint64 outlen = 0;
+        err           = alcp_cipher_aead_encrypt(m_handle,
+                                       aead_data.m_in,
+                                       aead_data.m_out,
+                                       aead_data.m_inl,
+                                       &outlen);
         if (alcp_is_error(err)) {
             printf("Encrypt Error\n");
             return false;
@@ -456,8 +488,12 @@ AlcpCipherAeadBase::alcpSIVModeToFuncCall(alcp_dc_ex_t& aead_data)
             }
         }
     } else {
-        err = alcp_cipher_aead_decrypt(
-            m_handle, aead_data.m_in, aead_data.m_out, aead_data.m_inl);
+        Uint64 outlen = 0;
+        err           = alcp_cipher_aead_decrypt(m_handle,
+                                       aead_data.m_in,
+                                       aead_data.m_out,
+                                       aead_data.m_inl,
+                                       &outlen);
         if (alcp_is_error(err)) {
             printf("Decrypt Error\n");
             return false;
@@ -487,4 +523,35 @@ AlcpCipherAeadBase::reset()
     return true;
 }
 
+bool
+AlcpCipherAeadBase::context_copy()
+{
+    return true;
+}
+
+bool
+AlcpCipherAeadBase::flush(const Uint8** pPlainText,
+                          Uint64        numBuffers,
+                          Uint64        len)
+{
+    // Default implementation - return success
+    return true;
+}
+
+bool
+AlcpCipherAeadBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len)
+{
+    // Default implementation - return success
+    return true;
+}
+bool
+AlcpCipherAeadBase::multibufferInit(const Uint8*  pKey,
+                                    Uint64        keyLen,
+                                    const Uint8** pIv,
+                                    Uint64        ivLen,
+                                    Uint64        numBuffers)
+{
+    // Default implementation - return success
+    return true;
+}
 } // namespace alcp::testing

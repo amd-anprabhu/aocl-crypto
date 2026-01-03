@@ -83,19 +83,20 @@ alcp_cipher_aead_request(const alc_cipher_mode_t mode,
                          alc_cipher_handle_p     pCipherHandle)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
-    ALCP_DEBUG_LOG(LOG_DBG, "KeyLen %6ld", keyLen);
+    ALCP_DEBUG_LOG(LOG_DBG, "Mode %d, KeyLen %6ld", mode, keyLen);
 #endif
     alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     new (ctx) Context;
 
-    ALCP_ZERO_LEN_ERR_RET(keyLen, err);
+    ALCP_ZERO_LEN_ERR_RET(keyLen);
 
-    auto alcpCipher       = new CipherFactory<iCipherAead>;
+    auto alcpCipher = new CipherFactory<iCipherAead>;
+
     ctx->m_cipher_factory = static_cast<void*>(alcpCipher);
 
     auto aead = alcpCipher->create(getCipherAeadMode(mode), getKeyLen(keyLen));
@@ -114,15 +115,18 @@ alcp_cipher_aead_request_with_extState(const alc_cipher_mode_t mode,
                                        alc_cipher_state_t*     pCipherState,
                                        alc_cipher_handle_p     pCipherHandle)
 {
+#ifdef ALCP_ENABLE_DEBUG_LOGGING
+    ALCP_DEBUG_LOG(LOG_DBG, "Mode %d, KeyLen %6ld", mode, keyLen);
+#endif
     alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     new (ctx) Context;
 
-    ALCP_ZERO_LEN_ERR_RET(keyLen, err);
+    ALCP_ZERO_LEN_ERR_RET(keyLen);
 
     auto alcpCipher       = new CipherFactory<iCipherAead>;
     ctx->m_cipher_factory = static_cast<void*>(alcpCipher);
@@ -143,27 +147,28 @@ alc_error_t
 alcp_cipher_aead_encrypt(const alc_cipher_handle_p pCipherHandle,
                          const Uint8*              pInput,
                          Uint8*                    pOutput,
-                         Uint64                    len)
+                         Uint64                    len,
+                         Uint64*                   outlen)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "EncLen %6ld", len);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
-    ALCP_BAD_PTR_ERR_RET(pInput, err);
-    ALCP_BAD_PTR_ERR_RET(pOutput, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(pInput);
+    ALCP_BAD_PTR_ERR_RET(pOutput);
+    ALCP_BAD_PTR_ERR_RET(outlen);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
         return ALC_ERROR_BAD_STATE;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
 
     auto i = static_cast<iCipherAead*>(ctx->m_cipher);
 
-    err = i->encrypt(pInput, pOutput, len);
+    alc_error_t err = i->encrypt(pInput, pOutput, len, outlen);
 
     return err;
 }
@@ -172,32 +177,32 @@ alc_error_t
 alcp_cipher_aead_decrypt(const alc_cipher_handle_p pCipherHandle,
                          const Uint8*              pInput,
                          Uint8*                    pOutput,
-                         Uint64                    len)
+                         Uint64                    len,
+                         Uint64*                   outlen)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "DecLen %6ld", len);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
-    ALCP_BAD_PTR_ERR_RET(pInput, err);
-    ALCP_BAD_PTR_ERR_RET(pOutput, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(pInput);
+    ALCP_BAD_PTR_ERR_RET(pOutput);
+    ALCP_BAD_PTR_ERR_RET(outlen);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
         return ALC_ERROR_BAD_STATE;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
 
     auto i = static_cast<iCipherAead*>(ctx->m_cipher);
-    // ALCP_BAD_PTR_ERR_RET(i->decrypt, err);
-    err = i->decrypt(pInput, pOutput, len);
+
+    alc_error_t err = i->decrypt(pInput, pOutput, len, outlen);
 
     return err;
 }
 
-// FIXME: alcp_cipher_init can be reused here as well.
 alc_error_t
 alcp_cipher_aead_init(const alc_cipher_handle_p pCipherHandle,
                       const Uint8*              pKey,
@@ -210,18 +215,20 @@ alcp_cipher_aead_init(const alc_cipher_handle_p pCipherHandle,
 #endif
     alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
         return ALC_ERROR_BAD_STATE;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
 
     auto i = static_cast<iCipherAead*>(ctx->m_cipher);
 
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
+
+    /* FIXME: instead of this, should we call ALCP_BAD_PTR_ERR_RET checks ? */
     if ((pKey != NULL && keyLen != 0) || (pIv != NULL && ivLen != 0)) {
         err = i->init(pKey, keyLen, pIv, ivLen);
     }
@@ -237,26 +244,22 @@ alcp_cipher_aead_set_aad(const alc_cipher_handle_p pCipherHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "ADLen %6ld", aadLen);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
     if (aadLen == 0) {
-        return err;
+        return ALC_ERROR_NONE;
     }
-
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
-    ALCP_BAD_PTR_ERR_RET(pInput, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(pInput);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
         return ALC_ERROR_BAD_STATE;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
 
     auto i = static_cast<iCipherAead*>(ctx->m_cipher);
 
-    err = i->setAad(pInput, aadLen);
-
-    return err;
+    return i->setAad(pInput, aadLen);
 }
 
 alc_error_t
@@ -267,26 +270,23 @@ alcp_cipher_aead_get_tag(const alc_cipher_handle_p pCipherHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "TagLen %6ld", tagLen);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
 
-    ALCP_BAD_PTR_ERR_RET(pOutput, err);
+    ALCP_BAD_PTR_ERR_RET(pOutput);
 
-    ALCP_ZERO_LEN_ERR_RET(tagLen, err);
+    ALCP_ZERO_LEN_ERR_RET(tagLen);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
         return ALC_ERROR_BAD_STATE;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
 
     auto i = static_cast<iCipherAead*>(ctx->m_cipher);
 
-    err = i->getTag(pOutput, tagLen);
-
-    return err;
+    return i->getTag(pOutput, tagLen);
 }
 
 alc_error_t
@@ -296,24 +296,20 @@ alcp_cipher_aead_set_tag_length(const alc_cipher_handle_p pCipherHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "TagLen %ld", tagLen);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
-
-    ALCP_ZERO_LEN_ERR_RET(tagLen, err);
+    ALCP_ZERO_LEN_ERR_RET(tagLen);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
         return ALC_ERROR_BAD_STATE;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher, err);
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
 
     auto i = static_cast<iCipherAead*>(ctx->m_cipher);
     // ALCP_BAD_PTR_ERR_RET(i->setTagLength, err);
-    err = i->setTagLength(tagLen);
-
-    return err;
+    return i->setTagLength(tagLen);
 }
 
 alc_error_t
@@ -323,16 +319,17 @@ alcp_cipher_aead_set_ccm_plaintext_length(
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "PTLen %6ld", plaintextLength);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle, err);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context, err);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
 
     auto ctx = static_cast<alcp::cipher::Context*>(pCipherHandle->ch_context);
-    auto i   = static_cast<iCipherAead*>(ctx->m_cipher);
-    err      = i->setPlainTextLength(plaintextLength);
 
-    return err;
+    /* check if ctx->m_cipher is not nullptr */
+    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
+
+    auto i = static_cast<iCipherAead*>(ctx->m_cipher);
+    return i->setPlainTextLength(plaintextLength);
 }
 
 void
@@ -357,8 +354,6 @@ alcp_cipher_aead_finish(const alc_cipher_handle_p pCipherHandle)
     if (alcpCipher != nullptr) {
         delete alcpCipher;
     }
-
-    // ctx->finish(ctx);
 
     ctx->~Context();
 }

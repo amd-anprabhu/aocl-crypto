@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -111,8 +111,11 @@ ippsAES_CCMEncrypt(const Ipp8u*      pSrc,
     (reinterpret_cast<ipp_wrp_aes_aead_ctx*>(pState))->is_encrypt = true;
 
     // CCM Encrypt
-    err = alcp_cipher_aead_encrypt(
-        &(context_aead->handle), (Uint8*)pSrc, (Uint8*)pDst, len);
+    {
+        Uint64 outlen = 0;
+        err           = alcp_cipher_aead_encrypt(
+            &(context_aead->handle), (Uint8*)pSrc, (Uint8*)pDst, len, &outlen);
+    }
     if (alcp_is_error(err)) {
         return ippStsErr;
     }
@@ -133,8 +136,11 @@ ippsAES_CCMDecrypt(const Ipp8u*      pSrc,
         &((reinterpret_cast<ipp_wrp_aes_aead_ctx*>(pState))->aead_ctx);
     (reinterpret_cast<ipp_wrp_aes_aead_ctx*>(pState))->is_encrypt = false;
     // CCM Encrypt
-    err = alcp_cipher_aead_decrypt(
-        &(context_aead->handle), (Uint8*)pSrc, (Uint8*)pDst, len);
+    {
+        Uint64 outlen = 0;
+        err           = alcp_cipher_aead_decrypt(
+            &(context_aead->handle), (Uint8*)pSrc, (Uint8*)pDst, len, &outlen);
+    }
     if (alcp_is_error(err)) {
         return ippStsErr;
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -118,7 +118,8 @@ TEST(CMACSIV, encTest1)
     // err = siv->setPaddingLen(padLen);
     // EXPECT_TRUE(err == ALC_ERROR_NONE);
 
-    siv->encrypt(pt, &ct_act[0], cPtSize);
+    Uint64 outlen = 0;
+    siv->encrypt(pt, &ct_act[0], cPtSize, &outlen);
     std::vector<Uint8> cmp_act(&ct_act.at(0), &ct_act.at(cPtSize));
     EXPECT_EQ(ct_exp, cmp_act);
 
@@ -191,7 +192,8 @@ TEST(CMACSIV, encTest2)
     // err = siv->setPaddingLen(1);
     // EXPECT_TRUE(err);
 
-    siv->encrypt(pt, &ct_act[0], sizeof(pt) - 1);
+    Uint64 outlen = 0;
+    siv->encrypt(pt, &ct_act[0], sizeof(pt) - 1, &outlen);
     std::vector<Uint8> cmp_act(&ct_act.at(0), &ct_act.at(cPtSize));
     EXPECT_EQ(ct_exp, cmp_act);
 

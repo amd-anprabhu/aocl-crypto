@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -40,6 +40,10 @@ namespace alcp::testing {
 OpenSSLEcdhBase::OpenSSLEcdhBase(const alc_ec_info_t& info)
     : m_info{ info }
 {
+    m_ec_handle = OSSL_LIB_CTX_new();
+    if (m_ec_handle == nullptr) {
+        std::cout << "Failed to create OSSL_LIB_CTX for ECDH" << std::endl;
+    }
 }
 
 OpenSSLEcdhBase::~OpenSSLEcdhBase()
@@ -125,7 +129,7 @@ OpenSSLEcdhBase::SetPrivateKey(Uint8 private_key[], Uint64 len)
             && OSSL_PARAM_BLD_push_BN(param_bld, "priv", priv))
             params = OSSL_PARAM_BLD_to_param(param_bld);
         // Context for RAW to PKey conversion
-        ctx_pkey = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+        ctx_pkey = EVP_PKEY_CTX_new_from_name(m_ec_handle, "EC", NULL);
         // Initiate RAW to PKey conversion
         if (ctx_pkey == NULL || params == NULL
             || EVP_PKEY_fromdata_init(ctx_pkey) <= 0
@@ -193,7 +197,7 @@ OpenSSLEcdhBase::ComputeSecretKey(const alcp_ecdh_data_t& data_peer1,
                                                 data_peer2.m_Peer_PubKeyLen))
             params = OSSL_PARAM_BLD_to_param(param_bld);
         // Context for RAW to PKey conversion
-        ctx_pkey = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+        ctx_pkey = EVP_PKEY_CTX_new_from_name(m_ec_handle, "EC", NULL);
         if (ctx_pkey == NULL || params == NULL
             || EVP_PKEY_fromdata_init(ctx_pkey) <= 0
             || EVP_PKEY_fromdata(

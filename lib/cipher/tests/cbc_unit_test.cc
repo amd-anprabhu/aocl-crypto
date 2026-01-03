@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,6 +28,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <numeric>
 #include <random>
 
 #include <gtest/gtest.h>
@@ -47,6 +48,28 @@ using alcp::cipher::Cbc;
 using alcp::cipher::CipherFactory;
 using alcp::cipher::iCipher;
 namespace alcp::cipher::unittest::cbc {
+
+void
+printHexString(const char* info, const unsigned char* bytes, int length)
+{
+    char* p_hex_string = (char*)malloc(sizeof(char) * ((length * 2) + 1));
+    for (int i = 0; i < length; i++) {
+        char chararray[2];
+        chararray[0] = (bytes[i] & 0xf0) >> 4;
+        chararray[1] = bytes[i] & 0x0f;
+        for (int j = 0; j < 2; j++) {
+            if (chararray[j] >= 0xa) {
+                chararray[j] = 'a' + chararray[j] - 0xa;
+            } else {
+                chararray[j] = '0' + chararray[j] - 0x0;
+            }
+            p_hex_string[i * 2 + j] = chararray[j];
+        }
+    }
+    p_hex_string[length * 2] = 0x0;
+    printf("%s:%s\n", info, p_hex_string);
+    free(p_hex_string);
+}
 std::vector<Uint8> key       = { 0x45, 0x74, 0x3e, 0xcf, 0x0a, 0x7d, 0x79, 0x60,
                                  0x01, 0xe4, 0xec, 0x34, 0x6b, 0xf0, 0xc4, 0x58 };
 std::vector<Uint8> iv        = { 0x8e, 0x56, 0x8c, 0x65, 0x9f, 0x9a, 0x6c, 0x83,
@@ -80,6 +103,7 @@ std::vector<Uint8> plainText = {
     0xe4, 0x23, 0x1e, 0xf6, 0xf4, 0xa7, 0x61, 0xc0, 0x1d, 0x07, 0x05, 0xc8,
     0x4d, 0xbd, 0x6e, 0xf4, 0x82, 0xfa, 0x37, 0xb6
 };
+
 std::vector<Uint8> cipherText = {
     0xe2, 0x27, 0x81, 0xbb, 0x3f, 0xf3, 0x3c, 0x74, 0x11, 0x84, 0xe1, 0x1d,
     0x84, 0xd4, 0x49, 0xfc, 0x9c, 0x9b, 0xbf, 0x21, 0x77, 0x5a, 0x8e, 0x41,
@@ -148,7 +172,11 @@ TEST(CBC, BasicEncryption)
 
     cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
-    cbc->encrypt(&plainText[0], &output[0], plainText.size());
+    Uint64 outlen = 0;
+    cbc->encrypt(&plainText[0], &output[0], plainText.size(), &outlen);
+    EXPECT_EQ(
+        outlen,
+        cipherText.size()); // Should produce full output for complete blocks
 
     EXPECT_EQ(cipherText, output);
 
@@ -168,11 +196,85 @@ TEST(CBC, BasicDecryption)
 
     cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
-    cbc->decrypt(&cipherText[0], &output[0], cipherText.size());
+    Uint64 outlen = 0;
+    cbc->decrypt(&cipherText[0], &output[0], cipherText.size(), &outlen);
+    EXPECT_EQ(
+        outlen,
+        plainText.size()); // Should produce full output for complete blocks
 
     EXPECT_EQ(plainText, output);
 
     delete alcpCipher;
+}
+
+TEST(CBC, ContextCopyEncryption)
+{
+    auto alcpCipher = new CipherFactory<iCipher>;
+    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+
+    if (cbc == nullptr) {
+        delete alcpCipher;
+        FAIL();
+    }
+    std::vector<Uint8> output(cipherText.size());
+
+    cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
+
+    // Copy the context
+    auto alcpCipher2_cpy = new CipherFactory<iCipher>;
+    auto cbc_copy        = alcpCipher2_cpy->create("aes-cbc-128");
+    if (cbc_copy == nullptr) {
+        delete alcpCipher;
+        delete alcpCipher2_cpy;
+        FAIL();
+    }
+    cbc->CopyCtx(cbc, cbc_copy);
+
+    Uint64 outlen = 0;
+    cbc_copy->encrypt(&plainText[0], &output[0], plainText.size(), &outlen);
+    EXPECT_EQ(
+        outlen,
+        cipherText.size()); // Should produce full output for complete blocks
+
+    EXPECT_EQ(cipherText, output);
+
+    delete alcpCipher;
+    delete alcpCipher2_cpy;
+}
+
+TEST(CBC, ContextCopyDecryption)
+{
+    auto alcpCipher = new CipherFactory<iCipher>;
+    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+
+    if (cbc == nullptr) {
+        delete alcpCipher;
+        FAIL();
+    }
+    std::vector<Uint8> output(cipherText.size());
+
+    cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
+
+    // Copy the context
+    auto alcpCipher2_cpy = new CipherFactory<iCipher>;
+    auto cbc_copy        = alcpCipher2_cpy->create("aes-cbc-128");
+    if (cbc_copy == nullptr) {
+        delete alcpCipher;
+        delete alcpCipher2_cpy;
+        FAIL();
+    }
+    cbc->CopyCtx(cbc, cbc_copy);
+
+    Uint64 outlen = 0;
+    cbc_copy->decrypt(&cipherText[0], &output[0], cipherText.size(), &outlen);
+    EXPECT_EQ(
+        outlen,
+        plainText.size()); // Should produce full output for complete blocks
+
+    EXPECT_EQ(plainText, output);
+
+    delete alcpCipher;
+    delete alcpCipher2_cpy;
 }
 
 TEST(CBC, MultiUpdateEncryption)
@@ -192,15 +294,81 @@ TEST(CBC, MultiUpdateEncryption)
     alc_error_t err = cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
     for (Uint64 i = 0; i < plainText.size() / 16; i++) {
-        err = cbc->encrypt(
-            &plainText[0] + i * 16, &output[0] + i * 16, 16); // 16 byte chunks
+        Uint64 chunk_outlen = 0;
+        err                 = cbc->encrypt(&plainText[0] + i * 16,
+                           &output[0] + i * 16,
+                           16,
+                           &chunk_outlen); // 16 byte chunks
         if (alcp_is_error(err)) {
             std::cout << "Encrypt failed!" << std::endl;
         }
         EXPECT_FALSE(alcp_is_error(err));
+        EXPECT_EQ(chunk_outlen,
+                  16); // CBC should output 16 bytes for 16-byte complete block
     }
 
     EXPECT_EQ(cipherText, output);
+
+    delete alcpCipher;
+}
+
+TEST(CBC, MultiUpdateEncryptionSmallChunks)
+{
+#ifndef AES_MULTI_UPDATE
+    GTEST_SKIP() << "Multi Update functionality unavailable!";
+#endif
+    auto alcpCipher = new CipherFactory<iCipher>;
+    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+
+    if (cbc == nullptr) {
+        delete alcpCipher;
+        FAIL();
+    }
+    std::vector<Uint8> output(cipherText.size());
+
+    alc_error_t err = cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
+
+    // Test with various small chunk sizes
+    std::vector<Uint64> chunkSizes = { 1, 2, 3, 4, 5, 7, 8, 11, 13, 15 };
+
+    for (Uint64 chunkSize : chunkSizes) {
+        std::cout << "Testing with chunk size: " << chunkSize << std::endl;
+        // Reset output buffer and cipher for each chunk size test
+        std::fill(output.begin(), output.end(), 0);
+        err = cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
+
+        Uint64 inputBytesProcessed = 0;
+        Uint64 totalOutputBytes    = 0;
+
+        // Process data in small chunks using encrypt
+        while (inputBytesProcessed < plainText.size()) {
+            Uint64 remainingBytes   = plainText.size() - inputBytesProcessed;
+            Uint64 currentChunkSize = std::min(chunkSize, remainingBytes);
+            Uint64 outputBytes      = 0;
+
+            err = cbc->encrypt(&plainText[0] + inputBytesProcessed,
+                               &output[0] + totalOutputBytes,
+                               currentChunkSize,
+                               &outputBytes);
+
+            if (alcp_is_error(err)) {
+                std::cout << "Encrypt failed with chunk size " << chunkSize
+                          << " at offset " << inputBytesProcessed << std::endl;
+            }
+            EXPECT_FALSE(alcp_is_error(err))
+                << "Failed with chunk size " << chunkSize;
+
+            inputBytesProcessed += currentChunkSize;
+            totalOutputBytes += outputBytes;
+        }
+
+        // For CBC multi-update, we should have all the data encrypted by the
+        // end
+        EXPECT_EQ(totalOutputBytes, cipherText.size())
+            << "Total output size mismatch with chunk size " << chunkSize;
+        EXPECT_EQ(cipherText, output)
+            << "Mismatch with chunk size " << chunkSize;
+    }
 
     delete alcpCipher;
 }
@@ -234,12 +402,18 @@ TEST(CBC, MultiUpdateDecryption)
         alc_error_t err = cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
         for (Uint64 i = 0; i < plainText.size() / 16; i++) {
-            err =
-                cbc->decrypt(&cipherText[0] + i * 16, &output[0] + i * 16, 16);
+            Uint64 chunk_outlen = 0;
+            err                 = cbc->decrypt(&cipherText[0] + i * 16,
+                               &output[0] + i * 16,
+                               16,
+                               &chunk_outlen);
             if (alcp_is_error(err)) {
                 std::cout << "Decrypt failed!" << std::endl;
             }
             EXPECT_FALSE(alcp_is_error(err));
+            EXPECT_EQ(
+                chunk_outlen,
+                16); // CBC should output 16 bytes for 16-byte complete block
         }
         EXPECT_EQ(plainText, output)
             << "FAIL CPU_FEATURE:"
@@ -248,27 +422,161 @@ TEST(CBC, MultiUpdateDecryption)
         delete alcpCipher;
     }
 }
-
-void
-printHexString(const char* info, const unsigned char* bytes, int length)
+TEST(CBC, MultiUpdateDecryptionSmallChunks)
 {
-    char* p_hex_string = (char*)malloc(sizeof(char) * ((length * 2) + 1));
-    for (int i = 0; i < length; i++) {
-        char chararray[2];
-        chararray[0] = (bytes[i] & 0xf0) >> 4;
-        chararray[1] = bytes[i] & 0x0f;
-        for (int j = 0; j < 2; j++) {
-            if (chararray[j] >= 0xa) {
-                chararray[j] = 'a' + chararray[j] - 0xa;
-            } else {
-                chararray[j] = '0' + chararray[j] - 0x0;
-            }
-            p_hex_string[i * 2 + j] = chararray[j];
-        }
+#ifndef AES_MULTI_UPDATE
+    GTEST_SKIP() << "Multi Update functionality unavailable!";
+#endif
+    auto alcpCipher = new CipherFactory<iCipher>;
+    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+
+    if (cbc == nullptr) {
+        delete alcpCipher;
+        FAIL();
     }
-    p_hex_string[length * 2] = 0x0;
-    printf("%s:%s\n", info, p_hex_string);
-    free(p_hex_string);
+    std::vector<Uint8> output(plainText.size());
+
+    alc_error_t err = cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
+
+    // Test with various small chunk sizes
+    std::vector<Uint64> chunkSizes = { 1, 2, 3, 4, 5, 7, 8, 11, 13, 15 };
+
+    for (Uint64 chunkSize : chunkSizes) {
+        std::cout << "Testing with chunk size: " << chunkSize << std::endl;
+        // Reset output buffer and cipher for each chunk size test
+        std::fill(output.begin(), output.end(), 0);
+        err = cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
+
+        Uint64 inputBytesProcessed = 0;
+        Uint64 totalOutputBytes    = 0;
+
+        // Process data in small chunks using decrypt
+        while (inputBytesProcessed < cipherText.size()) {
+            Uint64 remainingBytes   = cipherText.size() - inputBytesProcessed;
+            Uint64 currentChunkSize = std::min(chunkSize, remainingBytes);
+            Uint64 outputBytes      = 0;
+
+            err = cbc->decrypt(&cipherText[0] + inputBytesProcessed,
+                               &output[0] + totalOutputBytes,
+                               currentChunkSize,
+                               &outputBytes);
+
+            if (alcp_is_error(err)) {
+                std::cout << "Decrypt failed with chunk size " << chunkSize
+                          << " at offset " << inputBytesProcessed << std::endl;
+            }
+            EXPECT_FALSE(alcp_is_error(err))
+                << "Failed with chunk size " << chunkSize;
+
+            inputBytesProcessed += currentChunkSize;
+            totalOutputBytes += outputBytes;
+        }
+
+        // For CBC multi-update, we should have all the data decrypted by the
+        // end
+        EXPECT_EQ(totalOutputBytes, plainText.size())
+            << "Total output size mismatch with chunk size " << chunkSize;
+        EXPECT_EQ(plainText, output)
+            << "Mismatch with chunk size " << chunkSize;
+    }
+
+    delete alcpCipher;
+}
+
+TEST(CBC, InplaceEncryption)
+{
+#ifndef CBC_INPLACE_BUFFER
+    GTEST_SKIP() << "In-place encryption functionality disabled!";
+#endif
+    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+
+    // Test for all arch
+    for (CpuCipherFeatures feature : cpu_features) {
+#ifdef DEBUG
+        std::cout
+            << "Cpu Feature:"
+            << static_cast<
+                   typename std::underlying_type<CpuCipherFeatures>::type>(
+                   feature)
+            << std::endl;
+#endif
+        auto alcpCipher = new CipherFactory<iCipher>;
+        auto cbc =
+            alcpCipher->create("aes-cbc-128", feature); // KeySize is 128 bits
+
+        if (cbc == nullptr) {
+            delete alcpCipher;
+            FAIL();
+        }
+
+        // Create a copy of plainText to avoid modifying the original
+        std::vector<Uint8> plainText_copy = plainText;
+
+        cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
+
+        // Encrypt in-place using the copy
+        Uint64 outlen = 0;
+        cbc->encrypt(&plainText_copy[0],
+                     &plainText_copy[0],
+                     plainText_copy.size(),
+                     &outlen);
+        EXPECT_EQ(outlen, cipherText.size()); // Should produce full output for
+                                              // complete blocks
+
+        EXPECT_EQ(cipherText, plainText_copy)
+            << "FAIL CPU_FEATURE:"
+            << std::underlying_type<CpuCipherFeatures>::type(feature);
+
+        delete alcpCipher;
+    }
+}
+
+TEST(CBC, InplaceDecryption)
+{
+#ifndef CBC_INPLACE_BUFFER
+    GTEST_SKIP() << "In-place decryption functionality disabled!";
+#endif
+    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+
+    // Test for all arch
+    for (CpuCipherFeatures feature : cpu_features) {
+#ifdef DEBUG
+        std::cout
+            << "Cpu Feature:"
+            << static_cast<
+                   typename std::underlying_type<CpuCipherFeatures>::type>(
+                   feature)
+            << std::endl;
+#endif
+        auto alcpCipher = new CipherFactory<iCipher>;
+        auto cbc =
+            alcpCipher->create("aes-cbc-128", feature); // KeySize is 128 bits
+
+        if (cbc == nullptr) {
+            delete alcpCipher;
+            FAIL();
+        }
+
+        // Make a copy of cipherText for each feature test
+        std::vector<Uint8> cipherText_copy = cipherText;
+
+        // In-place decryption (source and destination are the same)
+        cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
+        Uint64 outlen = 0;
+        cbc->decrypt(&cipherText_copy[0],
+                     &cipherText_copy[0],
+                     cipherText_copy.size(),
+                     &outlen);
+        EXPECT_EQ(
+            outlen,
+            plainText.size()); // Should produce full output for complete blocks
+
+        EXPECT_EQ(plainText, cipherText_copy)
+            << "FAIL CPU_FEATURE:"
+            << std::underlying_type<CpuCipherFeatures>::type(feature);
+
+        delete alcpCipher;
+    }
 }
 
 #if 0
@@ -304,9 +612,9 @@ TEST(CBC, PaddingEncryption)
         alc_error_t err = cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
         err = cbc->encrypt(&pt[0], &output[0], pt.size());
-
+#ifdef DEBUG
         printHexString("CT", &output[0], output.size());
-
+#endif
         if (alcp_is_error(err)) {
             std::cout << "Encrypt failed!" << std::endl;
         }
@@ -342,48 +650,245 @@ TEST(CBC, RandomEncryptDecryptTest)
 
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
 
-    for (int i = (cTextSize - 16); i > 16; i -= 16)
-        for (CpuCipherFeatures feature : cpu_features) {
+    for (CpuCipherFeatures feature : cpu_features) {
 #ifdef DEBUG
-            std::cout
-                << "Cpu Feature:"
-                << static_cast<
-                       typename std::underlying_type<CpuCipherFeatures>::type>(
-                       feature)
-                << std::endl;
+        std::cout
+            << "Cpu Feature:"
+            << static_cast<
+                   typename std::underlying_type<CpuCipherFeatures>::type>(
+                   feature)
+            << std::endl;
 #endif
-            const std::vector<Uint8> plainTextVect(plain_text_vect.begin() + i,
-                                                   plain_text_vect.end());
-            std::vector<Uint8>       plainTextOut(plainTextVect.size());
-            auto                     alcpCipher = new CipherFactory<iCipher>;
-            auto cbc = alcpCipher->create("aes-cbc-256", feature);
+        const std::vector<Uint8> plainTextVect(plain_text_vect.begin(),
+                                               plain_text_vect.end());
+        std::vector<Uint8>       plainTextOut(plainTextVect.size());
+        auto                     alcpCipher = new CipherFactory<iCipher>;
+        auto cbc = alcpCipher->create("aes-cbc-256", feature);
 
-            if (cbc == nullptr) {
-                delete alcpCipher;
-                FAIL();
-            }
-            cbc->init(key_256, 256, &iv[0], sizeof(iv));
-
-            cbc->encrypt(
-                &plainTextVect[0], &cipher_text_vect[0], plainTextVect.size());
-
-            cbc->init(key_256, 256, &iv[0], sizeof(iv));
-
-            cbc->decrypt(
-                &cipher_text_vect[0], &plainTextOut[0], plainTextVect.size());
-
-            EXPECT_EQ(plainTextVect, plainTextOut);
-
+        if (cbc == nullptr) {
             delete alcpCipher;
-#ifdef DEBUG
-            auto ret = std::mismatch(plainTextVect.begin(),
-                                     plainTextVect.end(),
-                                     plainTextOut.begin());
-            std::cout << "First:" << ret.first - plainTextVect.begin()
-                      << "Second:" << ret.second - plainTextOut.begin()
-                      << std::endl;
-#endif
+            FAIL();
         }
+        cbc->init(key_256, 256, &iv[0], sizeof(iv));
+
+        Uint64 encrypt_outlen = 0;
+        cbc->encrypt(&plainTextVect[0],
+                     &cipher_text_vect[0],
+                     plainTextVect.size(),
+                     &encrypt_outlen);
+
+        cbc->init(key_256, 256, &iv[0], sizeof(iv));
+
+        Uint64 decrypt_outlen = 0;
+        cbc->decrypt(&cipher_text_vect[0],
+                     &plainTextOut[0],
+                     plainTextVect.size(),
+                     &decrypt_outlen);
+
+        delete alcpCipher;
+#ifdef DEBUG
+
+        if (plainTextVect != plainTextOut) {
+            // Print the key, IV, and ciphertext for debugging
+            printHexString("Key", key_256, 32);
+            printHexString("IV", iv, 16);
+            printHexString(
+                "Ciphertext", &cipher_text_vect[0], plainTextVect.size());
+            printHexString(
+                "plainTextVect", &plainTextVect[0], plainTextVect.size());
+
+            printf("\n");
+            printHexString(
+                "plainTextOut", &plainTextOut[0], plainTextOut.size());
+            printf("\n");
+
+            printf("Length: %zu\n", plainTextVect.size());
+        }
+#endif
+        // print address of the vectors for debugging
+        ASSERT_EQ(plainTextVect, plainTextOut);
+
+#ifdef DEBUG
+        auto ret = std::mismatch(
+            plainTextVect.begin(), plainTextVect.end(), plainTextOut.begin());
+        std::cout << "First:" << ret.first - plainTextVect.begin()
+                  << "Second:" << ret.second - plainTextOut.begin()
+                  << std::endl;
+#endif
+    }
+}
+TEST(CBC, MultiBufferRandomTest)
+{
+    Uint8        key_256[32] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe };
+    const Uint64 cTextSize   = 16; // 16 bytes * 1000 buffers
+    std::vector<const Uint8*> plain_text_vect(cTextSize);
+    std::vector<Uint8*>       cipher_text_vect(cTextSize);
+    std::vector<const Uint8*> iv_vect(16);
+    int                       num_buffers = 2; // Number of buffers to test
+    // Fill buffer with random data
+    // allocate memory for the vectors
+    for (int i = 0; i < num_buffers; ++i) {
+        plain_text_vect[i] = new Uint8[cTextSize];
+        iv_vect[i]         = new Uint8[16];
+        // Initialize the random number generator
+        std::unique_ptr<IRandomize> random = std::make_unique<Randomize>(12);
+        random->getRandomBytes(const_cast<Uint8*>(plain_text_vect[i]),
+                               cTextSize);
+        random->getRandomBytes(const_cast<Uint8*>(iv_vect[i]), 16);
+        cipher_text_vect[i] = new Uint8[cTextSize];
+    }
+
+    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+
+    for (CpuCipherFeatures feature : cpu_features) {
+        /* FIXME: run this test only for zen4 for now? */
+        if (feature != CpuCipherFeatures::eVaes512) {
+            std::cout << "Skipping test for feature avx512 " << std::endl;
+            continue;
+        }
+        auto alcpCipher = new CipherFactory<iCipher>;
+        auto cbc        = alcpCipher->create("aes-cbc-256", feature);
+
+        if (cbc == nullptr) {
+            delete alcpCipher;
+            FAIL();
+        }
+        cbc->init(key_256, 256, nullptr, 0);
+        cbc->multibufferInit(
+            key_256, 256, iv_vect.data(), iv_vect.size(), num_buffers);
+
+        // Test flush and dequeue operations
+        alc_error_t err =
+            cbc->flush(plain_text_vect.data(), num_buffers, cTextSize);
+        EXPECT_FALSE(alcp_is_error(err));
+
+        err = cbc->dequeue(cipher_text_vect.data(), num_buffers, cTextSize);
+        EXPECT_FALSE(alcp_is_error(err));
+        // Verify the output
+        std::vector<Uint8> plainText(cTextSize);
+        for (int i = 0; i < num_buffers; ++i) {
+            cbc->init(key_256, 256, iv_vect[i], 16);
+            Uint64 verify_outlen = 0;
+            cbc->decrypt(cipher_text_vect[i],
+                         plainText.data(),
+                         cTextSize,
+                         &verify_outlen);
+            printHexString("Cipher Text", cipher_text_vect[i], cTextSize);
+            printHexString("Plain Text", plainText.data(), cTextSize);
+            printHexString("plain_text_vect", plain_text_vect[i], cTextSize);
+            // ASSERT_EQ(0, memcmp(plain_text_vect[i], plainText.data(),
+            // cTextSize));
+        }
+
+        delete alcpCipher;
+    }
+    /* delete iv_vect */
+    for (int i = 0; i < num_buffers; ++i) {
+        delete[] iv_vect[i];
+        delete[] cipher_text_vect[i];
+        delete[] plain_text_vect[i];
+    }
+}
+
+// Multi-update tests for arbitrary sizes - testing the cipher_multi_update_api
+// functionality
+TEST(CBC, MultiUpdateArbitrarySizesVariousUpdateCounts)
+{
+#ifndef AES_MULTI_UPDATE
+    GTEST_SKIP() << "Multi Update functionality unavailable!";
+#endif
+    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    for (CpuCipherFeatures feature : cpu_features) {
+        auto alcpCipher = new CipherFactory<iCipher>;
+        auto cbc        = alcpCipher->create("aes-cbc-128", feature);
+
+        if (cbc == nullptr) {
+            delete alcpCipher;
+            continue;
+        }
+
+        // Test various update counts with different chunk sizes
+        std::vector<std::vector<size_t>> chunk_patterns = {
+            { 5, 7, 4 },               // 3 updates, sums to 16
+            { 1, 2, 3, 4, 6 },         // 5 updates, sums to 16
+            { 3, 13, 16 },             // 3 updates, sums to 32
+            { 8, 24 },                 // 2 updates, sums to 32
+            { 1, 1, 1, 1, 12, 16, 16 } // 7 updates, sums to 48
+        };
+
+        for (auto& chunks : chunk_patterns) {
+            // Calculate total size needed
+            size_t total_size =
+                std::accumulate(chunks.begin(), chunks.end(), 0);
+
+            // Create test data
+            std::vector<Uint8> input_data(total_size);
+            std::iota(input_data.begin(),
+                      input_data.end(),
+                      0x30); // Fill with '0', '1', '2', etc.
+
+            std::vector<Uint8> output1(total_size), output2(total_size);
+            Uint64             total_output1 = 0, total_output2 = 0;
+
+            // Test encryption with multi-update
+            cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
+
+            size_t input_offset = 0;
+            for (size_t chunk_size : chunks) {
+                Uint64 chunk_output = 0;
+                auto   err          = cbc->encrypt(&input_data[input_offset],
+                                        &output1[total_output1],
+                                        chunk_size,
+                                        &chunk_output);
+                EXPECT_EQ(err, ALC_ERROR_NONE);
+                input_offset += chunk_size;
+                total_output1 += chunk_output;
+            }
+
+            // Test decryption with multi-update - create separate factory for
+            // second cipher
+            auto alcpCipher2 = new CipherFactory<iCipher>;
+            auto cbc2        = alcpCipher2->create("aes-cbc-128", feature);
+            cbc2->init(&key[0], key.size() * 8, &iv[0], iv.size());
+
+            size_t output_offset = 0;
+            for (size_t i = 0; i < chunks.size(); i++) {
+                // Find how much was encrypted in this chunk
+                Uint64 encrypted_size =
+                    (i == chunks.size() - 1)
+                        ? (total_output1 - output_offset)
+                        : (chunks[i] / 16) * 16; // Complete blocks only
+
+                if (encrypted_size > 0) {
+                    Uint64 chunk_output = 0;
+                    auto   err          = cbc2->decrypt(&output1[output_offset],
+                                             &output2[total_output2],
+                                             encrypted_size,
+                                             &chunk_output);
+                    EXPECT_EQ(err, ALC_ERROR_NONE);
+                    output_offset += encrypted_size;
+                    total_output2 += chunk_output;
+                }
+            }
+
+            // Verify the decrypted data matches input (up to complete blocks)
+            size_t complete_blocks = (total_size / 16) * 16;
+            for (size_t i = 0; i < complete_blocks; i++) {
+                EXPECT_EQ(input_data[i], output2[i])
+                    << "Mismatch at byte " << i << " for feature "
+                    << static_cast<int>(feature);
+            }
+
+            // Clean up second factory
+            delete alcpCipher2;
+        }
+
+        // Factory destructor will clean up the cipher object
+        delete alcpCipher;
+    }
 }
 
 int

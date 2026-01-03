@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -66,7 +66,9 @@ RotateLeft(Uint32 value, Uint32 count)
 static inline Uint64
 RotateLeft(Uint64 value, Uint64 count)
 {
-    return value << count | value >> (64 - count);
+    // return value << count | value >> (64 - count);
+    /* valid range of this shift amount should be 0 <= count < 64 */
+    return (value << (count & 63)) | (value >> ((64 - count) & 63));
 }
 
 constexpr Uint32 BitsPerByte   = 8;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -47,7 +47,7 @@
 struct _alc_prov_digest_ctx
 {
     alc_digest_handle_t handle;
-    Uint32              shake_digest_size;
+    Uint64              shake_digest_size;
 };
 typedef struct _alc_prov_digest_ctx alc_prov_digest_ctx_t,
     *alc_prov_digest_ctx_p;
@@ -64,6 +64,10 @@ alcp_prov_digest_get_params(OSSL_PARAM    params[],
                             size_t        blockSize,
                             size_t        digestSize,
                             unsigned long flags);
+
+int
+alcp_prov_digest_get_ctx_params(OSSL_PARAM params[], void* provctx);
+
 int
 alcp_prov_digest_final(void* vctx, unsigned char* out, size_t outsize);
 

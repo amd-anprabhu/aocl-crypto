@@ -1,4 +1,4 @@
- # Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ # Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions are met:
@@ -30,6 +30,11 @@ Include(${CMAKE_SOURCE_DIR}/cmake/AlcpTestUtils.cmake)
 SET(LIBS ${LIBS} gtest alcp)
 
  SET(EXTRA_INCLUDES "")
+
+IF(ALCP_ENABLE_CBC_INPLACE_BUFFER)
+    ADD_COMPILE_OPTIONS("-DCBC_INPLACE_BUFFER")
+    MESSAGE(status "CBC_INPLACE_BUFFER enabled in tests")
+ENDIF(ALCP_ENABLE_CBC_INPLACE_BUFFER)
 
 IF(ENABLE_TESTS_IPP_API)
 ADD_COMPILE_OPTIONS("-DUSE_IPP")
@@ -90,7 +95,6 @@ if(ALCP_ENABLE_FUZZ_TESTS)
     endif()
 endif(ALCP_ENABLE_FUZZ_TESTS)
 
-# FIXME: Enable this once this test is up and running on windows
 IF(UNIX)
    ADD_SUBDIRECTORY(dl_load)
 ENDIF(UNIX)

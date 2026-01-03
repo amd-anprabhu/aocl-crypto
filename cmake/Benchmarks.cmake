@@ -37,7 +37,7 @@ FetchContent_Declare(benchmark
     GIT_TAG v1.8.3)
 FetchContent_MakeAvailable(benchmark)
 
-option(MULTI_INIT_BENCH "Enable Multi-Init Benchmarks" OFF)
+option(MULTI_INIT_BENCH "Enable Multi-Init Benchmarks" ON)
 if(MULTI_INIT_BENCH)
     add_definitions(-DMULTI_INIT_BENCH)
 endif()

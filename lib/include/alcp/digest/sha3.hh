@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -43,13 +43,35 @@ static constexpr Uint8 cDim = 5;
  * They take each of the 25 lanes of m_state i.e., word of 64 bits.
  * And rotate it by a fixed number of positions
  */
-static constexpr Uint8 cRotationConstants[cDim][cDim] = {
+alignas(64) static constexpr Uint64 cRotationConstants[cDim][cDim] = {
     { 0, 1, 62, 28, 27 },
     { 36, 44, 6, 55, 20 },
     { 3, 10, 43, 25, 39 },
     { 41, 45, 15, 21, 8 },
     { 18, 2, 61, 56, 14 }
 };
+
+// Rotation constants to be used after Harmonize step
+alignas(64) static constexpr Uint64 cRotationConstantsHarmonize[cDim][cDim] = {
+    { 0, 44, 43, 21, 14 },
+    { 18, 1, 6, 25, 8 },
+    { 41, 2, 62, 55, 39 },
+    { 3, 45, 61, 28, 20 },
+    { 36, 10, 15, 56, 27 }
+};
+
+// Round constants used in the Iota step
+alignas(64) static constexpr Uint64 cRoundConstantsIota[24] = {
+    0x0000000000000001, 0x0000000000008082, 0x800000000000808A,
+    0x8000000080008000, 0x000000000000808B, 0x0000000080000001,
+    0x8000000080008081, 0x8000000000008009, 0x000000000000008A,
+    0x0000000000000088, 0x0000000080008009, 0x000000008000000A,
+    0x000000008000808B, 0x800000000000008B, 0x8000000000008089,
+    0x8000000000008003, 0x8000000000008002, 0x8000000000000080,
+    0x000000000000800A, 0x800000008000000A, 0x8000000080008081,
+    0x8000000000008080, 0x0000000080000001, 0x8000000080008008
+};
+
 // maximum size of message block in bits is used for shake128 digest
 static constexpr Uint32 MaxDigestBlockSizeBits = 1344;
 

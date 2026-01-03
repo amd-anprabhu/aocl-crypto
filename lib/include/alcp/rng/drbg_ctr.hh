@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -32,7 +32,7 @@
 #include <immintrin.h>
 
 // FIXME: Remove once debug ctr debug utilities are removed
-// #define DEBUG 0
+#define DEBUG 0
 
 namespace alcp::rng::drbg {
 

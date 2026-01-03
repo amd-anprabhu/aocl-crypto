@@ -49,8 +49,6 @@ using alcp::utils::CpuId;
 
 namespace alcp::digest {
 
-#include "sha3_inplace.cc.inc"
-
 static inline void
 round(Uint64 roundConst, Uint64 state[cDim][cDim])
 {
@@ -111,7 +109,8 @@ fFunction(Uint64* stateFlat)
 {
     const Uint64 num_rounds = 24;
     for (Uint64 i = 0; i < num_rounds; ++i) {
-        round(cRoundConstants[i], reinterpret_cast<Uint64(*)[5]>(stateFlat));
+        round(cRoundConstantsIota[i],
+              reinterpret_cast<Uint64(*)[5]>(stateFlat));
     }
 }
 
@@ -144,8 +143,14 @@ Sha3<digest_len>::squeezeChunk(Uint8* pBuf, Uint64 size)
             (Uint8*)m_state_flat, pBuf, size, m_block_len, m_shake_index);
 #else
         if (avx512f_available) {
-            return zen4::Sha3Finalize(
-                (Uint8*)m_state_flat, pBuf, size, m_block_len, m_shake_index);
+            return zen4::Sha3Finalize((Uint8*)m_state_flat,
+                                      pBuf,
+                                      size,
+                                      m_block_len,
+                                      m_shake_index,
+                                      cRoundConstantsIota,
+                                      cRotationConstants,
+                                      cRotationConstantsHarmonize);
         } else {
             return zen3::Sha3Finalize(
                 (Uint8*)m_state_flat, pBuf, size, m_block_len, m_shake_index);
@@ -154,8 +159,14 @@ Sha3<digest_len>::squeezeChunk(Uint8* pBuf, Uint64 size)
     }
 
     if (zen4_available && avx512f_available) {
-        return zen4::Sha3Finalize(
-            (Uint8*)m_state_flat, pBuf, size, m_block_len, m_shake_index);
+        return zen4::Sha3Finalize((Uint8*)m_state_flat,
+                                  pBuf,
+                                  size,
+                                  m_block_len,
+                                  m_shake_index,
+                                  cRoundConstantsIota,
+                                  cRotationConstants,
+                                  cRotationConstantsHarmonize);
     }
 
     if (zen3_available) {
@@ -216,8 +227,13 @@ Sha3<digest_len>::processChunk(const Uint8* pSrc, Uint64 len)
             m_state_flat, p_msg_buffer64, msg_size, m_block_len);
 #else
         if (avx512f_available) {
-            return zen4::Sha3Update(
-                m_state_flat, p_msg_buffer64, msg_size, m_block_len);
+            return zen4::Sha3Update(m_state_flat,
+                                    p_msg_buffer64,
+                                    msg_size,
+                                    m_block_len,
+                                    cRoundConstantsIota,
+                                    cRotationConstants,
+                                    cRotationConstantsHarmonize);
         } else {
             return zen3::Sha3Update(
                 m_state_flat, p_msg_buffer64, msg_size, m_block_len);
@@ -226,8 +242,13 @@ Sha3<digest_len>::processChunk(const Uint8* pSrc, Uint64 len)
     }
 
     if (zen4_available && avx512f_available) {
-        return zen4::Sha3Update(
-            m_state_flat, p_msg_buffer64, msg_size, m_block_len);
+        return zen4::Sha3Update(m_state_flat,
+                                p_msg_buffer64,
+                                msg_size,
+                                m_block_len,
+                                cRoundConstantsIota,
+                                cRotationConstants,
+                                cRotationConstantsHarmonize);
     }
 
     if (zen3_available) {

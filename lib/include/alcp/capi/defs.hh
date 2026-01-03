@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -43,21 +43,27 @@
         printf("\n");                                                          \
     } while (0)
 
-#define ALCP_BAD_PTR_ERR_RET(ptr, err)                                         \
-    do {                                                                       \
-        using namespace alcp::base;                                            \
-        if (nullptr == ptr) {                                                  \
-            auto e = GenericError{ eInvalidArgument };                         \
-            return (alc_error_t)e.code();                                      \
-        }                                                                      \
-    } while (0)
+#define ALCP_BAD_PTR_ERR_RET(ptr)                                              \
+    if (nullptr == ptr) {                                                      \
+        return ALC_ERROR_INVALID_DATA;                                         \
+    }
 
-#define ALCP_ZERO_LEN_ERR_RET(len, err)                                        \
+#define ALCP_ZERO_LEN_ERR_RET(len)                                             \
+    if (0 == len) {                                                            \
+        return ALC_ERROR_INVALID_SIZE;                                         \
+    }
+
+/* FIXME, use this in future */
+#define ALCP_GENERIC_ERR_CHECK(param)                                          \
     do {                                                                       \
-        using namespace alcp::base;                                            \
-        if (0 == len) {                                                        \
-            auto e = GenericError{ eInvalidArgument };                         \
-            return (alc_error_t)e.code();                                      \
+        if constexpr (std::is_pointer_v<decltype(param)>) {                    \
+            if (nullptr == param) {                                            \
+                return ALC_ERROR_INVALID_DATA;                                 \
+            }                                                                  \
+        } else if constexpr (std::is_integral_v<decltype(param)>) {            \
+            if (0 == param) {                                                  \
+                return ALC_ERROR_INVALID_SIZE;                                 \
+            }                                                                  \
         }                                                                      \
     } while (0)
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -84,7 +84,6 @@ create_demo_session(alc_cipher_handle_p handle,
         printf("Error: Unable to Initalize \n");
         goto out;
     }
-    // FIXME: alcp_cipher_aead_int() to be added here
 
     return 0;
 
@@ -102,7 +101,8 @@ encrypt_demo(alc_cipher_handle_p handle,
 {
     alc_error_t err;
 
-    err = alcp_cipher_encrypt(handle, plaintxt, ciphertxt, len);
+    Uint64 encrypt_outlen = 0;
+    err = alcp_cipher_encrypt(handle, plaintxt, ciphertxt, len, &encrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: Unable to Encrypt \n");
 
@@ -121,7 +121,8 @@ decrypt_demo(alc_cipher_handle_p handle,
 {
     alc_error_t err;
 
-    err = alcp_cipher_decrypt(handle, ciphertxt, plaintxt, len);
+    Uint64 decrypt_outlen = 0;
+    err = alcp_cipher_decrypt(handle, ciphertxt, plaintxt, len, &decrypt_outlen);
     if (alcp_is_error(err)) {
         printf("Error: Unable to Decrypt \n");
 

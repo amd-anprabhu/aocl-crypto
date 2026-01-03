@@ -116,8 +116,8 @@ For using IPP just specify `-i` command line argument.
 For using OpenSSL just specify `-o` command line argument.
 
 ### Force runtime CPU Architecture
-To force runtime CPU Architecture, use the environment variable ALCP_ENABLE_INSTRUCTIONS before running the test executable.
+To force runtime CPU Architecture, use the environment variable AOCL_ENABLE_INSTRUCTION before running the test executable.
 Supported options are ZEN1, ZEN2, ZEN3, ZEN4, ZEN5
 ```sh
-$ ALCP_ENABLE_INSTRUCTIONS=ZEN3 ./bench/cipher/bench_cipher
+$ AOCL_ENABLE_INSTRUCTION=ZEN3 ./bench/cipher/bench_cipher
 ```

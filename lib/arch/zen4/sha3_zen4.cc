@@ -82,36 +82,8 @@ namespace alcp::digest { namespace zen4 {
     // Constants
     static constexpr Uint8 cDim      = 5;
     static constexpr Uint8 cRegs     = 3;
-    static constexpr Uint8 cRounds   = 24;
     static constexpr Uint8 cRounds12 = 12;
     // Constants
-
-    static inline void load128Absorb128(__m128i&      dest_State,
-                                        const Uint64* p_src_state,
-                                        const Uint64* p_src)
-    {
-        dest_State = _mm_loadu_epi64(p_src_state);
-        dest_State =
-            _mm_xor_epi64(dest_State, _mm_lddqu_si128((const __m128i*)(p_src)));
-    }
-
-    static inline void load128Absorb64(__m128i&      dest_State,
-                                       Uint64*       p_src_state,
-                                       const Uint64* p_src)
-    {
-        (*p_src_state) ^= (*p_src);
-        dest_State = _mm_loadu_epi64(p_src_state);
-    }
-
-    static inline void absorbRow(__m128i       state[cDim][cRegs],
-                                 Uint64        para_state[cDim][cDim],
-                                 const Uint64* pSrc,
-                                 const Uint64  row)
-    {
-        load128Absorb128(state[row][0], &para_state[row][0], &pSrc[0]);
-        load128Absorb128(state[row][1], &para_state[row][2], &pSrc[2]);
-        state[row][2] = _mm_cvtsi64_si128(para_state[row][4] ^ pSrc[4]);
-    }
 
     static inline void loadRow(__m128i      state[cDim][cRegs],
                                Uint64       para_state[cDim][cDim],
@@ -122,77 +94,19 @@ namespace alcp::digest { namespace zen4 {
         state[row][2] = _mm_cvtsi64_si128(para_state[row][4]);
     }
 
-    static inline void fFunction(Uint64        para_state[cDim][cDim],
-                                 const Uint64* pSrc,
-                                 const Uint64  chunk_size_u64)
+    static inline void __attribute__((always_inline)) fFunction(
+        Uint64        para_state[cDim][cDim],
+        const Uint64* pSrc,
+        const Uint64  chunk_size_u64,
+        const Uint64* pRoundConstants,
+        const Uint64 (*pRotationConstants)[5],
+        const Uint64 (*pRotationConstantsHarmonize)[5])
     {
-        // setting constants
-        alignas(64) static const __m128i cRoundConstant[cRounds] = {
-            _mm_set_epi64x(0x0, 0x0000000000000001),
-            _mm_set_epi64x(0x0, 0x0000000000008082),
-            _mm_set_epi64x(0x0, 0x800000000000808A),
-            _mm_set_epi64x(0x0, 0x8000000080008000),
-            _mm_set_epi64x(0x0, 0x000000000000808B),
-            _mm_set_epi64x(0x0, 0x0000000080000001),
-            _mm_set_epi64x(0x0, 0x8000000080008081),
-            _mm_set_epi64x(0x0, 0x8000000000008009),
-            _mm_set_epi64x(0x0, 0x000000000000008A),
-            _mm_set_epi64x(0x0, 0x0000000000000088),
-            _mm_set_epi64x(0x0, 0x0000000080008009),
-            _mm_set_epi64x(0x0, 0x000000008000000A),
-            _mm_set_epi64x(0x0, 0x000000008000808B),
-            _mm_set_epi64x(0x0, 0x800000000000008B),
-            _mm_set_epi64x(0x0, 0x8000000000008089),
-            _mm_set_epi64x(0x0, 0x8000000000008003),
-            _mm_set_epi64x(0x0, 0x8000000000008002),
-            _mm_set_epi64x(0x0, 0x8000000000000080),
-            _mm_set_epi64x(0x0, 0x000000000000800A),
-            _mm_set_epi64x(0x0, 0x800000008000000A),
-            _mm_set_epi64x(0x0, 0x8000000080008081),
-            _mm_set_epi64x(0x0, 0x8000000000008080),
-            _mm_set_epi64x(0x0, 0x0000000080000001),
-            _mm_set_epi64x(0x0, 0x8000000080008008)
-        };
-
-        alignas(64) static const __m128i cRotate0[5][3] = {
-            { _mm_set_epi64x(1, 0),
-              _mm_set_epi64x(28, 62),
-              _mm_set_epi64x(0, 27) },
-            { _mm_set_epi64x(44, 36),
-              _mm_set_epi64x(55, 6),
-              _mm_set_epi64x(0, 20) },
-            { _mm_set_epi64x(10, 3),
-              _mm_set_epi64x(25, 43),
-              _mm_set_epi64x(0, 39) },
-            { _mm_set_epi64x(45, 41),
-              _mm_set_epi64x(21, 15),
-              _mm_set_epi64x(0, 8) },
-            { _mm_set_epi64x(2, 18),
-              _mm_set_epi64x(56, 61),
-              _mm_set_epi64x(0, 14) }
-        };
-
-        alignas(64) static const __m128i cRotate1[5][3] = {
-            { _mm_set_epi64x(44, 0),
-              _mm_set_epi64x(21, 43),
-              _mm_set_epi64x(0, 14) },
-            { _mm_set_epi64x(1, 18),
-              _mm_set_epi64x(25, 6),
-              _mm_set_epi64x(0, 8) },
-            { _mm_set_epi64x(2, 41),
-              _mm_set_epi64x(55, 62),
-              _mm_set_epi64x(0, 39) },
-            { _mm_set_epi64x(45, 3),
-              _mm_set_epi64x(28, 61),
-              _mm_set_epi64x(0, 20) },
-            { _mm_set_epi64x(10, 36),
-              _mm_set_epi64x(56, 15),
-              _mm_set_epi64x(0, 27) }
-        };
-        // setting constants
-
         // Loading data
         __m128i state[cDim][cRegs]{};
+        for (Uint64 i = 0; i < cDim; i++) {
+            loadRow(state, para_state, i);
+        }
 
         /**
          * The only possible values of digest_len are 128, 224, 256, 384, and
@@ -206,77 +120,52 @@ namespace alcp::digest { namespace zen4 {
          * - And =0 in Sha3Finalize calls because we don't absorb any input in
          * the squeezing phase.
          */
-        if (chunk_size_u64 == 9) {
-            // SHA3-512
-            // Row 0
-            absorbRow(state, para_state, pSrc, 0);
-            // Row 1
-            load128Absorb128(state[1][0], &para_state[1][0], &pSrc[5]);
-            load128Absorb128(state[1][1], &para_state[1][2], &pSrc[7]);
-            state[1][2] = _mm_cvtsi64_si128(para_state[1][4]);
-            // Row 2-4
-            for (Uint64 i = 2; i < 5; i++) {
-                loadRow(state, para_state, i);
-            }
-        } else if (chunk_size_u64 == 13) {
-            // SHA3-384
-            // Row 0
-            absorbRow(state, para_state, pSrc, 0);
-            // Row 1
-            absorbRow(state, para_state, &pSrc[5], 1);
-            // Row 2
-            load128Absorb128(state[2][0], &para_state[2][0], &pSrc[10]);
-            load128Absorb64(state[2][1], &para_state[2][2], &pSrc[12]);
-            state[2][2] = _mm_cvtsi64_si128(para_state[2][4]);
-            // Row 3
-            loadRow(state, para_state, 3);
-            loadRow(state, para_state, 4);
-        } else if (chunk_size_u64 == 17) {
-            // SHA3-256, SHAKE-256
-            // Row 0
-            absorbRow(state, para_state, pSrc, 0);
-            // Row 1
-            absorbRow(state, para_state, &pSrc[5], 1);
-            // Row 2
-            absorbRow(state, para_state, &pSrc[10], 2);
-            // Row 3
-            load128Absorb128(state[3][0], &para_state[3][0], &pSrc[15]);
-            state[3][1] = _mm_loadu_epi64(&para_state[3][2]);
-            state[3][2] = _mm_cvtsi64_si128(para_state[3][4]);
-            // Row 4
-            loadRow(state, para_state, 4);
-        } else if (chunk_size_u64 == 18) {
-            // SHA3-224
-            // Row 0
-            absorbRow(state, para_state, pSrc, 0);
-            // Row 1
-            absorbRow(state, para_state, &pSrc[5], 1);
-            // Row 2
-            absorbRow(state, para_state, &pSrc[10], 2);
-            // Row 3
-            load128Absorb128(state[3][0], &para_state[3][0], &pSrc[15]);
-            load128Absorb64(state[3][1], &para_state[3][2], &pSrc[17]);
-            state[3][2] = _mm_cvtsi64_si128(para_state[3][4]);
-            // Row 4
-            loadRow(state, para_state, 4);
-        } else if (chunk_size_u64 == 21) {
-            // SHAKE-128
-            // Row 0
-            absorbRow(state, para_state, pSrc, 0);
-            // Row 1
-            absorbRow(state, para_state, &pSrc[5], 1);
-            // Row 2
-            absorbRow(state, para_state, &pSrc[10], 2);
-            // Row 3
-            absorbRow(state, para_state, &pSrc[15], 3);
-            // Row 4
-            para_state[4][0] ^= pSrc[20];
-            loadRow(state, para_state, 4);
-        } else {
-            // Calls from Sha3Finalize go here
-            for (Uint64 i = 0; i < cDim; i++) {
-                loadRow(state, para_state, i);
-            }
+        switch (chunk_size_u64) {
+            case 21:
+                state[3][1] = _mm_xor_epi64(
+                    state[3][1],
+                    _mm_shuffle_epi32(_mm_loadu_si64(&pSrc[18]), 0x4E));
+                state[3][2] =
+                    _mm_xor_epi64(state[3][2], _mm_loadu_si64(&pSrc[19]));
+                state[4][0] =
+                    _mm_xor_epi64(state[4][0], _mm_loadu_si64(&pSrc[20]));
+                [[fallthrough]];
+
+            case 18:
+                state[3][1] =
+                    _mm_xor_epi64(state[3][1], _mm_loadu_si64(&pSrc[17]));
+                [[fallthrough]];
+
+            case 17:
+                state[2][1] = _mm_xor_epi64(
+                    state[2][1],
+                    _mm_shuffle_epi32(_mm_loadu_si64(&pSrc[13]), 0x4E));
+                state[2][2] =
+                    _mm_xor_epi64(state[2][2], _mm_loadu_si64(&pSrc[14]));
+                state[3][0] = _mm_xor_epi64(
+                    state[3][0], _mm_lddqu_si128(((const __m128i*)&pSrc[15])));
+                [[fallthrough]];
+
+            case 13:
+                state[1][2] =
+                    _mm_xor_epi64(state[1][2], _mm_loadu_si64(&pSrc[9]));
+                state[2][0] = _mm_xor_epi64(
+                    state[2][0], _mm_lddqu_si128(((const __m128i*)&pSrc[10])));
+                state[2][1] =
+                    _mm_xor_epi64(state[2][1], _mm_loadu_si64(&pSrc[12]));
+                [[fallthrough]];
+
+            case 9:
+                state[0][0] = _mm_xor_epi64(
+                    state[0][0], _mm_lddqu_si128(((const __m128i*)pSrc)));
+                state[0][1] = _mm_xor_epi64(
+                    state[0][1], _mm_lddqu_si128(((const __m128i*)&pSrc[2])));
+                state[0][2] =
+                    _mm_xor_epi64(state[0][2], _mm_loadu_si64(&pSrc[4]));
+                state[1][0] = _mm_xor_epi64(
+                    state[1][0], _mm_lddqu_si128(((const __m128i*)&pSrc[5])));
+                state[1][1] = _mm_xor_epi64(
+                    state[1][1], _mm_lddqu_si128(((const __m128i*)&pSrc[7])));
         }
         // Loading data
 
@@ -301,6 +190,8 @@ namespace alcp::digest { namespace zen4 {
             for (Uint64 i = 0; i < cRegs; i++) {
                 temp[0][i] = _mm_ternarylogic_epi64(
                     state[0][i], state[1][i], state[2][i], 0x96);
+            }
+            for (Uint64 i = 0; i < cRegs; i++) {
                 temp[0][i] = _mm_ternarylogic_epi64(
                     temp[0][i], state[3][i], state[4][i], 0x96);
             }
@@ -336,9 +227,14 @@ namespace alcp::digest { namespace zen4 {
 
             /////////////////////////////// RHO even
             for (Uint64 i = 0; i < cDim; i++) {
-                for (Uint64 j = 0; j < cRegs; j++) {
-                    state[i][j] = _mm_rolv_epi64(state[i][j], cRotate0[i][j]);
-                }
+                state[i][0] = _mm_rolv_epi64(
+                    state[i][0],
+                    _mm_lddqu_si128((const __m128i*)&pRotationConstants[i][0]));
+                state[i][1] = _mm_rolv_epi64(
+                    state[i][1],
+                    _mm_lddqu_si128((const __m128i*)&pRotationConstants[i][2]));
+                state[i][2] = _mm_rolv_epi64(
+                    state[i][2], _mm_cvtsi64_si128(pRotationConstants[i][4]));
             }
             /////////////////////////////// RHO even
 
@@ -413,7 +309,8 @@ namespace alcp::digest { namespace zen4 {
             /////////////////////////////// CHI even
 
             /////////////////////////////// IOTA even
-            state[0][0] = _mm_xor_epi64(state[0][0], cRoundConstant[k * 2]);
+            state[0][0] = _mm_xor_epi64(
+                state[0][0], _mm_cvtsi64_si128(pRoundConstants[k * 2]));
             /////////////////////////////// IOTA even
 
             /////////////////////////////// HARMONIZE
@@ -492,6 +389,8 @@ namespace alcp::digest { namespace zen4 {
             for (Uint64 i = 0; i < cRegs; i++) {
                 temp[0][i] = _mm_ternarylogic_epi64(
                     state[0][i], state[1][i], state[2][i], 0x96);
+            }
+            for (Uint64 i = 0; i < cRegs; i++) {
                 temp[0][i] = _mm_ternarylogic_epi64(
                     temp[0][i], state[3][i], state[4][i], 0x96);
             }
@@ -527,9 +426,17 @@ namespace alcp::digest { namespace zen4 {
 
             /////////////////////////////// RHO odd round
             for (Uint64 i = 0; i < cDim; i++) {
-                for (Uint64 j = 0; j < cRegs; j++) {
-                    state[i][j] = _mm_rolv_epi64(state[i][j], cRotate1[i][j]);
-                }
+                state[i][0] = _mm_rolv_epi64(
+                    state[i][0],
+                    _mm_lddqu_si128(
+                        (const __m128i*)&pRotationConstantsHarmonize[i][0]));
+                state[i][1] = _mm_rolv_epi64(
+                    state[i][1],
+                    _mm_lddqu_si128(
+                        (const __m128i*)&pRotationConstantsHarmonize[i][2]));
+                state[i][2] = _mm_rolv_epi64(
+                    state[i][2],
+                    _mm_cvtsi64_si128(pRotationConstantsHarmonize[i][4]));
             }
             /////////////////////////////// RHO odd round
 
@@ -540,7 +447,8 @@ namespace alcp::digest { namespace zen4 {
             // Permute Idx for operand 2 : 1, 2, 3, 4, 0
             // Permute Idx for operand 3 : 2, 3, 4, 0, 1
             state[0][0] = _mm_ternarylogic_epi64(
-                _mm_xor_epi64(state[0][0], cRoundConstant[k * 2 + 1]),
+                _mm_xor_epi64(state[0][0],
+                              _mm_cvtsi64_si128(pRoundConstants[k * 2 + 1])),
                 _mm_mask_shuffle_epi32(
                     temp[0][1], 0x3, state[0][0], _MM_PERM_AADC),
                 state[0][1],
@@ -664,29 +572,39 @@ namespace alcp::digest { namespace zen4 {
         // Storing data
     }
 
-    alc_error_t Sha3Update(Uint64* state,
-                           Uint64* pSrc,
-                           Uint64  msg_size,
-                           Uint64  chunk_size)
+    alc_error_t Sha3Update(Uint64*       state,
+                           Uint64*       pSrc,
+                           Uint64        msg_size,
+                           Uint64        chunk_size,
+                           const Uint64* pRoundConstants,
+                           const Uint64 (*pRotationConstants)[5],
+                           const Uint64 (*pRotationConstantsHarmonize)[5])
     {
 
         Uint32 num_chunks     = msg_size / chunk_size;
         Uint64 chunk_size_u64 = chunk_size / 8;
 
         for (Uint32 i = 0; i < num_chunks; i++) {
-            fFunction(
-                reinterpret_cast<Uint64(*)[cDim]>(state), pSrc, chunk_size_u64);
+            fFunction(reinterpret_cast<Uint64(*)[cDim]>(state),
+                      pSrc,
+                      chunk_size_u64,
+                      pRoundConstants,
+                      pRotationConstants,
+                      pRotationConstantsHarmonize);
             pSrc += chunk_size_u64;
         }
 
         return ALC_ERROR_NONE;
     }
 
-    void Sha3Finalize(Uint8*  state,
-                      Uint8*  hash,
-                      Uint64  hash_size,
-                      Uint64  chunk_size,
-                      Uint64& index)
+    void Sha3Finalize(Uint8*        state,
+                      Uint8*        hash,
+                      Uint64        hash_size,
+                      Uint64        chunk_size,
+                      Uint64&       index,
+                      const Uint64* pRoundConstants,
+                      const Uint64 (*pRotationConstants)[5],
+                      const Uint64 (*pRotationConstantsHarmonize)[5])
     {
         Uint64 rem = chunk_size - index;
 
@@ -701,7 +619,12 @@ namespace alcp::digest { namespace zen4 {
         index = 0;
 
         while (hash_size) {
-            fFunction(reinterpret_cast<Uint64(*)[cDim]>(state), nullptr, 0);
+            fFunction(reinterpret_cast<Uint64(*)[cDim]>(state),
+                      nullptr,
+                      0,
+                      pRoundConstants,
+                      pRotationConstants,
+                      pRotationConstantsHarmonize);
             if (hash_size <= chunk_size) {
                 CopyBlock(hash, state + index, hash_size);
                 index = (index + hash_size);

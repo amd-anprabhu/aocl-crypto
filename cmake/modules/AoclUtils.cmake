@@ -1,4 +1,4 @@
- # Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ # Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions are met:
@@ -32,7 +32,7 @@ IF(ENABLE_AOCL_UTILS)
 		MESSAGE(STATUS "AOCL_UTILS_INSTALL_DIR set, overriding fetch path")
 	ELSE(AOCL_UTILS_INSTALL_DIR)
         ExternalProject_Add(aoclutils
-            GIT_REPOSITORY git@github.com:amd/aocl-utils.git
+            GIT_REPOSITORY https://github.com/amd/aocl-utils.git
             GIT_TAG dev
             SOURCE_DIR "${CMAKE_BINARY_DIR}/external/src/aoclutils"
             BINARY_DIR "${EXTERNAL_INSTALL_LOCATION}/aoclutils"

@@ -75,7 +75,7 @@ endfunction(alcp_check_compiler_version)
 
 
 # Generic Warnings
-SET (ALCP_WARNINGS -Wall -Werror -Wno-gnu-zero-variadic-macro-arguments)
+SET (ALCP_WARNINGS -Wall -Werror -Wno-gnu-zero-variadic-macro-arguments -Wno-vla)
 function(alcp_get_cflags_warnings)
     set(ALCP_CFLAGS_WARNINGS ${ALCP_WARNINGS} CACHE INTERNAL "")
     set(ALCP_CFLAGS_WARNINGS ${ALCP_CFLAGS_WARNINGS} PARENT_SCOPE)
@@ -149,7 +149,6 @@ function(alcp_get_arch_cflags_zen3)
 endfunction(alcp_get_arch_cflags_zen3)
 
 # lib/arch/zen4 Compile Flags
-# FIXME: this function name has to change
 function(alcp_get_arch_cflags_zen4)
     set(ARCH_COMPILE_FLAGS
         -O3 -fPIC -march=znver3 -mavx -mavx2 -maes -mvaes -mpclmul -mavx512f -mavx512dq -mavx512ifma
@@ -261,7 +260,7 @@ function(alcp_add_coverage_flags)
         target_link_options(alcp_static PUBLIC ${ALCP_LFLAGS_COV_GCC})
     elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         # check if lcov is installed
-        find_program(LLVM_COV llvm-cov-14)
+        find_program(LLVM_COV llvm-cov)
         if (NOT LLVM_COV)
             message(FATAL_ERROR "llvm-cov installation not found, coverage build with AOCC/Clang will not work!")
         endif()

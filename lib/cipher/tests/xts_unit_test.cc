@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -270,14 +270,16 @@ TEST(XTS, valid_all_sizes_encrypt_decrypt_test)
             auto               dest    = std::make_unique<Uint8[]>(i);
             fillRandom(plainText);
 
-            err = xts->encrypt(&(plainText[0]), dest.get(), ct_size);
+            Uint64 outlen = 0;
+            err = xts->encrypt(&(plainText[0]), dest.get(), ct_size, &outlen);
             EXPECT_EQ(err, ALC_ERROR_NONE);
 
             std::vector<Uint8> pt(i, 0);
 
             err = xts->init(key, 256, iv, 16);
             EXPECT_EQ(err, ALC_ERROR_NONE);
-            err = xts->decrypt(dest.get(), &(pt[0]), ct_size);
+            Uint64 outlen2 = 0;
+            err = xts->decrypt(dest.get(), &(pt[0]), ct_size, &outlen2);
 
             EXPECT_TRUE(err == ALC_ERROR_NONE);
             EXPECT_EQ(plainText, pt);
@@ -294,7 +296,7 @@ TEST(XTS, encrypt_huge)
                       0x2c, 0x8a, 0xd6, 0xab, 0x91, 0x0d, 0x43, 0x68,
                       0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x61 };
     Uint8 iv[16]  = { 0x2c, 0x8a, 0xd6, 0xab, 0x91, 0x0d, 0x43, 0x68,
-                     0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x60 };
+                      0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x60 };
 
     std::vector<Uint8> plainText = {
         0xf4, 0x2f, 0xa5, 0x55, 0xea, 0x94, 0x71, 0x0a, 0x20, 0xab, 0x16, 0x4b,
@@ -360,8 +362,11 @@ TEST(XTS, encrypt_huge)
 
         std::vector<Uint8> output_buffer(plainText.size(), 0x0);
 
-        err = xts->encrypt(
-            &(plainText[0]), &(output_buffer[0]), output_buffer.size());
+        Uint64 outlen = 0;
+        err           = xts->encrypt(&(plainText[0]),
+                           &(output_buffer[0]),
+                           output_buffer.size(),
+                           &outlen);
 
         EXPECT_TRUE(err == ALC_ERROR_NONE);
 
@@ -378,7 +383,7 @@ TEST(XTS, decrypt_huge)
                       0x2c, 0x8a, 0xd6, 0xab, 0x91, 0x0d, 0x43, 0x68,
                       0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x61 };
     Uint8 iv[16]  = { 0x2c, 0x8a, 0xd6, 0xab, 0x91, 0x0d, 0x43, 0x68,
-                     0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x60 };
+                      0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x60 };
 
     std::vector<Uint8> plainText = {
         0xf4, 0x2f, 0xa5, 0x55, 0xea, 0x94, 0x71, 0x0a, 0x20, 0xab, 0x16, 0x4b,
@@ -435,8 +440,11 @@ TEST(XTS, decrypt_huge)
 
         EXPECT_TRUE(err == ALC_ERROR_NONE);
 
-        err = xts->decrypt(
-            &(cipherText[0]), &(output_buffer[0]), output_buffer.size());
+        Uint64 outlen = 0;
+        err           = xts->decrypt(&(cipherText[0]),
+                           &(output_buffer[0]),
+                           output_buffer.size(),
+                           &outlen);
 
         EXPECT_TRUE(err == ALC_ERROR_NONE);
 
@@ -454,7 +462,7 @@ TEST(XTS, encrypt_huge_multi_update)
                       0x2c, 0x8a, 0xd6, 0xab, 0x91, 0x0d, 0x43, 0x68,
                       0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x61 };
     Uint8 iv[16]  = { 0x2c, 0x8a, 0xd6, 0xab, 0x91, 0x0d, 0x43, 0x68,
-                     0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x60 };
+                      0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x60 };
 
     std::vector<Uint8> plainText = {
         0xf4, 0x2f, 0xa5, 0x55, 0xea, 0x94, 0x71, 0x0a, 0x20, 0xab, 0x16, 0x4b,
@@ -525,7 +533,8 @@ TEST(XTS, encrypt_huge_multi_update)
                 multi_update_size = plainText.size();
             }
             while (multi_update_size > 0) {
-                err = xts->encrypt(curr_pt, curr_ot, 16);
+                Uint64 outlen = 0;
+                err           = xts->encrypt(curr_pt, curr_ot, 16, &outlen);
 
                 EXPECT_FALSE(alcp_is_error(err));
                 multi_update_size -= 16;
@@ -534,7 +543,9 @@ TEST(XTS, encrypt_huge_multi_update)
             }
             // Last 2 blocks if available
             if (extra_update_size) {
-                err = xts->encrypt(curr_pt, curr_ot, extra_update_size);
+                Uint64 outlen = 0;
+                err =
+                    xts->encrypt(curr_pt, curr_ot, extra_update_size, &outlen);
 
                 EXPECT_FALSE(alcp_is_error(err));
             }
@@ -562,7 +573,7 @@ TEST(XTS, encrypt_huge_multi_update_serial)
                       0x2c, 0x8a, 0xd6, 0xab, 0x91, 0x0d, 0x43, 0x68,
                       0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x61 };
     Uint8 iv[16]  = { 0x2c, 0x8a, 0xd6, 0xab, 0x91, 0x0d, 0x43, 0x68,
-                     0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x60 };
+                      0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x60 };
 
     std::vector<Uint8> plainText = {
         0xf4, 0x2f, 0xa5, 0x55, 0xea, 0x94, 0x71, 0x0a, 0x20, 0xab, 0x16, 0x4b,
@@ -703,7 +714,7 @@ TEST(XTS, encrypt_huge_multi_update_arbitrary)
                       0x2c, 0x8a, 0xd6, 0xab, 0x91, 0x0d, 0x43, 0x68,
                       0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x61 };
     Uint8 iv[16]  = { 0x2c, 0x8a, 0xd6, 0xab, 0x91, 0x0d, 0x43, 0x68,
-                     0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x60 };
+                      0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x60 };
 
     std::vector<Uint8> plainText = {
         0xf4, 0x2f, 0xa5, 0x55, 0xea, 0x94, 0x71, 0x0a, 0x20, 0xab, 0x16, 0x4b,
@@ -825,7 +836,7 @@ TEST(XTS, decrypt_huge_multi_update)
                       0x2c, 0x8a, 0xd6, 0xab, 0x91, 0x0d, 0x43, 0x68,
                       0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x61 };
     Uint8 iv[16]  = { 0x2c, 0x8a, 0xd6, 0xab, 0x91, 0x0d, 0x43, 0x68,
-                     0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x60 };
+                      0xd7, 0x81, 0xb7, 0x52, 0x4b, 0x45, 0x8c, 0x60 };
 
     std::vector<Uint8> plainText = {
         0xf4, 0x2f, 0xa5, 0x55, 0xea, 0x94, 0x71, 0x0a, 0x20, 0xab, 0x16, 0x4b,
@@ -914,7 +925,6 @@ TEST(XTS, decrypt_huge_multi_update)
     }
 }
 
-// FIXME: Need to bring back this testing
 #if 1
 
 using namespace alcp::cipher;
@@ -959,18 +969,18 @@ class XTS_KAT
     {
         // Tuple order
         // {key,nonce,aad,plain,ciphertext,tag}
-        const auto params                                      = GetParam();
+        const auto& params                                     = GetParam();
         const auto [key, tweak_key, iv, plaintext, ciphertext] = params.second;
-        const auto test_name                                   = params.first;
+        const auto& test_name                                  = params.first;
 
         // Copy Values to class variables
         m_key        = key;
         m_key_size   = key.size();
-        m_tweak      = tweak_key;
-        m_iv         = iv;
-        m_plaintext  = plaintext;
-        m_ciphertext = ciphertext;
-        m_test_name  = test_name;
+        m_tweak      = std::move(tweak_key);
+        m_iv         = std::move(iv);
+        m_plaintext  = std::move(plaintext);
+        m_ciphertext = std::move(ciphertext);
+        m_test_name  = std::move(test_name);
 
         // Insert Tweak Key into key
         m_key.insert(m_key.end(), m_tweak.begin(), m_tweak.end());
@@ -989,9 +999,8 @@ INSTANTIATE_TEST_SUITE_P(
     KnownAnswerTest,
     XTS_KAT,
     testing::ValuesIn(KATDataset),
-    [](const testing::TestParamInfo<XTS_KAT::ParamType>& info) {
-        return info.param.first;
-    });
+    [](const testing::TestParamInfo<XTS_KAT::ParamType>& tpInfo)
+        -> const std::string { return tpInfo.param.first; });
 
 TEST_P(XTS_KAT, valid_encrypt_request)
 {
@@ -999,8 +1008,9 @@ TEST_P(XTS_KAT, valid_encrypt_request)
 
     pXtsObj->init(m_key.data(), m_key_size * 8, m_iv.data(), m_iv.size());
 
-    alc_error_t err = pXtsObj->encrypt(
-        &(m_plaintext.at(0)), &(out.at(0)), m_plaintext.size());
+    Uint64      outlen = 0;
+    alc_error_t err    = pXtsObj->encrypt(
+        &(m_plaintext.at(0)), &(out.at(0)), m_plaintext.size(), &outlen);
 
     EXPECT_EQ(err, ALC_ERROR_NONE);
     EXPECT_EQ(out, m_ciphertext);
@@ -1014,8 +1024,9 @@ TEST_P(XTS_KAT, valid_decrypt_request)
 
     pXtsObj->init(m_key.data(), m_key_size * 8, m_iv.data(), m_iv.size());
 
-    alc_error_t err = pXtsObj->decrypt(
-        &(m_ciphertext.at(0)), &(out.at(0)), m_plaintext.size());
+    Uint64      outlen = 0;
+    alc_error_t err    = pXtsObj->decrypt(
+        &(m_ciphertext.at(0)), &(out.at(0)), m_plaintext.size(), &outlen);
 
     EXPECT_EQ(err, ALC_ERROR_NONE);
     EXPECT_EQ(out, m_plaintext);
@@ -1026,12 +1037,15 @@ TEST_P(XTS_KAT, valid_encrypt_decrypt_test)
     pXtsObj->init(m_key.data(), m_key_size * 8, m_iv.data(), m_iv.size());
     std::vector<Uint8> outct(m_ciphertext.size()), outpt(m_plaintext.size());
 
-    alc_error_t err = pXtsObj->encrypt(
-        &(m_plaintext.at(0)), &(outct.at(0)), m_plaintext.size());
+    Uint64      outlen = 0;
+    alc_error_t err    = pXtsObj->encrypt(
+        &(m_plaintext.at(0)), &(outct.at(0)), m_plaintext.size(), &outlen);
 
     pXtsObj->init(m_key.data(), m_key_size * 8, m_iv.data(), m_iv.size());
 
-    err = pXtsObj->decrypt(&(outct.at(0)), &(outpt.at(0)), m_plaintext.size());
+    Uint64 outlen2 = 0;
+    err            = pXtsObj->decrypt(
+        &(outct.at(0)), &(outpt.at(0)), m_plaintext.size(), &outlen2);
 
     EXPECT_TRUE(err == ALC_ERROR_NONE);
     EXPECT_EQ(m_plaintext, outpt);

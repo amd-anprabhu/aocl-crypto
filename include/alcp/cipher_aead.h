@@ -51,7 +51,7 @@ EXTERN_C_BEGIN
  * identify the memory to be allocated for context </b>
  * @endparblock
  *
- * @return      Size of Context
+ * @return      Size of context in bytes
  */
 ALCP_API_EXPORT Uint64
 alcp_cipher_aead_context_size(void);
@@ -92,7 +92,7 @@ alcp_cipher_aead_request(const alc_cipher_mode_t cipherMode,
  * @endparblock
  * @note     Error needs to be checked for each call,
  *           valid only if @ref alcp_is_error (ret) is false
- * @param [in]    cipherMode       AEAD cipher mode to be set
+ * @param [in]    mode       AEAD cipher mode to be set
  * @param [in]    keyLen           key length in bits
  * @param [in]    pCipherState           pointer to the state of the cipher
  * holding expanded and precomputed keys
@@ -119,7 +119,7 @@ alcp_cipher_aead_request_with_extState(const alc_cipher_mode_t mode,
  * @param[in] pKey  Key
  * @param[in] keyLen  key Length in bits
  * @param[in] pIv  IV/Nonce
- * @param[in] ivLen  iv Length in bits
+ * @param[in] ivLen  IV length in bytes
  * @return   &nbsp; Error Code for the API called. If alc_error_t
  * is not ALC_ERROR_NONE then an error has occurred and handle will be invalid
  * for future operations
@@ -145,6 +145,7 @@ alcp_cipher_aead_init(const alc_cipher_handle_p pCipherHandle,
  * @param[in]    pInput    Pointer to plainText
  * @param[out]   pOutput   Pointer to cipherText
  * @param[in]    len       Length of plainText/cipherText
+ * @param[out]   outlen    Pointer to store actual bytes written to pOutput
  * @return   &nbsp; Error Code for the API called. If alc_error_t
  * is not ALC_ERROR_NONE then an error has occurred and handle will be invalid
  * for future operations
@@ -153,7 +154,8 @@ ALCP_API_EXPORT alc_error_t
 alcp_cipher_aead_encrypt(const alc_cipher_handle_p pCipherHandle,
                          const Uint8*              pInput,
                          Uint8*                    pOutput,
-                         Uint64                    len);
+                         Uint64                    len,
+                         Uint64*                   outlen);
 
 /**
  * @brief    AEAD decryption of cipher text and write it to plain text with
@@ -169,6 +171,7 @@ alcp_cipher_aead_encrypt(const alc_cipher_handle_p pCipherHandle,
  * @param[in]    pInput    Pointer to CipherText
  * @param[out]   pOutput   Pointer to PlainText
  * @param[in]    len       Length of PlainText/CipherText
+ * @param[out]   outlen    Pointer to store actual bytes written to pOutput
  * @return   &nbsp; Error Code for the API called. If alc_error_t
  * is not ALC_ERROR_NONE then an error has occurred and handle will be invalid
  * for future operations
@@ -177,16 +180,17 @@ ALCP_API_EXPORT alc_error_t
 alcp_cipher_aead_decrypt(const alc_cipher_handle_p pCipherHandle,
                          const Uint8*              pInput,
                          Uint8*                    pOutput,
-                         Uint64                    len);
+                         Uint64                    len,
+                         Uint64*                   outlen);
 
 /**
- * @brief AEAD set Additonal Data for the Tag Generation.
+ * @brief AEAD set Additional Data for the Tag generation.
  * @parblock <br> &nbsp;
  * <b>This AEAD API can be called after @ref alcp_cipher_aead_init.</b>
  *
  * @endparblock
  * @param[in] pCipherHandle Session handle for encrypt/decrypt operation
- * @param[in] pInput    Additional Data in Bytes
+ * @param[in] pInput    Additional Data in bytes
  * @param[in] len       Length in bytes of Additional Data
  * @return   &nbsp; Error Code for the API called. If @ref alc_error_t
  * is not ALC_ERROR_NONE, then an error has occurred and handle will be invalid
@@ -201,14 +205,16 @@ alcp_cipher_aead_set_aad(const alc_cipher_handle_p pCipherHandle,
  * @brief AEAD get a copy of Tag generated.
  * @parblock <br> &nbsp;
  * <b>This AEAD API can be called after @ref alcp_cipher_aead_request and
- * before @ref alcp_cipher_aead_finish </b>
+ * before @ref alcp_cipher_aead_finish. During encrypt, this API copies the
+ * generated tag to the provided buffer, and during decryption, it retrieves the
+ * internally calculated tag and compares it with the provided buffer.</b>
  * @endparblock
  * @param[in] pCipherHandle Session handle for encrypt/decrypt operation
  * @param[out] pOutput  Byte addressable memory to write tag into
  * @param[in] tagLen    Length of Tag in bytes
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE then an error has occurred and handle will be invalid
- * for future operations
+ * @return   &nbsp; Returns ALC_ERROR_NONE on success, ALC_ERROR_TAG_MISMATCH if
+ * the tag generated during encryption does not match the tag provided during
+ * decryption, or other error codes if an error has occurred.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_cipher_aead_get_tag(const alc_cipher_handle_p pCipherHandle,

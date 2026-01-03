@@ -102,7 +102,7 @@ built or running.
     - CMake (3.26 or later)
     - GCC (11.0 or later)
     - Git (2.30.2 or later)
-    - OpenSSL ( 3.0.8 or later )
+    - OpenSSL ( 3.1.3 or later )
     - Make ( 4.0 or later )
     - 7zip ( 15.0 or later )
   - Optional Dependancies
@@ -330,6 +330,12 @@ typedef enum _alc_error_generic
      * Mismatch is tag observed in Decrypt
      */
     ALC_ERROR_TAG_MISMATCH,
+
+    /*
+     * Algorithm is implimented for specific hardware only
+     * and no fallback implementaion is available
+     */
+    ALC_ERROR_NO_FALLBACK,
 
 } alc_error_generic_t;
 ```

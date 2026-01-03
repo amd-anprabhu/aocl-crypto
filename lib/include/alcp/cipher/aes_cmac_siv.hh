@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -44,9 +44,8 @@
 using Cmac = alcp::mac::Cmac;
 #define SIZE_CMAC 128 / 8
 namespace alcp::cipher {
-
+// cpuid namespace
 using utils::CpuId;
-
 class ALCP_API_EXPORT Siv
     : public Aes
     , public virtual iCipher
@@ -129,11 +128,38 @@ class SivT
   public:
     alc_error_t encrypt(const Uint8* pInput,
                         Uint8*       pOutput,
-                        Uint64       len) override;
+                        Uint64       len,
+                        Uint64*      outlen) override;
     alc_error_t decrypt(const Uint8* pCipherText,
                         Uint8*       pPlainText,
-                        Uint64       len) override;
+                        Uint64       len,
+                        Uint64*      outlen) override;
     alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
+    alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+    alc_error_t flush(const Uint8** pPlainText,
+                      Uint64        numBuffers,
+                      Uint64        len) override
+    {
+        return ctrobj->flush(pPlainText, numBuffers, len);
+    }
+
+    alc_error_t dequeue(Uint8** pCipherText,
+                        Uint64  numBuffers,
+                        Uint64  len) override
+    {
+        return ctrobj->dequeue(pCipherText, numBuffers, len);
+    }
+    alc_error_t multibufferInit(const Uint8*  pKey,
+                                Uint64        keyLen,
+                                const Uint8** pIv,
+                                Uint64        ivLen,
+                                Uint64        numBuffers) override
+    {
+        return ctrobj->multibufferInit(pKey, keyLen, pIv, ivLen, numBuffers);
+    }
 };
 
 } // namespace alcp::cipher

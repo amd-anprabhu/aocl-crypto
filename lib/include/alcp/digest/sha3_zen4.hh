@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -31,13 +31,19 @@
 #include "alcp/error.h"
 
 namespace alcp::digest { namespace zen4 {
-    alc_error_t Sha3Update(Uint64* pState,
-                           Uint64* pSrc,
-                           Uint64  msg_size,
-                           Uint64  chunk_size);
-    void        Sha3Finalize(Uint8*  state,
-                             Uint8*  hash,
-                             Uint64  hash_size,
-                             Uint64  chunk_size,
-                             Uint64& index);
+    alc_error_t Sha3Update(Uint64*       pState,
+                           Uint64*       pSrc,
+                           Uint64        msg_size,
+                           Uint64        chunk_size,
+                           const Uint64* pRoundConstants,
+                           const Uint64 (*pRotationConstants)[5],
+                           const Uint64 (*pRotationConstantsHarmonize)[5]);
+    void        Sha3Finalize(Uint8*        state,
+                             Uint8*        hash,
+                             Uint64        hash_size,
+                             Uint64        chunk_size,
+                             Uint64&       index,
+                             const Uint64* pRoundConstants,
+                             const Uint64 (*pRotationConstants)[5],
+                             const Uint64 (*pRotationConstantsHarmonize)[5]);
 }} // namespace alcp::digest::zen4

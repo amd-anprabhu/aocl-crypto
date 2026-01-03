@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2021-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -134,6 +134,12 @@ typedef enum _alc_error_generic
      * Mismatch is tag observed in Decrypt
      */
     ALC_ERROR_TAG_MISMATCH,
+
+    /*
+     * Algorithm is implimented for specific hardware only
+     * and no fallback implementaion is available
+     */
+    ALC_ERROR_NO_FALLBACK,
 
 } alc_error_generic_t;
 

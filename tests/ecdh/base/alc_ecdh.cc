@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -36,7 +36,8 @@ namespace alcp::testing {
 
 AlcpEcdhBase::AlcpEcdhBase(const alc_ec_info_t& info)
     : m_info{ info }
-{}
+{
+}
 
 bool
 AlcpEcdhBase::init(const alc_ec_info_t& info)
@@ -93,7 +94,6 @@ AlcpEcdhBase::SetPrivateKey(Uint8 private_key[], Uint64 len)
 {
     alc_error_t err = ALC_ERROR_NONE;
     if (m_info.ecCurveId == ALCP_EC_CURVE25519) {
-        // FIXME: Implement
         // FIXME: SetPrivKey method missing of X25519 ECC Curve
         std::cout << "Method Not implemented" << std::endl;
     } else {

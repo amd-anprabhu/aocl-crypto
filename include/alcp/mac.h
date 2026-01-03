@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2021-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -60,7 +60,7 @@ typedef enum _alc_mac_type
 /**
  * @brief Stores details of HMAC
  *
- * @param  digest_mode Store info of digest used for HMAC
+ * @param  digest_mode Digest algorithm used for HMAC
  *
  * @struct alc_hmac_info_t
  *
@@ -81,11 +81,10 @@ typedef struct _alc_hmac_info
  * @struct alc_cmac_info_t
  *
  */
-// TODO: Do we need type and mode since only one mode is supported ? Currently
-// its used to validate.
+// NOTE: Mode is currently used for validation, only AES-based CMAC is supported.
 typedef struct _alc_cmac_info
 {
-    alc_cipher_mode_t ci_mode; /*! Mode: ALC_AES_MODE_CTR etc */
+    alc_cipher_mode_t ci_mode; /*! Cipher mode (ALC_AES_MODE_CBC) */
     // Other specific info about CMAC
 } alc_cmac_info_t, *alc_cmac_info_p;
 
@@ -125,24 +124,23 @@ typedef struct alc_mac_handle
  *              pMacInfo
  *
  * @parblock <br> &nbsp;
- * <b>This API can be called before @ref alcp_mac_request to identify the memory
- * to be allocated for context </b>
+ * <b>This API should be called before @ref alcp_mac_request to identify the
+ * memory to be allocated for the context.</b>
  * @endparblock
  *
- * @return      Size of Context
+ * @return      Size of context in bytes
  */
 ALCP_API_EXPORT Uint64
 alcp_mac_context_size(void);
 
 /**
- * @brief    Allows caller to request for a MAC as described by
- *           macType
+ * @brief    Request a MAC handle for the specified MAC type
  * @parblock <br> &nbsp;
  * <b>This API must be called before making any other API call</b>
  * @endparblock
  * @note     Error needs to be checked after each call,
  *           valid only if @ref alcp_is_error (ret) is false
- * @param  [in]  macType     Description of the MAC session
+ * @param  [in]  macType     MAC type to use
  * @param [out]  pMacHandle  Library populated session handle for future
  * mac operations.
  * @return   &nbsp; Error Code for the API called. If alc_error_t
@@ -153,16 +151,16 @@ ALCP_API_EXPORT alc_error_t
 alcp_mac_request(alc_mac_handle_p pMacHandle, alc_mac_type_t macType);
 
 /**
- * @brief    Allows caller to set key and initialize hmac session
+ * @brief    Set key and initialize MAC session
  * @parblock <br> &nbsp;
  * <b>This API must be called only after @ref alcp_mac_request</b>
  * @endparblock
  * @note     Error needs to be checked after each call,
  *           valid only if @ref alcp_is_error (ret) is false
- * @param [in]   pMacHandle Library populated session handle for future
- * @param [in]   key  pointer to key for mac operations.
- * @param [in]   size size of key.
- * @param [in] info Macinfo populated based on the type of the MAC
+ * @param [in]   pMacHandle Session handle for MAC operations
+ * @param [in]   key  Pointer to key for MAC operations
+ * @param [in]   size Size of key in bytes
+ * @param [in]   info MAC info populated based on the selected MAC type
 
  * @return   &nbsp; Error Code for the API called. If alc_error_t
  * is not ALC_ERROR_NONE then, an error has occurred and handle will be invalid
@@ -175,7 +173,7 @@ alcp_mac_init(alc_mac_handle_p pMacHandle,
               alc_mac_info_t*  info);
 
 /**
- * @brief    Allows caller to update MAC with chunk of data to be authenticated
+ * @brief    Update MAC with a chunk of data to be authenticated
  * @parblock <br> &nbsp;
  * <b>This API is called to update data to be authenticated. So should be called
  * after @ref alcp_mac_request  and before the end of session call, @ref
@@ -183,19 +181,18 @@ alcp_mac_init(alc_mac_handle_p pMacHandle,
  * @endparblock
  * @note     Error needs to be checked for each call,
  *           valid only if @ref alcp_is_error (ret) is false
- * @param [in]   pMacHandle  Session handle for future MAC
- *                         operation
+ * @param [in]   pMacHandle  Session handle for MAC operation
  * @param [in]   buff       The chunk of the message to be updated
  * @param [in]   size       Length of input buffer in bytes
  * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE then, an error has occurred and handle will be invalid
+ * is not ALC_ERROR_NONE then an error has occurred and handle will be invalid
  * for future operations
  */
 ALCP_API_EXPORT alc_error_t
 alcp_mac_update(alc_mac_handle_p pMacHandle, const Uint8* buff, Uint64 size);
 
 /**
- * @brief               Allows caller to finalize and copy final MAC
+ * @brief               Finalize the MAC and copy the result
  * @parblock <br> &nbsp;
  * <b>This API is called to finalize mac so should be called after @ref
  * alcp_mac_init and before @ref alcp_mac_finish</b>
@@ -204,12 +201,11 @@ alcp_mac_update(alc_mac_handle_p pMacHandle, const Uint8* buff, Uint64 size);
  *                      - Error needs to be checked for each call,
  *                        valid only if @ref alcp_is_error (ret) is false.
  *
- * @param [in]   pMacHandle  Session handle for future MAC
- *                       operation
- * @param [in]   buff        The buffer holding mac
- * @param [in]   size        mac size in bytes.
+ * @param [in]   pMacHandle  Session handle for MAC operation
+ * @param [in]   buff        Output buffer for the MAC
+ * @param [in]   size        MAC size in bytes
  * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE then, an error has occurred and handle will be invalid
+ * is not ALC_ERROR_NONE then an error has occurred and handle will be invalid
  * for future operations
  */
 ALCP_API_EXPORT alc_error_t
@@ -217,14 +213,14 @@ alcp_mac_finalize(alc_mac_handle_p pMacHandle, Uint8* buff, Uint64 size);
 
 /**
  *
- * @brief               Free resources that was allotted by @ref
+ * @brief               Free resources that were allocated by @ref
  *                      alcp_mac_request
  * @parblock <br> &nbsp;
  * <b>This API is called to free resources so should be called to free the
  * session</b>
  * @endparblock
- * @note                alcp_mac_request() should be called first to allocate
- *                      the Handler.
+ * @note                alcp_mac_request() must be called before to allocate
+ *                      the handle.
  *
  * @param [in]   pMacHandle Session handle used for the MAC operations
  * @return   &nbsp; Error Code for the API called. If alc_error_t
@@ -236,13 +232,13 @@ alcp_mac_finish(alc_mac_handle_p pMacHandle);
 
 /**
  *
- * @brief               resets the data given to it during @ref alcp_mac_update
+ * @brief               Reset the data given during @ref alcp_mac_update
  * or @ref alcp_mac_finalize
  * @parblock <br> &nbsp;
  * <b>This API is called to reset data so should be called after @ref
  * alcp_mac_request  and before @ref alcp_mac_finish</b>
  * @endparblock
- * @param [in]   pMacHandle Session handle for future MAC operation
+ * @param [in]   pMacHandle Session handle for MAC operation
  * @return   &nbsp; Error Code for the API called. If alc_error_t
  * is not ALC_ERROR_NONE, an error has occurred and handle will be invalid for
  * future operations
@@ -251,7 +247,7 @@ ALCP_API_EXPORT alc_error_t
 alcp_mac_reset(alc_mac_handle_p pMacHandle);
 
 /**
- * @brief        copies the context from source to destination
+ * @brief        Copy the context from source to destination
  *
  * @parblock <br> &nbsp;
  * <b>This API can be called only after @ref alcp_mac_init and before @ref
@@ -269,7 +265,7 @@ alcp_mac_context_copy(const alc_mac_handle_p pSrcHandle,
 
 EXTERN_C_END
 
-#endif /* _ALCP_CIPHER_H_ */
+#endif /* _ALCP_MAC_H_ */
        /**
         * @}
         */
