@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -492,36 +492,25 @@ alcp_prov_rsa_verify_recover(void*                vprsactx,
                              const unsigned char* sig,
                              size_t               siglen)
 {
-    alc_error_t       err     = ALC_ERROR_NONE;
     alc_prov_rsa_ctx* prsactx = (alc_prov_rsa_ctx*)vprsactx;
     ENTER();
 
-    if (rout == NULL) {
-        *routlen = prsactx->rsa_size;
-        EXIT();
-        return 1;
+    // Delegate to default provider (AOCL doesn't implement verify-recover)
+    typedef int (*fun_ptr)(void*                vprsactx,
+                           unsigned char*       rout,
+                           size_t*              routlen,
+                           size_t               routsize,
+                           const unsigned char* sig,
+                           size_t               siglen);
+    fun_ptr fun =
+        (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_VERIFY_RECOVER);
+
+    if (!fun) {
+        return 0;
     }
 
-    if (prsactx->ossl_rsa_ctx->mdname[0] != '\0') {
-        if (prsactx->ossl_rsa_ctx->pad_mode == RSA_PKCS1_PADDING) {
-            // ToDo : Implement the recover operation
-            ERR_raise(ERR_LIB_PROV, ERR_R_RSA_LIB);
-        } else {
-            ERR_raise_data(ERR_LIB_PROV,
-                           PROV_R_INVALID_PADDING_MODE,
-                           "Only PKCS#1 v1.5 padding allowed");
-        }
-        return 0;
-    } else {
-        err = alcp_rsa_publickey_encrypt(&prsactx->handle, sig, siglen, rout);
-        if (err != ALC_ERROR_NONE) {
-            ERR_raise(ERR_LIB_PROV, ERR_R_RSA_LIB);
-            return 0;
-        }
-    }
-    *routlen = siglen;
     EXIT();
-    return 1;
+    return fun(prsactx->ossl_rsa_ctx, rout, routlen, routsize, sig, siglen);
 }
 
 static int
