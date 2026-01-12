@@ -158,8 +158,8 @@ alcp_cipher_encrypt(const alc_cipher_handle_p pCipherHandle,
 alc_error_t
 alcp_flush(const alc_cipher_handle_p pCipherHandle,
            const Uint8**             pPlainText,
-           Uint64                    numBuffers,
-           Uint64                    len)
+                   const Uint64*             pLengths,
+                   Uint64                    numBuffers)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG);
@@ -167,6 +167,7 @@ alcp_flush(const alc_cipher_handle_p pCipherHandle,
 
     ALCP_BAD_PTR_ERR_RET(pCipherHandle);
     ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(pLengths);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
@@ -174,14 +175,14 @@ alcp_flush(const alc_cipher_handle_p pCipherHandle,
     }
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
     auto i = static_cast<iCipher*>(ctx->m_cipher);
-    return i->flush(pPlainText, numBuffers, len);
+    return i->flush(pPlainText, pLengths, numBuffers);
 }
 
 alc_error_t
 alcp_dequeue(const alc_cipher_handle_p pCipherHandle,
-             Uint8**                   pCipherText,
-             Uint64                    numBuffers,
-             Uint64                    len)
+                     Uint8**                   pCipherText,
+                     Uint64                    numBuffers,
+                     const Uint64*             pLengths)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG);
@@ -190,7 +191,7 @@ alcp_dequeue(const alc_cipher_handle_p pCipherHandle,
     ALCP_BAD_PTR_ERR_RET(pCipherHandle);
     ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
     ALCP_BAD_PTR_ERR_RET(pCipherText);
-    ALCP_ZERO_LEN_ERR_RET(len);
+    ALCP_BAD_PTR_ERR_RET(pLengths);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
     if (ctx->destructed == 1) {
@@ -199,7 +200,7 @@ alcp_dequeue(const alc_cipher_handle_p pCipherHandle,
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
 
     auto i = static_cast<iCipher*>(ctx->m_cipher);
-    return i->dequeue(pCipherText, numBuffers, len);
+    return i->dequeue(pCipherText, numBuffers, pLengths);
 }
 
 alc_error_t

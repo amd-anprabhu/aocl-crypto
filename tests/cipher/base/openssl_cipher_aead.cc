@@ -782,20 +782,20 @@ OpenSSLCipherAeadBase::context_copy()
 
 bool
 OpenSSLCipherAeadBase::flush(const Uint8** pPlainText,
-                             Uint64        numBuffers,
-                             Uint64        len)
+                             const Uint64* pLengths,
+                             Uint64        numBuffers)
 {
-    // Default implementation - return success
-    return true;
+    // OpenSSL AEAD doesn't support multi-buffer operations
+    return false;
 }
 
 bool
 OpenSSLCipherAeadBase::dequeue(Uint8** pCipherText,
                                Uint64  numBuffers,
-                               Uint64  len)
+                               const Uint64* pLengths)
 {
-    // Default implementation - return success
-    return true;
+    // OpenSSL AEAD doesn't support multi-buffer operations
+    return false;
 }
 bool
 OpenSSLCipherAeadBase::multibufferInit(const Uint8*  pKey,

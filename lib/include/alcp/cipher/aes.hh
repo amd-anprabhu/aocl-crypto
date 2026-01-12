@@ -84,6 +84,7 @@ class Aes : public Rijndael
     const Uint8**                      m_pData_aes               = nullptr;
     Uint8  m_Ivs_aes[MAX_CIPHER_BUFFER_SIZE][MAX_CIPHER_IV_SIZE] = {};
     Uint8* m_pIvs_aes                                            = m_Ivs_aes[0];
+    Uint64                             m_bufferLengths_aes[MAX_CIPHER_BUFFER_SIZE] = {};
 
     // Partial block buffering for outlen support
     __attribute__((aligned(16))) Uint8 m_partial_block[16] = {};
@@ -144,15 +145,26 @@ class Aes : public Rijndael
         m_nrounds                   = getRounds();
     }
 
-    virtual alc_error_t flush(const Uint8** pPlainText,
-                              Uint64        numBuffers,
-                              Uint64        len)
+    /**
+     * @brief Multi-buffer flush API (variable-length)
+     * Default implementation returns NOT_SUPPORTED.
+     * Override in derived classes that support multi-buffer operations.
+     */
+    virtual alc_error_t flush(const Uint8**  pPlainText,
+                              const Uint64*  pLengths,
+                              Uint64         numBuffers)
     {
         return ALC_ERROR_NOT_SUPPORTED;
     }
-    virtual alc_error_t dequeue(Uint8** pCipherText,
-                                Uint64  numBuffers,
-                                Uint64  len)
+
+    /**
+     * @brief Multi-buffer dequeue API (variable-length)
+     * Default implementation returns NOT_SUPPORTED.
+     * Override in derived classes that support multi-buffer operations.
+     */
+    virtual alc_error_t dequeue(Uint8**       pCipherText,
+                                Uint64        numBuffers,
+                                const Uint64* pLengths)
     {
         return ALC_ERROR_NOT_SUPPORTED;
     }

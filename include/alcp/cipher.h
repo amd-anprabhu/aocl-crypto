@@ -280,46 +280,48 @@ alcp_cipher_context_copy(const alc_cipher_handle_p src,
  * @brief Submit multiple plaintext buffers for encryption (multi-buffer API)
  *
  * @parblock <br> &nbsp;
- * <b>This API enqueues a batch of buffers for processing after a successful
- * @ref alcp_multibuffer_init call. The number of buffers and their lengths must
- * match the parameters provided during initialization.</b>
+ * <b>Enqueues a batch of buffers for parallel SIMD processing. Each buffer
+ * can have a different length. Call alcp_dequeue() to retrieve results.</b>
  * @endparblock
  *
  * @param[in] pCipherHandle Session handle for cipher operation
  * @param[in] pPlainText    Array of pointers to plaintext buffers
- * @param[in] numBuffers    Number of buffers in the batch
- * @param[in] len           Length of each buffer in bytes
+ * @param[in] pLengths      Array of per-buffer lengths in bytes
+ * @param[in] numBuffers    Number of buffers in the batch (max 127)
  * @return Error code:
  *         - ALC_ERROR_NONE          Success
+ *         - ALC_ERROR_INVALID_ARG   Invalid parameters
+ *         - ALC_ERROR_BAD_STATE     Cipher not initialized
  */
 ALCP_API_EXPORT alc_error_t
 alcp_flush(const alc_cipher_handle_p pCipherHandle,
-           const Uint8**             pPlainText,
-           Uint64                    numBuffers,
-           Uint64                    len);
+                   const Uint8**             pPlainText,
+                   const Uint64*             pLengths,
+                   Uint64                    numBuffers);
 
 /**
  * @brief Dequeue processed ciphertext buffers (multi-buffer API)
  *
  * @parblock <br> &nbsp;
- * <b>This API retrieves the outputs corresponding to the buffers submitted via
- * @ref alcp_flush. Each output buffer pointer must be pre-allocated by the
- * caller with space for the specified length.</b>
+ * <b>Retrieves encrypted outputs for buffers submitted via alcp_flush().
+ * Uses the Iterative MinLen algorithm for maximum SIMD parallelism.</b>
  * @endparblock
  *
  * @param[in]  pCipherHandle Session handle for cipher operation
  * @param[out] pCipherText   Array of pointers to ciphertext buffers (outputs)
  * @param[in]  numBuffers    Number of buffers to dequeue
- * @param[in]  len           Length of each buffer in bytes
+ * @param[in]  pLengths      Array of per-buffer lengths in bytes
  * @return Error code:
  *         - ALC_ERROR_NONE          Success
- *         - ALC_ERROR_BAD_STATE     Either src or dst is in an invalid state
+ *         - ALC_ERROR_BAD_STATE     Invalid state
+ *         - ALC_ERROR_NO_FALLBACK   AVX512 not available
  */
 ALCP_API_EXPORT alc_error_t
 alcp_dequeue(const alc_cipher_handle_p pCipherHandle,
-             Uint8**                   pCipherText,
-             Uint64                    numBuffers,
-             Uint64                    len);
+                     Uint8**                   pCipherText,
+                     Uint64                    numBuffers,
+                     const Uint64*             pLengths);
+
 EXTERN_C_END
 
 #endif /* _ALCP_CIPHER_H_ */

@@ -760,12 +760,15 @@ TEST(CBC, MultiBufferRandomTest)
         cbc->multibufferInit(
             key_256, 256, iv_vect.data(), iv_vect.size(), num_buffers);
 
+        // Create lengths array for uniform-length buffers
+        std::vector<Uint64> lengths(num_buffers, cTextSize);
+
         // Test flush and dequeue operations
         alc_error_t err =
-            cbc->flush(plain_text_vect.data(), num_buffers, cTextSize);
+            cbc->flush(plain_text_vect.data(), lengths.data(), num_buffers);
         EXPECT_FALSE(alcp_is_error(err));
 
-        err = cbc->dequeue(cipher_text_vect.data(), num_buffers, cTextSize);
+        err = cbc->dequeue(cipher_text_vect.data(), num_buffers, lengths.data());
         EXPECT_FALSE(alcp_is_error(err));
         // Verify the output
         std::vector<Uint8> plainText(cTextSize);

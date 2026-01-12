@@ -58,12 +58,6 @@ static constexpr Uint32 Chacha20Constants[4] = {
                         Uint64 pInputLen);                                     \
     alc_error_t decrypt(const Uint8 *pInput, Uint8 *pOutput,                   \
                         Uint64 pInputLen);                                     \
-    alc_error_t flush(const Uint8 *pPlainText, Uint64 numBuffers,              \
-                      Uint64 len) override {                                   \
-      return ALC_ERROR_NONE;                                                   \
-    }                                                                          \
-    alc_error_t dequeue(const Uint8 *pPlainText, Uint64 numBuffers,              \
-                        Uint64 len) override { return ALC_ERROR_NONE; }          \
   };
 
 class ALCP_API_EXPORT ChaCha20 : public virtual iCipher
@@ -94,8 +88,8 @@ class ALCP_API_EXPORT ChaCha20 : public virtual iCipher
                      const Uint64 keyLen,
                      const Uint8* pIv,
                      const Uint64 ivLen) override;
-    alc_error_t flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len) override { return ALC_ERROR_NOT_SUPPORTED; }
-    alc_error_t dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len) override { return ALC_ERROR_NOT_SUPPORTED; }
+    alc_error_t flush(const Uint8** pPlainText, const Uint64* pLengths, Uint64 numBuffers) override { return ALC_ERROR_NOT_SUPPORTED; }
+    alc_error_t dequeue(Uint8** pCipherText, Uint64 numBuffers, const Uint64* pLengths) override { return ALC_ERROR_NOT_SUPPORTED; }
     alc_error_t multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint8 ** pIv, Uint64 ivLen, Uint64 numBuffers) override {
             return ALC_ERROR_NOT_SUPPORTED;
         }

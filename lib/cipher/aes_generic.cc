@@ -32,7 +32,6 @@
 #include "alcp/cipher/cipher_wrapper.hh"
 
 #include "alcp/utils/cpuid.hh"
-#include <stdexcept>
 
 using alcp::utils::CpuId;
 
@@ -74,34 +73,92 @@ AesGenericCiphersT<mode, keyLenBits, arch>::multibufferInit(const Uint8* pKey,
     return ALC_ERROR_NONE;
 }
 
-// flush function to store the multibuffer data to the memory
+
+// flush function to store the multibuffer data to the memory (variable-length version)
 template<alcp::cipher::CipherMode       mode,
          alcp::cipher::CipherKeyLen     keyLenBits,
          alcp::utils::CpuCipherFeatures arch>
 alc_error_t
-AesGenericCiphersT<mode, keyLenBits, arch>::flush(const Uint8** pPlainText,
-                                                  Uint64        numBuffers,
-                                                  Uint64        len)
+AesGenericCiphersT<mode, keyLenBits, arch>::flush(const Uint8**  pPlainText,
+                                                  const Uint64*  pLengths,
+                                                  Uint64         numBuffers)
 {
     alc_error_t err = ALC_ERROR_NONE;
-    if (pPlainText == nullptr) {
+    if (pPlainText == nullptr || pLengths == nullptr) {
         printf("\nError: Invalid input pointer\n");
         return ALC_ERROR_INVALID_ARG;
     }
+    if (numBuffers > MAX_CIPHER_BUFFER_SIZE) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     m_pData_aes = pPlainText;
+    // Copy lengths to member array
+    for (Uint64 i = 0; i < numBuffers; i++) {
+        m_bufferLengths_aes[i] = pLengths[i];
+    }
     return err;
 }
-// Dequence the data
+
+/**
+ * @brief Dequeue processed ciphertext buffers with variable lengths (multi-buffer API)
+ *
+ * This function implements the **Iterative MinLen Algorithm** for processing multiple
+ * buffers with varying lengths while maximizing SIMD parallelism.
+ *
+ * ## Algorithm Overview
+ *
+ * The naive approach of processing each buffer individually wastes SIMD lanes. Instead,
+ * we use an iterative strategy that keeps all SIMD lanes utilized as long as possible:
+ *
+ * ```
+ * Example with 4 buffers of lengths: [64, 128, 128, 256] bytes
+ *
+ * Iteration 1: minLen = 64
+ *   Process all 4 buffers for 64 bytes (VAES512 - 4 lanes active)
+ *   Buffer 0 completes, removed from active list
+ *   Remaining: [-, 64, 64, 192]
+ *
+ * Iteration 2: minLen = 64
+ *   Process 3 buffers for 64 bytes (VAES512 + AESNI decomposition)
+ *   Buffers 1,2 complete
+ *   Remaining: [-, -, -, 128]
+ *
+ * Iteration 3: Single buffer remains
+ *   Process buffer 3 for 128 bytes (AESNI single-buffer path)
+ * ```
+ *
+ * ## Processing Steps
+ *
+ * 1. **Initialize**: Track active buffer indices and current offsets (all start at 0)
+ * 2. **Iterate**: While 2+ buffers active:
+ *    - Find minimum remaining length among active buffers
+ *    - Process all active buffers for that length using SIMD
+ *    - Remove completed buffers from active list
+ * 3. **Single Buffer**: If one buffer remains, process with AESNI
+ * 4. **Tails**: Process any remaining unaligned bytes individually
+ *
+ * @param[out] pCipherText  Array of pointers to ciphertext output buffers
+ * @param[in]  numBuffers   Number of buffers to process (max 127)
+ * @param[in]  pLengths     Array of per-buffer lengths in bytes (or nullptr to use
+ *                          lengths from prior flush() call)
+ * @return ALC_ERROR_NONE on success, error code otherwise
+ *
+ * @note This function requires AVX512 VAES support. Falls back with ALC_ERROR_NO_FALLBACK
+ *       on systems without this capability.
+ * @note Only CBC and CFB modes are currently supported for variable-length multi-buffer.
+ */
 template<alcp::cipher::CipherMode       mode,
          alcp::cipher::CipherKeyLen     keyLenBits,
          alcp::utils::CpuCipherFeatures arch>
 alc_error_t
-AesGenericCiphersT<mode, keyLenBits, arch>::dequeue(Uint8** pCipherText,
-                                                    Uint64  numBuffers,
-                                                    Uint64  len)
+AesGenericCiphersT<mode, keyLenBits, arch>::dequeue(Uint8**       pCipherText,
+                                                    Uint64        numBuffers,
+                                                    const Uint64* pLengths)
 {
     alc_error_t err = ALC_ERROR_NONE;
     m_isEnc_aes     = ALCP_ENC;
+
+    // Validate cipher state
     if (__builtin_expect(!(m_isKeySet_aes), 0)) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
@@ -110,174 +167,296 @@ AesGenericCiphersT<mode, keyLenBits, arch>::dequeue(Uint8** pCipherText,
         m_ivLen_aes = 16;
     }
 
+    // Require AVX512 VAES for multi-buffer operations
     if (__builtin_expect(arch < CpuCipherFeatures::eVaes512, 0)) {
         return ALC_ERROR_NO_FALLBACK;
     }
-    // Direct dispatch, no lambdas or std::function
+
+    // Only CBC and CFB modes support variable-length multi-buffer
     if constexpr (!(mode == CipherMode::eAesCBC || mode == CipherMode::eAesCFB)) {
         return ALC_ERROR_NOT_SUPPORTED;
     }
 
-    // Split up the number of buffers into power of 2
-    if (__builtin_expect(numBuffers >= 128, 0)) {
+    // Validate buffer count (must fit in stack-allocated arrays)
+    if (__builtin_expect(numBuffers > MAX_CIPHER_BUFFER_SIZE, 0)) {
         return ALC_ERROR_INVALID_ARG;
     }
-    // Power-of-two fast path
-    if (__builtin_expect(numBuffers && ((numBuffers & (numBuffers - 1)) == 0), 1)) {
-        int i = __builtin_ctzll(numBuffers);
-        size_t bufferCount = static_cast<size_t>(1ULL << i);
-        if constexpr (mode == CipherMode::eAesCBC) {
-            if (i == 0) {
-                err = aesni::EncryptCbc(m_pData_aes[0],
-                                        pCipherText[0],
-                                        len,
-                                        m_cipher_key_data.m_enc_key,
-                                        getRounds(),
-                                        m_Ivs_aes[0]);
-            } else if (i == 1) {
-                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
-                for (size_t j = 0; j < bufferCount; ++j) {
-                    ivPtrs[j] = m_Ivs_aes[j];
-                }
-                err = vaes::EncryptCbc(&m_pData_aes[0],
-                                       &pCipherText[0],
-                                       len,
-                                       m_cipher_key_data.m_enc_key,
-                                       getRounds(),
-                                       bufferCount,
-                                       ivPtrs);
-            } else {
-                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
-                for (size_t j = 0; j < bufferCount; ++j) {
-                    ivPtrs[j] = m_Ivs_aes[j];
-                }
-                err = vaes512::EncryptCbc(&m_pData_aes[0],
-                                          &pCipherText[0],
-                                          len,
-                                          m_cipher_key_data.m_enc_key,
-                                          getRounds(),
-                                          bufferCount,
-                                          ivPtrs);
-            }
-        } else {
-            if (i == 0) {
-                err = aesni::EncryptCfb(m_pData_aes[0],
-                                        pCipherText[0],
-                                        len,
-                                        m_cipher_key_data.m_enc_key,
-                                        getRounds(),
-                                        m_Ivs_aes[0]);
-            } else if (i == 1) {
-                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
-                for (size_t j = 0; j < bufferCount; ++j) {
-                    ivPtrs[j] = m_Ivs_aes[j];
-                }
-                err = vaes::EncryptCfb(&m_pData_aes[0],
-                                       &pCipherText[0],
-                                       len,
-                                       m_cipher_key_data.m_enc_key,
-                                       getRounds(),
-                                       bufferCount,
-                                       ivPtrs);
-            } else {
-                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
-                for (size_t j = 0; j < bufferCount; ++j) {
-                    ivPtrs[j] = m_Ivs_aes[j];
-                }
-                err = vaes512::EncryptCfb(&m_pData_aes[0],
-                                          &pCipherText[0],
-                                          len,
-                                          m_cipher_key_data.m_enc_key,
-                                          getRounds(),
-                                          bufferCount,
-                                          ivPtrs);
-            }
-        }
-        if (err != ALC_ERROR_NONE) {
-            return err;
-        }
-        return ALC_ERROR_NONE;
+
+    // Use provided lengths or fall back to lengths from flush() call
+    const Uint64* actualLengths = pLengths ? pLengths : m_bufferLengths_aes;
+
+    // Step 1: Initialize active buffer tracking
+    // activeIndices: Maps position in processing arrays to original buffer index
+    // This allows us to remove completed buffers without reordering original data
+    Uint64 activeIndices[MAX_CIPHER_BUFFER_SIZE];
+    Uint64 activeCount = numBuffers;
+    for (Uint64 i = 0; i < numBuffers; i++) {
+        activeIndices[i] = i;
     }
 
-    // General path: iterate over set bits from MSB to LSB
-    size_t processedBuffers = 0;
-    Uint64 remaining = numBuffers;
-    while (remaining) {
-        int i = 63 - __builtin_clzll(remaining);
-        size_t bufferCount = static_cast<size_t>(1ULL << i);
-        if constexpr (mode == CipherMode::eAesCBC) {
-            if (i == 0) {
-                err = aesni::EncryptCbc(m_pData_aes[processedBuffers],
-                                        pCipherText[processedBuffers],
-                                        len,
-                                        m_cipher_key_data.m_enc_key,
-                                        getRounds(),
-                                        m_Ivs_aes[processedBuffers]);
-            } else if (i == 1) {
-                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
-                for (size_t j = 0; j < bufferCount; ++j) {
-                    ivPtrs[j] = m_Ivs_aes[processedBuffers + j];
-                }
-                err = vaes::EncryptCbc(&m_pData_aes[processedBuffers],
-                                       &pCipherText[processedBuffers],
-                                       len,
-                                       m_cipher_key_data.m_enc_key,
-                                       getRounds(),
-                                       bufferCount,
-                                       ivPtrs);
-            } else {
-                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
-                for (size_t j = 0; j < bufferCount; ++j) {
-                    ivPtrs[j] = m_Ivs_aes[processedBuffers + j];
-                }
-                err = vaes512::EncryptCbc(&m_pData_aes[processedBuffers],
-                                          &pCipherText[processedBuffers],
-                                          len,
-                                          m_cipher_key_data.m_enc_key,
-                                          getRounds(),
-                                          bufferCount,
-                                          ivPtrs);
-            }
-        } else {
-            if (i == 0) {
-                err = aesni::EncryptCfb(m_pData_aes[processedBuffers],
-                                        pCipherText[processedBuffers],
-                                        len,
-                                        m_cipher_key_data.m_enc_key,
-                                        getRounds(),
-                                        m_Ivs_aes[processedBuffers]);
-            } else if (i == 1) {
-                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
-                for (size_t j = 0; j < bufferCount; ++j) {
-                    ivPtrs[j] = m_Ivs_aes[processedBuffers + j];
-                }
-                err = vaes::EncryptCfb(&m_pData_aes[processedBuffers],
-                                       &pCipherText[processedBuffers],
-                                       len,
-                                       m_cipher_key_data.m_enc_key,
-                                       getRounds(),
-                                       bufferCount,
-                                       ivPtrs);
-            } else {
-                Uint8* ivPtrs[MAX_CIPHER_BUFFER_SIZE];
-                for (size_t j = 0; j < bufferCount; ++j) {
-                    ivPtrs[j] = m_Ivs_aes[processedBuffers + j];
-                }
-                err = vaes512::EncryptCfb(&m_pData_aes[processedBuffers],
-                                          &pCipherText[processedBuffers],
-                                          len,
-                                          m_cipher_key_data.m_enc_key,
-                                          getRounds(),
-                                          bufferCount,
-                                          ivPtrs);
-            }
-        }
-        if (err != ALC_ERROR_NONE) {
-            return err;
-        }
-        processedBuffers += bufferCount;
-        remaining &= ~(1ULL << i);
+    // Track how many bytes we've processed for each buffer
+    Uint64 currentOffsets[MAX_CIPHER_BUFFER_SIZE];
+    for (Uint64 i = 0; i < numBuffers; i++) {
+        currentOffsets[i] = 0;
     }
+
+    // Step 2: Iterative MinLen processing loop
+    // Continue while we have 2+ buffers (can use SIMD parallelism)
+    while (activeCount > 2) {
+        // Find minimum remaining length among all active buffers
+        // This is the amount we can safely process for ALL buffers in parallel
+        Uint64 minLen = UINT64_MAX;
+        for (Uint64 i = 0; i < activeCount; i++) {
+            Uint64 bufIdx = activeIndices[i];
+            Uint64 remaining = actualLengths[bufIdx] - currentOffsets[bufIdx];
+            if (remaining < minLen) {
+                minLen = remaining;
+            }
+        }
+
+        // Align to AES block boundary (16 bytes)
+        // Any remaining bytes < 16 will be handled in Step 4
+        minLen = (minLen / 16) * 16;
+
+        // If no aligned data remains, exit loop to process unaligned tails
+        if (minLen == 0) {
+            break;
+        }
+
+        // Power-of-2 decomposition: Process buffers in optimal SIMD batches
+        // Example: 5 buffers → batch of 4 (VAES512) + batch of 1 (AESNI)
+        // This ensures we always use the widest SIMD path available
+        Uint64 processed = 0;
+        Uint64 toProcess = activeCount;
+
+        while (toProcess > 0) {
+            // Find highest set bit to get largest power-of-2 batch size
+            // __builtin_clzll counts leading zeros, so 63 - clz gives bit position
+            int i = 63 - __builtin_clzll(toProcess);
+            size_t batchCount = static_cast<size_t>(1ULL << i);
+
+            // Prepare contiguous arrays for SIMD processing
+            // Map from active buffer positions to original buffer data
+            const Uint8* batchInputs[MAX_CIPHER_BUFFER_SIZE];
+            Uint8* batchOutputs[MAX_CIPHER_BUFFER_SIZE];
+            Uint8* batchIvs[MAX_CIPHER_BUFFER_SIZE];
+
+            for (size_t j = 0; j < batchCount; j++) {
+                Uint64 bufIdx = activeIndices[processed + j];
+                batchInputs[j] = m_pData_aes[bufIdx] + currentOffsets[bufIdx];
+                batchOutputs[j] = pCipherText[bufIdx] + currentOffsets[bufIdx];
+                batchIvs[j] = m_Ivs_aes[bufIdx];
+            }
+
+            // Dispatch to optimal SIMD implementation based on batch size:
+            //   i=0 (1 buffer):  AESNI single-buffer
+            //   i=1 (2 buffers): VAES256 (2 lanes)
+            //   i≥2 (4+ buffers): VAES512 (4 lanes per ZMM register)
+            if constexpr (mode == CipherMode::eAesCBC) {
+                if (i == 0) {
+                    // Single buffer - use aesni
+                    err = aesni::EncryptCbc(batchInputs[0],
+                                            batchOutputs[0],
+                                            minLen,
+                                            m_cipher_key_data.m_enc_key,
+                                            getRounds(),
+                                            batchIvs[0]);
+                } else if (i == 1) {
+                    // 2 buffers - use VAES256
+                    err = vaes::EncryptCbc(batchInputs,
+                                           batchOutputs,
+                                           minLen,
+                                           m_cipher_key_data.m_enc_key,
+                                           getRounds(),
+                                           batchCount,
+                                           batchIvs);
+                } else {
+                    // 4+ buffers - use VAES512
+                    err = vaes512::EncryptCbc(batchInputs,
+                                              batchOutputs,
+                                              minLen,
+                                              m_cipher_key_data.m_enc_key,
+                                              getRounds(),
+                                              batchCount,
+                                              batchIvs);
+                }
+            } else {  // CipherMode::eAesCFB
+                if (i == 0) {
+                    // Single buffer - use aesni
+                    err = aesni::EncryptCfb(batchInputs[0],
+                                            batchOutputs[0],
+                                            minLen,
+                                            m_cipher_key_data.m_enc_key,
+                                            getRounds(),
+                                            batchIvs[0]);
+                } else if (i == 1) {
+                    // 2 buffers - use VAES256
+                    err = vaes::EncryptCfb(batchInputs,
+                                           batchOutputs,
+                                           minLen,
+                                           m_cipher_key_data.m_enc_key,
+                                           getRounds(),
+                                           batchCount,
+                                           batchIvs);
+                } else {
+                    // 4+ buffers - use VAES512
+                    err = vaes512::EncryptCfb(batchInputs,
+                                              batchOutputs,
+                                              minLen,
+                                              m_cipher_key_data.m_enc_key,
+                                              getRounds(),
+                                              batchCount,
+                                              batchIvs);
+                }
+            }
+
+            if (err != ALC_ERROR_NONE) {
+                return err;
+            }
+
+            // Update offsets for processed buffers
+            for (size_t j = 0; j < batchCount; j++) {
+                Uint64 bufIdx = activeIndices[processed + j];
+                currentOffsets[bufIdx] += minLen;
+            }
+
+            processed += batchCount;
+            toProcess &= ~(1ULL << i);  // Clear the bit we just processed
+        }
+
+        // Compact active buffer list by removing completed buffers
+        // A buffer is complete when its offset equals its total length
+        Uint64 newActiveCount = 0;
+        for (Uint64 i = 0; i < activeCount; i++) {
+            Uint64 bufIdx = activeIndices[i];
+            if (currentOffsets[bufIdx] < actualLengths[bufIdx]) {
+                activeIndices[newActiveCount++] = bufIdx;
+            }
+        }
+        activeCount = newActiveCount;
+    }
+
+    // Step 3: Handle single/two remaining buffer
+    // When only two buffers remains use VAES Path
+    if (activeCount == 2) {
+        Uint64 bufIdx0 = activeIndices[0];
+        Uint64 bufIdx1 = activeIndices[1];
+
+        Uint64 remaining0 = actualLengths[bufIdx0] - currentOffsets[bufIdx0];
+        Uint64 remaining1 = actualLengths[bufIdx1] - currentOffsets[bufIdx1];
+        Uint64 minLen = (remaining0 < remaining1 ? remaining0 : remaining1);
+        Uint64 alignedLen = (minLen / 16) * 16;
+
+        if (alignedLen > 0) {
+            const Uint8* batchInputs[2] = {
+                m_pData_aes[bufIdx0] + currentOffsets[bufIdx0],
+                m_pData_aes[bufIdx1] + currentOffsets[bufIdx1]
+            };
+            Uint8* batchOutputs[2] = {
+                pCipherText[bufIdx0] + currentOffsets[bufIdx0],
+                pCipherText[bufIdx1] + currentOffsets[bufIdx1]
+            };
+            Uint8* batchIvs[2] = {
+                m_Ivs_aes[bufIdx0],
+                m_Ivs_aes[bufIdx1]
+            };
+
+            if constexpr (mode == CipherMode::eAesCBC) {
+                err = vaes::EncryptCbc(batchInputs,
+                                       batchOutputs,
+                                       alignedLen,
+                                       m_cipher_key_data.m_enc_key,
+                                       getRounds(),
+                                       2,
+                                       batchIvs);
+            } else { // eAesCFB
+                err = vaes::EncryptCfb(batchInputs,
+                                       batchOutputs,
+                                       alignedLen,
+                                       m_cipher_key_data.m_enc_key,
+                                       getRounds(),
+                                       2,
+                                       batchIvs);
+            }
+
+            if (err != ALC_ERROR_NONE) {
+                return err;
+            }
+
+            currentOffsets[bufIdx0] += alignedLen;
+            currentOffsets[bufIdx1] += alignedLen;
+        }
+    }
+
+    // When only one buffer remains, SIMD parallelism isn't beneficial
+    // Use single-buffer AESNI path for remaining aligned data
+    if (activeCount == 1) {
+        Uint64 bufIdx = activeIndices[0];
+        Uint64 remaining = actualLengths[bufIdx] - currentOffsets[bufIdx];
+        Uint64 alignedLen = (remaining / 16) * 16;
+
+        if (alignedLen > 0) {
+            const Uint8* input = m_pData_aes[bufIdx] + currentOffsets[bufIdx];
+            Uint8* output = pCipherText[bufIdx] + currentOffsets[bufIdx];
+
+            if constexpr (mode == CipherMode::eAesCBC) {
+                err = aesni::EncryptCbc(input,
+                                        output,
+                                        alignedLen,
+                                        m_cipher_key_data.m_enc_key,
+                                        getRounds(),
+                                        m_Ivs_aes[bufIdx]);
+            } else {  // CipherMode::eAesCFB
+                err = aesni::EncryptCfb(input,
+                                        output,
+                                        alignedLen,
+                                        m_cipher_key_data.m_enc_key,
+                                        getRounds(),
+                                        m_Ivs_aes[bufIdx]);
+            }
+
+            if (err != ALC_ERROR_NONE) {
+                return err;
+            }
+
+            currentOffsets[bufIdx] += alignedLen;
+        }
+    }
+
+    // =========================================================================
+    // Step 4: Process unaligned tail bytes
+    // =========================================================================
+    // Any buffer with length not divisible by 16 has remaining bytes
+    // These must be processed individually (cannot parallelize partial blocks)
+    for (Uint64 i = 0; i < numBuffers; i++) {
+        Uint64 remaining = actualLengths[i] - currentOffsets[i];
+
+        if (remaining > 0) {
+            const Uint8* tailInput = m_pData_aes[i] + currentOffsets[i];
+            Uint8* tailOutput = pCipherText[i] + currentOffsets[i];
+
+            if constexpr (mode == CipherMode::eAesCBC) {
+                err = aesni::EncryptCbc(tailInput,
+                                        tailOutput,
+                                        remaining,
+                                        m_cipher_key_data.m_enc_key,
+                                        getRounds(),
+                                        m_Ivs_aes[i]);
+            } else {  // CipherMode::eAesCFB
+                err = aesni::EncryptCfb(tailInput,
+                                        tailOutput,
+                                        remaining,
+                                        m_cipher_key_data.m_enc_key,
+                                        getRounds(),
+                                        m_Ivs_aes[i]);
+            }
+
+            if (err != ALC_ERROR_NONE) {
+                return err;
+            }
+        }
+    }
+
     return ALC_ERROR_NONE;
 }
 

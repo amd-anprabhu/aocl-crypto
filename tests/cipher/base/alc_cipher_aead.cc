@@ -531,18 +531,18 @@ AlcpCipherAeadBase::context_copy()
 
 bool
 AlcpCipherAeadBase::flush(const Uint8** pPlainText,
-                          Uint64        numBuffers,
-                          Uint64        len)
+                          const Uint64* pLengths,
+                          Uint64        numBuffers)
 {
-    // Default implementation - return success
-    return true;
+    // AEAD modes don't support multi-buffer operations
+    return false;
 }
 
 bool
-AlcpCipherAeadBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len)
+AlcpCipherAeadBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, const Uint64* pLengths)
 {
-    // Default implementation - return success
-    return true;
+    // AEAD modes don't support multi-buffer operations
+    return false;
 }
 bool
 AlcpCipherAeadBase::multibufferInit(const Uint8*  pKey,

@@ -119,17 +119,17 @@ class ALCP_API_EXPORT Ccm
                             Uint64      dataLen,
                             bool        isEncrypt);
 
-    alc_error_t flush(const Uint8** pPlainText,
-                      Uint64        numBuffers,
-                      Uint64        len) override
+    alc_error_t flush(const Uint8**  pPlainText,
+                      const Uint64*  pLengths,
+                      Uint64         numBuffers) override
     {
-        return ALC_ERROR_NONE;
+        return ALC_ERROR_NOT_SUPPORTED;
     }
-    alc_error_t dequeue(Uint8** pCipherText,
-                        Uint64  numBuffers,
-                        Uint64  len) override
+    alc_error_t dequeue(Uint8**       pCipherText,
+                        Uint64        numBuffers,
+                        const Uint64* pLengths) override
     {
-        return ALC_ERROR_NONE;
+        return ALC_ERROR_NOT_SUPPORTED;
     }
 };
 
@@ -179,15 +179,17 @@ class CcmT
     }
 
     alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
-    alc_error_t flush(const Uint8** pPlainText,
-                      Uint64        numBuffers,
-                      Uint64        len) override
+
+    // Explicit overrides to resolve diamond inheritance ambiguity
+    alc_error_t flush(const Uint8**  pPlainText,
+                      const Uint64*  pLengths,
+                      Uint64         numBuffers) override final
     {
         return ALC_ERROR_NOT_SUPPORTED;
     }
-    alc_error_t dequeue(Uint8** pCipherText,
-                        Uint64  numBuffers,
-                        Uint64  len) override
+    alc_error_t dequeue(Uint8**       pCipherText,
+                        Uint64        numBuffers,
+                        const Uint64* pLengths) override final
     {
         return ALC_ERROR_NOT_SUPPORTED;
     }

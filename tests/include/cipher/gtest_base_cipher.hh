@@ -1338,9 +1338,10 @@ CipherMultiBufferCrossTest(int               keySize,
 
         std::vector<const Uint8*> input_buffer_pointers(numBuffers);
         std::vector<Uint8*>       output_buffer_pointers(numBuffers);
-        for (int i = 0; i < numBuffers; ++i) {
-            input_buffer_pointers[i]  = vec_in[i].data();
-            output_buffer_pointers[i] = vec_out[i].data();
+        std::vector<Uint64>       bufferLengths(numBuffers, static_cast<Uint64>(i));
+        for (int j = 0; j < numBuffers; ++j) {
+            input_buffer_pointers[j]  = vec_in[j].data();
+            output_buffer_pointers[j] = vec_out[j].data();
         }
 
         // initialize the cipher context
@@ -1351,12 +1352,12 @@ CipherMultiBufferCrossTest(int               keySize,
             return;
         }
 
-        if (!p_cb->flush(input_buffer_pointers.data(), numBuffers, i)) {
+        if (!p_cb->flush(input_buffer_pointers.data(), bufferLengths.data(), numBuffers)) {
             std::cout << "Multi-buffer flush failed." << std::endl;
             return;
         }
 
-        if (!p_cb->dequeue(output_buffer_pointers.data(), numBuffers, i)) {
+        if (!p_cb->dequeue(output_buffer_pointers.data(), numBuffers, bufferLengths.data())) {
             std::cout << "Multi-buffer dequeue failed." << std::endl;
             return;
         }

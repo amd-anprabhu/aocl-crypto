@@ -227,14 +227,14 @@ IPPCipherBase::context_copy()
 }
 
 bool
-IPPCipherBase::flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len)
+IPPCipherBase::flush(const Uint8** pPlainText, const Uint64* pLengths, Uint64 numBuffers)
 {
     // This function is not implemented in IPP
     std::cout << "IPPCipherBase::flush is not implemented." << std::endl;
     return false;
 }
 bool
-IPPCipherBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len)
+IPPCipherBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, const Uint64* pLengths)
 {
     // This function is not implemented in IPP
     std::cout << "IPPCipherBase::dequeue is not implemented." << std::endl;

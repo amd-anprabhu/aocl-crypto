@@ -309,6 +309,7 @@ CipherMultibufferBench(benchmark::State& state,
 
     std::vector<const Uint8*> input_buffer_pointers(numBuffers);
     std::vector<Uint8*>       output_buffer_pointers(numBuffers);
+    std::vector<Uint64>       bufferLengths(numBuffers, blockSize);
     for (Uint64 i = 0; i < numBuffers; ++i) {
         input_buffer_pointers[i]  = vec_in[i].data();
         output_buffer_pointers[i] = vec_out[i].data();
@@ -326,12 +327,12 @@ CipherMultibufferBench(benchmark::State& state,
     #ifndef MULTI_INIT_BENCH
     for (auto _ : state) {
     #endif
-        if (!p_cb->flush(input_buffer_pointers.data(), numBuffers, blockSize)) {
+        if (!p_cb->flush(input_buffer_pointers.data(), bufferLengths.data(), numBuffers)) {
             state.SkipWithError("BENCH_FLUSH_FAILURE");
         }
 
         if (!p_cb->dequeue(
-                output_buffer_pointers.data(), numBuffers, blockSize)) {
+                output_buffer_pointers.data(), numBuffers, bufferLengths.data())) {
             state.SkipWithError("BENCH_DEQUEUE_FAILURE");
         }
     }

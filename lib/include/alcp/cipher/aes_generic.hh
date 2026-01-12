@@ -90,12 +90,22 @@ class AesGenericCiphersT
                         Uint64*      outlen) override;
     alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override;
     alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
-    alc_error_t flush(const Uint8** pPlainText,
-                      Uint64        numBuffers,
-                      Uint64        len) override;
-    alc_error_t dequeue(Uint8** pCipherText,
-                        Uint64  numBuffers,
-                        Uint64  len) override;
+
+    /**
+     * @brief Primary multi-buffer flush API (variable-length)
+     * Stores plaintext pointers and per-buffer lengths for processing
+     */
+    alc_error_t flush(const Uint8**  pPlainText,
+                      const Uint64*  pLengths,
+                      Uint64         numBuffers) override;
+
+    /**
+     * @brief Primary multi-buffer dequeue API (variable-length)
+     * Processes all buffers using the Iterative MinLen algorithm
+     */
+    alc_error_t dequeue(Uint8**       pCipherText,
+                        Uint64        numBuffers,
+                        const Uint64* pLengths) override;
     alc_error_t multibufferInit(const Uint8*  pKey,
                                 Uint64        keyLen,
                                 const Uint8** pIv,

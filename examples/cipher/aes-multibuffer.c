@@ -195,31 +195,43 @@ alcp_aes_multibuffer_encrypt_demo(
         printf("Error: unable to allocate memory for plaintext pointers\n");
         return;
     }
-    
+
+    // Create lengths array for uniform-length buffers
+    Uint64 *lengths = malloc(num_buffers * sizeof(Uint64));
+    if (!lengths) {
+        printf("Error: unable to allocate memory for lengths array\n");
+        free(p_plaintxt);
+        return;
+    }
+
     for (Uint32 i = 0; i < num_buffers; i++) {
         p_plaintxt[i] = plaintxt;
+        lengths[i] = len;
     }
-    
-    err = alcp_flush(&handle, p_plaintxt, num_buffers, len);
+
+    err = alcp_flush(&handle, p_plaintxt, lengths, num_buffers);
     if (err == ALC_ERROR_NOT_SUPPORTED) {
         //printf("Unsupported on non-avx512 architectures\n");
         // Free memory and return but don't treat as error
+        free(lengths);
         free(p_plaintxt);
         return;
     } else if (alcp_is_error(err)) {
         printf("Error: unable to flush plaintext\n");
+        free(lengths);
         free(p_plaintxt);
         return;
     }
-    
+
     // dequeue the ciphertext from the internal buffer
     Uint8 **p_ciphertxt = malloc(num_buffers * sizeof(Uint8*));
     if (!p_ciphertxt) {
         printf("Error: unable to allocate memory for ciphertext pointers\n");
+        free(lengths);
         free(p_plaintxt);
         return;
     }
-    
+
     // allocate memory for ciphertext
     for (Uint32 i = 0; i < num_buffers; i++) {
         p_ciphertxt[i] = malloc(len);
@@ -230,12 +242,13 @@ alcp_aes_multibuffer_encrypt_demo(
                 free(p_ciphertxt[j]);
             }
             free(p_ciphertxt);
+            free(lengths);
             free(p_plaintxt);
             return;
         }
     }
-    
-    err = alcp_dequeue(&handle, p_ciphertxt, num_buffers, len);
+
+    err = alcp_dequeue(&handle, p_ciphertxt, num_buffers, lengths);
     if (err == ALC_ERROR_NOT_SUPPORTED || err == ALC_ERROR_NO_FALLBACK) {
         //printf("Unsupported on non-avx512 architectures\n");
         // Clean up memory and return but don't treat as error
@@ -243,6 +256,7 @@ alcp_aes_multibuffer_encrypt_demo(
             free(p_ciphertxt[i]);
         }
         free(p_ciphertxt);
+        free(lengths);
         free(p_plaintxt);
         return;
     } else if (alcp_is_error(err)) {
@@ -252,12 +266,13 @@ alcp_aes_multibuffer_encrypt_demo(
             free(p_ciphertxt[i]);
         }
         free(p_ciphertxt);
+        free(lengths);
         free(p_plaintxt);
         return;
     }
 
     memcpy(ciphertxt, p_ciphertxt[1], len);
-    
+
     // free the allocated memory for ciphertext
     for (Uint32 i = 0; i < num_buffers; i++) {
         if (p_ciphertxt[i]) {
@@ -266,6 +281,7 @@ alcp_aes_multibuffer_encrypt_demo(
         }
     }
     free(p_ciphertxt);
+    free(lengths);
     free(p_plaintxt);
     return;
 }
@@ -432,7 +448,7 @@ main(int argc, char *argv[])
             for (int buffer_idx = 0; buffer_idx < num_buffer_sizes; buffer_idx++) {
                 Uint32 num_buffers = buffer_sizes[buffer_idx];
                 printf("\n\nRunning with %d buffers:", num_buffers);
-                
+
                 for (int i = 0; i < MAX_TEST_CASE; i++) {
                     int inputLen = testblkSizes[i];
                     printf(" \n");

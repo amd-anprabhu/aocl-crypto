@@ -369,17 +369,17 @@ OpenSSLCipherBase::context_copy()
 }
 
 bool
-OpenSSLCipherBase::flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len)
+OpenSSLCipherBase::flush(const Uint8** pPlainText, const Uint64* pLengths, Uint64 numBuffers)
 {
-    // Default implementation - return success
-    return true;
+    // OpenSSL doesn't support multi-buffer operations
+    return false;
 }
 
 bool
-OpenSSLCipherBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len)
+OpenSSLCipherBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, const Uint64* pLengths)
 {
-    // Default implementation - return success
-    return true;
+    // OpenSSL doesn't support multi-buffer operations
+    return false;
 }
 
 bool
@@ -388,5 +388,5 @@ OpenSSLCipherBase::multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint
     // Default implementation - return success
     return true;
 
-} 
+}
 } // namespace alcp::testing

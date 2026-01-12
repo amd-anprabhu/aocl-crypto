@@ -133,7 +133,7 @@ class ALCP_API_EXPORT Gcm
 #endif
         m_gcm_ctx.m_tag_128           = _mm_setzero_si128();
         m_gcm_ctx.m_additionalDataLen = 0;
-        
+
         // Initialize AAD buffering fields
         m_gcm_ctx.m_aad_buffer.clear();
         m_gcm_ctx.m_aad_processed = false;
@@ -168,17 +168,17 @@ class ALCP_API_EXPORT Gcm
                      const Uint8* pIv,
                      Uint64       ivLen) override;
 
-    alc_error_t flush(const Uint8** pPlainText,
-                      Uint64        numBuffers,
-                      Uint64        len) override
+    alc_error_t flush(const Uint8**  pPlainText,
+                      const Uint64*  pLengths,
+                      Uint64         numBuffers) override
     {
-        return ALC_ERROR_NONE;
+        return ALC_ERROR_NOT_SUPPORTED;
     }
-    alc_error_t dequeue(Uint8** pCipherText,
-                        Uint64  numBuffers,
-                        Uint64  len) override
+    alc_error_t dequeue(Uint8**       pCipherText,
+                        Uint64        numBuffers,
+                        const Uint64* pLengths) override
     {
-        return ALC_ERROR_NONE;
+        return ALC_ERROR_NOT_SUPPORTED;
     }
 };
 
@@ -236,15 +236,17 @@ class GcmT
         return ALC_ERROR_NOT_SUPPORTED;
     }
     alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
-    alc_error_t flush(const Uint8** pPlainText,
-                      Uint64        numBuffers,
-                      Uint64        len) override
+
+    // Explicit overrides to resolve diamond inheritance ambiguity
+    alc_error_t flush(const Uint8**  pPlainText,
+                      const Uint64*  pLengths,
+                      Uint64         numBuffers) override final
     {
         return ALC_ERROR_NOT_SUPPORTED;
     }
-    alc_error_t dequeue(Uint8** pCipherText,
-                        Uint64  numBuffers,
-                        Uint64  len) override
+    alc_error_t dequeue(Uint8**       pCipherText,
+                        Uint64        numBuffers,
+                        const Uint64* pLengths) override final
     {
         return ALC_ERROR_NOT_SUPPORTED;
     }

@@ -106,12 +106,26 @@ namespace alcp { namespace cipher {
                                             const Uint8** pIv,
                                             Uint64        ivLen,
                                             Uint64        numBuffers) = 0;
-        virtual alc_error_t flush(const Uint8** pPlainText,
-                                  Uint64        numBuffers,
-                                  Uint64        len)                  = 0;
-        virtual alc_error_t dequeue(Uint8** pCipherText,
-                                    Uint64  numBuffers,
-                                    Uint64  len)                = 0;
+
+        /**
+         * @brief Primary multi-buffer flush API (variable-length)
+         *
+         * Implementations must override this. The uniform-length version
+         * below provides a default implementation that calls this.
+         */
+        virtual alc_error_t flush(const Uint8**  pPlainText,
+                                  const Uint64*  pLengths,
+                                  Uint64         numBuffers)          = 0;
+
+        /**
+         * @brief Primary multi-buffer dequeue API (variable-length)
+         *
+         * Implementations must override this. The uniform-length version
+         * below provides a default implementation that calls this.
+         */
+        virtual alc_error_t dequeue(Uint8**       pCipherText,
+                                    Uint64        numBuffers,
+                                    const Uint64* pLengths)           = 0;
     };
 
     // iCipher segments
@@ -170,12 +184,23 @@ namespace alcp { namespace cipher {
     {
       public:
         virtual ~iCipherAead()                           = default;
-        virtual alc_error_t flush(const Uint8** pPlainText,
-                                  Uint64        numBuffers,
-                                  Uint64        len) override   = 0;
-        virtual alc_error_t dequeue(Uint8** pCipherText,
-                                    Uint64  numBuffers,
-                                    Uint64  len) override = 0;
+
+        // Multi-buffer interface - default to NOT_SUPPORTED for AEAD modes
+        // AEAD modes (GCM, CCM, etc.) have additional authentication requirements
+        // that make multi-buffer processing more complex
+        virtual alc_error_t flush(const Uint8**  pPlainText,
+                                  const Uint64*  pLengths,
+                                  Uint64         numBuffers) override
+        {
+            return ALC_ERROR_NOT_SUPPORTED;
+        }
+        virtual alc_error_t dequeue(Uint8**       pCipherText,
+                                    Uint64        numBuffers,
+                                    const Uint64* pLengths) override
+        {
+            return ALC_ERROR_NOT_SUPPORTED;
+        }
+
     };
 
     /* Cipher Factory for different Aead and non-Aead modes */

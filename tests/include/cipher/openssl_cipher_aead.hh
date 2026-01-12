@@ -99,22 +99,22 @@ class OpenSSLCipherAeadBase : public CipherAeadBase
               const Uint8* key,
               const Uint32 key_len,
               const Uint8* tkey,
-              const Uint64 block_size);
+              const Uint64 block_size) override;
     bool init(const Uint8* iv, const Uint8* key, const Uint32 key_len);
-    bool init(const Uint8* key, const Uint32 key_len);
+    bool init(const Uint8* key, const Uint32 key_len) override;
     // FIXME: Legacy functions needs to be removed like the one below
     bool encrypt(const Uint8* plaintxt, size_t len, Uint8* ciphertxt);
-    bool encrypt(alcp_dc_ex_t& data);
+    bool encrypt(alcp_dc_ex_t& data) override;
     bool decrypt(const Uint8* ciphertxt, size_t len, Uint8* plaintxt);
-    bool decrypt(alcp_dc_ex_t& data);
-    bool reset();
-    bool context_copy();
-    bool flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len);
-    bool dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len);
+    bool decrypt(alcp_dc_ex_t& data) override;
+    bool reset() override;
+    bool context_copy() override;
+    bool flush(const Uint8** pPlainText, const Uint64* pLengths, Uint64 numBuffers) override;
+    bool dequeue(Uint8** pCipherText, Uint64 numBuffers, const Uint64* pLengths) override;
     bool multibufferInit(const Uint8*  pKey,
                          Uint64        keyLen,
                          const Uint8** pIv,
                          Uint64        ivLen,
-                         Uint64        numBuffers);
+                         Uint64        numBuffers) override;
 };
 } // namespace alcp::testing
