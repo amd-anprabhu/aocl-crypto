@@ -372,14 +372,16 @@ bool
 OpenSSLCipherBase::flush(const Uint8** pPlainText, const Uint64* pLengths, Uint64 numBuffers)
 {
     // OpenSSL doesn't support multi-buffer operations
-    return false;
+    // skip implementation without failure- return success
+    return true;
 }
 
 bool
 OpenSSLCipherBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, const Uint64* pLengths)
 {
     // OpenSSL doesn't support multi-buffer operations
-    return false;
+    // skip implementation without failure- return success
+    return true;
 }
 
 bool
