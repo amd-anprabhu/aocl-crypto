@@ -83,8 +83,8 @@ class ChaChaPolyTest : public testing::Test
     std::vector<Uint8> ciphertext;
 
     // Todo: Add tests for zen4
-    CipherFactory<iCipherAead>* alcpCipher;
-    iCipherAead*                aead;
+    // Factory removed
+    iCipherAead*                aead = nullptr;
 
     static constexpr unsigned short chacha20_poly1305_tag_size = 16;
     void                            SetUp() override
@@ -106,15 +106,13 @@ class ChaChaPolyTest : public testing::Test
 
     void createChachaPolyObject()
     {
-        alcpCipher = new CipherFactory<iCipherAead>();
-        aead       = alcpCipher->create("chachapoly");
+        aead = createCipherAead(CipherMode::eCHACHA20_POLY1305, CipherKeyLen::eKey256Bit);
         if (aead == nullptr) {
-            delete alcpCipher;
             FAIL();
         }
     }
 
-    void destroyChachaPolyObject() { delete alcpCipher; }
+    void destroyChachaPolyObject() { delete aead; }
 
     void setInputValues()
     {

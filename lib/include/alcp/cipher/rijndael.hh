@@ -86,10 +86,6 @@ class ALCP_API_EXPORT Rijndael
     Uint32    m_key_size   = 0; /* key size in bytes */
     BlockSize m_block_size = eBits0;
 
-    // duplicate of aes, to be removed
-    const Uint8* m_pKey_rij   = NULL; /* User input key*/
-    Uint32       m_keyLen_rij = 0;    /* key len*/
-
   public:
     Rijndael();
     ~Rijndael();
@@ -122,9 +118,6 @@ class ALCP_API_EXPORT Rijndael
     void AESEncrypt(Uint32* blk0, const Uint8* pkey, int nr) const;
     void AesDecrypt(Uint32* blk0, const Uint8* pkey, int nr) const;
 
-    void setKeyLen(Uint32 keyLen) { m_keyLen_rij = keyLen; }
-    void setKey(const Uint8* pKey) { m_pKey_rij = pKey; }
-
     Uint32       getRounds() const { return m_nrounds; }
     Uint32       getKeySize() const { return m_key_size; }
     const Uint8* getEncryptKeys() const { return m_enc_key; }
@@ -133,8 +126,20 @@ class ALCP_API_EXPORT Rijndael
     const Uint8* getEncryptKeysRound() const { return m_round_key_enc; }
     const Uint8* getDecryptKeysRound() const { return m_round_key_dec; }
 
-    void setUp() { setKey(m_pKey_rij, m_keyLen_rij); }
     void setKey(const Uint8* key, int len);
+
+  protected:
+    // Non-const accessors for derived classes (e.g., KeyManager::copyKeyStateFrom)
+    Uint8* getEncryptKeysRoundMut() { return m_round_key_enc; }
+    Uint8* getDecryptKeysRoundMut() { return m_round_key_dec; }
+    
+    // Initialize key pointers to internal storage (used after copying key state)
+    void initKeyPointers() {
+        m_enc_key = m_round_key_enc;
+        m_dec_key = m_round_key_dec;
+    }
+
+  public:
     void setKey(const Uint8* key, Uint8* pExpKey, int len);
     void setRounds(int rounds) { m_nrounds = rounds; }
 

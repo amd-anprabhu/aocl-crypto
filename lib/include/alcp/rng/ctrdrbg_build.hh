@@ -27,6 +27,7 @@
  */
 
 #include "alcp/base.hh"
+#include "alcp/utils/cpuid.hh"
 #include "drbg_ctr.hh"
 
 using namespace alcp::base::status;

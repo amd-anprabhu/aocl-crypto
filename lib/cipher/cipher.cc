@@ -26,7 +26,7 @@
  *
  */
 
-#include "alcp/cipher/aes.hh"
+
 
 #include "alcp/cipher/aes_ccm.hh"
 #include "alcp/cipher/aes_cmac_siv.hh"
@@ -41,538 +41,369 @@ namespace alcp::cipher {
 
 using alcp::utils::CpuCipherFeatures;
 
-template<CipherMode MODE>
-iCipher*
-getGenericCiphers(const CipherKeyLen keyLen, const CpuCipherFeatures arch)
-{
-    if (arch < alcp::utils::CpuCipherFeatures::eAesni) {
-        printf("\n Error: Reference kernel not supported ");
-        return nullptr;
-    }
+namespace {
 
-    if (arch == alcp::utils::CpuCipherFeatures::eVaes512) {
-        switch (keyLen) {
-            case CipherKeyLen::eKey128Bit:
-                return new AesGenericCiphersT<MODE,
-                                              CipherKeyLen::eKey128Bit,
-                                              CpuCipherFeatures::eVaes512>();
-            case CipherKeyLen::eKey192Bit:
-                return new AesGenericCiphersT<MODE,
-                                              CipherKeyLen::eKey192Bit,
-                                              CpuCipherFeatures::eVaes512>();
-            case CipherKeyLen::eKey256Bit:
-                return new AesGenericCiphersT<MODE,
-                                              CipherKeyLen::eKey256Bit,
-                                              CpuCipherFeatures::eVaes512>();
-        }
-    } else if (arch == alcp::utils::CpuCipherFeatures::eVaes256) {
-        switch (keyLen) {
-            case CipherKeyLen::eKey128Bit:
-                return new AesGenericCiphersT<MODE,
-                                              CipherKeyLen::eKey128Bit,
-                                              CpuCipherFeatures::eVaes256>();
-            case CipherKeyLen::eKey192Bit:
-                return new AesGenericCiphersT<MODE,
-                                              CipherKeyLen::eKey192Bit,
-                                              CpuCipherFeatures::eVaes256>();
-            case CipherKeyLen::eKey256Bit:
-                return new AesGenericCiphersT<MODE,
-                                              CipherKeyLen::eKey256Bit,
-                                              CpuCipherFeatures::eVaes256>();
-        }
-    } else if (arch == alcp::utils::CpuCipherFeatures::eAesni) {
-        switch (keyLen) {
-            case CipherKeyLen::eKey128Bit:
-                return new AesGenericCiphersT<MODE,
-                                              CipherKeyLen::eKey128Bit,
-                                              CpuCipherFeatures::eAesni>();
-            case CipherKeyLen::eKey192Bit:
-                return new AesGenericCiphersT<MODE,
-                                              CipherKeyLen::eKey192Bit,
-                                              CpuCipherFeatures::eAesni>();
-            case CipherKeyLen::eKey256Bit:
-                return new AesGenericCiphersT<MODE,
-                                              CipherKeyLen::eKey256Bit,
-                                              CpuCipherFeatures::eAesni>();
-        }
+// Index conversion helpers for dispatch tables
+constexpr int
+keyLenToIndex(CipherKeyLen k)
+{
+    switch (k) {
+        case CipherKeyLen::eKey128Bit:
+            return 0;
+        case CipherKeyLen::eKey192Bit:
+            return 1;
+        case CipherKeyLen::eKey256Bit:
+            return 2;
     }
-    printf("\n Error: Reference kernel not supported ");
-    return nullptr;
+    return -1;
 }
 
-iCipherAead*
-getSiv(const CipherKeyLen keyLen, const CpuCipherFeatures arch)
+constexpr int
+archToIndex(CpuCipherFeatures a)
 {
-    if (arch == alcp::utils::CpuCipherFeatures::eVaes512) {
-        switch (keyLen) {
-            case CipherKeyLen::eKey128Bit:
-                return new SivT<CipherKeyLen::eKey128Bit,
-                                CpuCipherFeatures::eVaes512>();
-            case CipherKeyLen::eKey192Bit:
-                return new SivT<CipherKeyLen::eKey192Bit,
-                                CpuCipherFeatures::eVaes512>();
-            case CipherKeyLen::eKey256Bit:
-                return new SivT<CipherKeyLen::eKey256Bit,
-                                CpuCipherFeatures::eVaes512>();
-        }
-    } else if (arch == alcp::utils::CpuCipherFeatures::eVaes256) {
-        switch (keyLen) {
-            case CipherKeyLen::eKey128Bit:
-                return new SivT<CipherKeyLen::eKey128Bit,
-                                CpuCipherFeatures::eVaes256>();
-            case CipherKeyLen::eKey192Bit:
-                return new SivT<CipherKeyLen::eKey192Bit,
-                                CpuCipherFeatures::eVaes256>();
-            case CipherKeyLen::eKey256Bit:
-                return new SivT<CipherKeyLen::eKey256Bit,
-                                CpuCipherFeatures::eVaes256>();
-        }
-    } else if (arch == alcp::utils::CpuCipherFeatures::eAesni) {
-        switch (keyLen) {
-            case CipherKeyLen::eKey128Bit:
-                return new SivT<CipherKeyLen::eKey128Bit,
-                                CpuCipherFeatures::eAesni>();
-            case CipherKeyLen::eKey192Bit:
-                return new SivT<CipherKeyLen::eKey192Bit,
-                                CpuCipherFeatures::eAesni>();
-            case CipherKeyLen::eKey256Bit:
-                return new SivT<CipherKeyLen::eKey256Bit,
-                                CpuCipherFeatures::eAesni>();
-        }
-    }
-    printf("\n Error: Reference kernel not supported ");
-    return nullptr;
-}
-
-// copy-paste of siv, can be avoided
-iCipherAead*
-getGcm(const CipherKeyLen      keyLen,
-       const CpuCipherFeatures arch,
-       alc_cipher_state_t*     pCipherState)
-{
-    if (pCipherState == nullptr) {
-        printf("\n State invalid ");
-        return nullptr;
-    }
-
-    if (arch == alcp::utils::CpuCipherFeatures::eVaes512) {
-        switch (keyLen) {
-            case CipherKeyLen::eKey128Bit:
-                return new GcmT<CipherKeyLen::eKey128Bit,
-                                CpuCipherFeatures::eVaes512>(pCipherState);
-            case CipherKeyLen::eKey192Bit:
-                return new GcmT<CipherKeyLen::eKey192Bit,
-                                CpuCipherFeatures::eVaes512>(pCipherState);
-            case CipherKeyLen::eKey256Bit:
-                return new GcmT<CipherKeyLen::eKey256Bit,
-                                CpuCipherFeatures::eVaes512>(pCipherState);
-        }
-    } else if (arch == alcp::utils::CpuCipherFeatures::eVaes256) {
-        switch (keyLen) {
-            case CipherKeyLen::eKey128Bit:
-                return new GcmT<CipherKeyLen::eKey128Bit,
-                                CpuCipherFeatures::eVaes256>(pCipherState);
-            case CipherKeyLen::eKey192Bit:
-                return new GcmT<CipherKeyLen::eKey192Bit,
-                                CpuCipherFeatures::eVaes256>(pCipherState);
-            case CipherKeyLen::eKey256Bit:
-                return new GcmT<CipherKeyLen::eKey256Bit,
-                                CpuCipherFeatures::eVaes256>(pCipherState);
-        }
-    } else if (arch == alcp::utils::CpuCipherFeatures::eAesni) {
-        switch (keyLen) {
-            case CipherKeyLen::eKey128Bit:
-                return new GcmT<CipherKeyLen::eKey128Bit,
-                                CpuCipherFeatures::eAesni>(pCipherState);
-            case CipherKeyLen::eKey192Bit:
-                return new GcmT<CipherKeyLen::eKey192Bit,
-                                CpuCipherFeatures::eAesni>(pCipherState);
-            case CipherKeyLen::eKey256Bit:
-                return new GcmT<CipherKeyLen::eKey256Bit,
-                                CpuCipherFeatures::eAesni>(pCipherState);
-        }
-    }
-    printf("\n Error: Reference kernel not supported ");
-    return nullptr;
-}
-
-iCipherAead*
-getGcm(const CipherKeyLen keyLen, const CpuCipherFeatures arch)
-{
-    if (arch == alcp::utils::CpuCipherFeatures::eVaes512) {
-        switch (keyLen) {
-            case CipherKeyLen::eKey128Bit:
-                return new GcmT<CipherKeyLen::eKey128Bit,
-                                CpuCipherFeatures::eVaes512>();
-            case CipherKeyLen::eKey192Bit:
-                return new GcmT<CipherKeyLen::eKey192Bit,
-                                CpuCipherFeatures::eVaes512>();
-            case CipherKeyLen::eKey256Bit:
-                return new GcmT<CipherKeyLen::eKey256Bit,
-                                CpuCipherFeatures::eVaes512>();
-        }
-    } else if (arch == alcp::utils::CpuCipherFeatures::eVaes256) {
-        switch (keyLen) {
-            case CipherKeyLen::eKey128Bit:
-                return new GcmT<CipherKeyLen::eKey128Bit,
-                                CpuCipherFeatures::eVaes256>();
-            case CipherKeyLen::eKey192Bit:
-                return new GcmT<CipherKeyLen::eKey192Bit,
-                                CpuCipherFeatures::eVaes256>();
-            case CipherKeyLen::eKey256Bit:
-                return new GcmT<CipherKeyLen::eKey256Bit,
-                                CpuCipherFeatures::eVaes256>();
-        }
-    } else if (arch == alcp::utils::CpuCipherFeatures::eAesni) {
-        switch (keyLen) {
-            case CipherKeyLen::eKey128Bit:
-                return new GcmT<CipherKeyLen::eKey128Bit,
-                                CpuCipherFeatures::eAesni>();
-            case CipherKeyLen::eKey192Bit:
-                return new GcmT<CipherKeyLen::eKey192Bit,
-                                CpuCipherFeatures::eAesni>();
-            case CipherKeyLen::eKey256Bit:
-                return new GcmT<CipherKeyLen::eKey256Bit,
-                                CpuCipherFeatures::eAesni>();
-        }
-    }
-    printf("\n Error: Reference kernel not supported ");
-    return nullptr;
-}
-
-iCipherAead*
-getCcm(const CipherKeyLen keyLen, const CpuCipherFeatures arch)
-{
-    if (arch >= alcp::utils::CpuCipherFeatures::eAesni) {
-        switch (keyLen) {
-            case CipherKeyLen::eKey128Bit:
-                return new CcmT<CipherKeyLen::eKey128Bit,
-                                CpuCipherFeatures::eAesni>();
-            case CipherKeyLen::eKey192Bit:
-                return new CcmT<CipherKeyLen::eKey192Bit,
-                                CpuCipherFeatures::eAesni>();
-            case CipherKeyLen::eKey256Bit:
-                return new CcmT<CipherKeyLen::eKey256Bit,
-                                CpuCipherFeatures::eAesni>();
-        }
-    }
-    printf("\n Error: Reference kernel not supported ");
-    return nullptr;
-}
-
-iCipher*
-getXts(const CipherKeyLen keyLenBits, const CpuCipherFeatures arch)
-{
-    if ((keyLenBits != CipherKeyLen::eKey128Bit)
-        && (keyLenBits != CipherKeyLen::eKey256Bit)) {
-        printf("\n Error: key length not supported ");
-        return nullptr;
-    }
-    if (arch == alcp::utils::CpuCipherFeatures::eVaes512) {
-        switch (keyLenBits) {
-            case CipherKeyLen::eKey128Bit:
-                return new XtsT<CipherKeyLen::eKey128Bit,
-                                CpuCipherFeatures::eVaes512>();
-            case CipherKeyLen::eKey256Bit:
-                return new XtsT<CipherKeyLen::eKey256Bit,
-                                CpuCipherFeatures::eVaes512>();
-            default:
-                return nullptr;
-        }
-    } else if (arch == alcp::utils::CpuCipherFeatures::eVaes256) {
-        switch (keyLenBits) {
-            case CipherKeyLen::eKey128Bit:
-                return new XtsT<CipherKeyLen::eKey128Bit,
-                                CpuCipherFeatures::eVaes256>();
-            case CipherKeyLen::eKey256Bit:
-                return new XtsT<CipherKeyLen::eKey256Bit,
-                                CpuCipherFeatures::eVaes256>();
-            default:
-                return nullptr;
-        }
-    } else if (arch == alcp::utils::CpuCipherFeatures::eAesni) {
-        switch (keyLenBits) {
-            case CipherKeyLen::eKey128Bit:
-                return new XtsT<CipherKeyLen::eKey128Bit,
-                                CpuCipherFeatures::eAesni>();
-            case CipherKeyLen::eKey256Bit:
-                return new XtsT<CipherKeyLen::eKey256Bit,
-                                CpuCipherFeatures::eAesni>();
-            default:
-                return nullptr;
-        }
-    }
-    printf("\n Error: Reference kernel not supported ");
-    return nullptr;
-}
-
-iCipherSeg*
-getXtsBlock(const CipherKeyLen keyLenBits, const CpuCipherFeatures arch)
-{
-    if ((keyLenBits != CipherKeyLen::eKey128Bit)
-        && (keyLenBits != CipherKeyLen::eKey256Bit)) {
-        printf("\n Error: key length not supported ");
-        return nullptr;
-    }
-    if (arch == alcp::utils::CpuCipherFeatures::eVaes512) {
-        switch (keyLenBits) {
-            case CipherKeyLen::eKey128Bit:
-                return new XtsBlockT<CipherKeyLen::eKey128Bit,
-                                     CpuCipherFeatures::eVaes512>();
-            case CipherKeyLen::eKey256Bit:
-                return new XtsBlockT<CipherKeyLen::eKey256Bit,
-                                     CpuCipherFeatures::eVaes512>();
-            default:
-                return nullptr;
-        }
-    } else if (arch == alcp::utils::CpuCipherFeatures::eVaes256) {
-        switch (keyLenBits) {
-            case CipherKeyLen::eKey128Bit:
-                return new XtsBlockT<CipherKeyLen::eKey128Bit,
-                                     CpuCipherFeatures::eVaes256>();
-            case CipherKeyLen::eKey256Bit:
-                return new XtsBlockT<CipherKeyLen::eKey256Bit,
-                                     CpuCipherFeatures::eVaes256>();
-            default:
-                return nullptr;
-        }
-    } else if (arch == alcp::utils::CpuCipherFeatures::eAesni) {
-        switch (keyLenBits) {
-            case CipherKeyLen::eKey128Bit:
-                return new XtsBlockT<CipherKeyLen::eKey128Bit,
-                                     CpuCipherFeatures::eAesni>();
-            case CipherKeyLen::eKey256Bit:
-                return new XtsBlockT<CipherKeyLen::eKey256Bit,
-                                     CpuCipherFeatures::eAesni>();
-            default:
-                return nullptr;
-        }
-    }
-    printf("\n Error: Reference kernel not supported ");
-    return nullptr;
-}
-
-static bool
-isKeyLenSupported(CipherKeyLen keyLen)
-{
-    if ((keyLen != CipherKeyLen::eKey128Bit)
-        && (keyLen != CipherKeyLen::eKey192Bit)
-        && (keyLen != CipherKeyLen::eKey256Bit)) {
-        printf("\n Error: key length not supported ");
-        return false;
-    }
-    return true;
-}
-
-template<>
-void
-CipherFactory<iCipher>::getCipher()
-{
-
-    if (!isKeyLenSupported(m_keyLen)) {
-        printf("\n Error: key length not supported ");
-        m_iCipher = nullptr;
-        return;
-    }
-
-    // Non-AEAD ciphers
-    switch (m_cipher_mode) {
-        case CipherMode::eAesCBC:
-            m_iCipher =
-                getGenericCiphers<CipherMode::eAesCBC>(m_keyLen, m_arch);
-            break;
-        case CipherMode::eAesOFB:
-            m_iCipher =
-                getGenericCiphers<CipherMode::eAesOFB>(m_keyLen, m_arch);
-            break;
-        case CipherMode::eAesCTR:
-            m_iCipher =
-                getGenericCiphers<CipherMode::eAesCTR>(m_keyLen, m_arch);
-            break;
-        case CipherMode::eAesCFB:
-            m_iCipher =
-                getGenericCiphers<CipherMode::eAesCFB>(m_keyLen, m_arch);
-            break;
-        case CipherMode::eAesXTS:
-            m_iCipher = getXts(m_keyLen, m_arch);
-            break;
-        case CipherMode::eCHACHA20:
-            if (m_arch == CpuCipherFeatures::eVaes512) {
-                using namespace vaes512;
-                m_iCipher = new ChaCha256();
-            } else {
-                using namespace ref;
-                m_iCipher = new ChaCha256();
-            }
-            break;
+    switch (a) {
+        case CpuCipherFeatures::eAesni:
+            return 0;
+        case CpuCipherFeatures::eVaes256:
+            return 1;
+        case CpuCipherFeatures::eVaes512:
+            return 2;
         default:
-            printf("\n Error: Cipher mode not supported ");
-            m_iCipher = nullptr;
-            break;
+            return -1;
     }
 }
 
-template<>
-void
-CipherFactory<iCipherSeg>::getCipher()
+// Strategy dispatch table dimensions
+constexpr int NUM_KEY_LENS = 3; // 128, 192, 256
+constexpr int NUM_ARCHS    = 3; // eAesni, eVaes256, eVaes512
+
+// -----------------------------------------------------------------------------
+// Template-based Strategy Dispatcher
+// Eliminates repetitive switch/if-else chains by using compile-time lookup
+// -----------------------------------------------------------------------------
+
+template<typename Interface,
+         template<CipherKeyLen, CpuCipherFeatures>
+         class CipherT>
+struct CipherStrategy
 {
-    if (m_arch < alcp::utils::CpuCipherFeatures::eAesni) {
-        printf("\n Error: Reference kernel not supported ");
-        m_iCipher = nullptr;
-        return;
-    }
+    using CreatorFn = Interface* (*)();
 
-    // Non-AEAD ciphers
-    switch (m_cipher_mode) {
-        case CipherMode::eAesXTS:
-            m_iCipher = getXtsBlock(m_keyLen, m_arch);
-            break;
-        default:
-            printf("\n Error: Cipher mode not supported in iCipherSeg ");
-            m_iCipher = nullptr;
-            break;
-    }
-}
+    // Dispatch table: [keyLen][arch] -> creator function
+    static constexpr CreatorFn creators[NUM_KEY_LENS][NUM_ARCHS] = {
+        // eKey128Bit row
+        { []() -> Interface* {
+             return new CipherT<CipherKeyLen::eKey128Bit,
+                                CpuCipherFeatures::eAesni>();
+         },
+          []() -> Interface* {
+              return new CipherT<CipherKeyLen::eKey128Bit,
+                                 CpuCipherFeatures::eVaes256>();
+          },
+          []() -> Interface* {
+              return new CipherT<CipherKeyLen::eKey128Bit,
+                                 CpuCipherFeatures::eVaes512>();
+          } },
+        // eKey192Bit row
+        { []() -> Interface* {
+             return new CipherT<CipherKeyLen::eKey192Bit,
+                                CpuCipherFeatures::eAesni>();
+         },
+          []() -> Interface* {
+              return new CipherT<CipherKeyLen::eKey192Bit,
+                                 CpuCipherFeatures::eVaes256>();
+          },
+          []() -> Interface* {
+              return new CipherT<CipherKeyLen::eKey192Bit,
+                                 CpuCipherFeatures::eVaes512>();
+          } },
+        // eKey256Bit row
+        { []() -> Interface* {
+             return new CipherT<CipherKeyLen::eKey256Bit,
+                                CpuCipherFeatures::eAesni>();
+         },
+          []() -> Interface* {
+              return new CipherT<CipherKeyLen::eKey256Bit,
+                                 CpuCipherFeatures::eVaes256>();
+          },
+          []() -> Interface* {
+              return new CipherT<CipherKeyLen::eKey256Bit,
+                                 CpuCipherFeatures::eVaes512>();
+          } },
+    };
 
-template<>
-void
-CipherFactory<iCipherAead>::getCipher()
-{
-    if (!isKeyLenSupported(m_keyLen)) {
-        printf("\n Error: key length not supported ");
-        m_iCipher = nullptr;
-        return;
+    static Interface* dispatch(CipherKeyLen keyLen, CpuCipherFeatures arch)
+    {
+        int keyIdx  = keyLenToIndex(keyLen);
+        int archIdx = archToIndex(arch);
+        if (keyIdx < 0 || archIdx < 0) {
+            printf("\n Error: Invalid key length or architecture ");
+            return nullptr;
+        }
+        return creators[keyIdx][archIdx]();
     }
-
-    // AEAD ciphers
-    switch (m_cipher_mode) {
-        case CipherMode::eAesGCM:
-            if (m_cipher_state != nullptr) {
-                m_iCipher = getGcm(m_keyLen, m_arch, m_cipher_state);
-            } else {
-                m_iCipher = getGcm(m_keyLen, m_arch);
-            }
-            break;
-        case CipherMode::eAesCCM:
-            m_iCipher = getCcm(m_keyLen, m_arch);
-            break;
-        case CipherMode::eAesSIV:
-            m_iCipher = getSiv(m_keyLen, m_arch);
-            break;
-        case CipherMode::eCHACHA20_POLY1305:
-            if (m_arch == CpuCipherFeatures::eVaes512) {
-                using namespace vaes512;
-                m_iCipher = new ChaChaPoly256();
-            } else {
-                using namespace ref;
-                m_iCipher = new ChaChaPoly256();
-            }
-            break;
-        default:
-            printf("\n Error: Cipher mode not supported ");
-            m_iCipher = nullptr;
-            break;
-    }
-}
-
-static void
-listModes(cipherAlgoMapT map)
-{
-    std::cout << "List of supported cipher modes in the selected CipherFactory "
-              << std::endl;
-    for (auto it1 = map.begin(); it1 != map.end(); ++it1) {
-        std::cout << it1->first.c_str() << std::endl;
-    }
-}
-
-template<class INTERFACE>
-INTERFACE*
-CipherFactory<INTERFACE>::create(const string& name)
-{
-    auto it = m_cipherMap.find(name);
-    if (it == m_cipherMap.end()) {
-        std::cout << "\n error " << name << " cipher mode not supported "
-                  << std::endl;
-        listModes(m_cipherMap);
-        return nullptr;
-    }
-    cipherKeyLenTupleT t = it->second;
-    return create(std::get<0>(t), std::get<1>(t));
-}
-
-template<class INTERFACE>
-INTERFACE*
-CipherFactory<INTERFACE>::create(const string& name, CpuCipherFeatures arch)
-{
-    auto it = m_cipherMap.find(name);
-    if (it == m_cipherMap.end()) {
-        std::cout << "\n error " << name << " cipher mode not supported "
-                  << std::endl;
-        listModes(m_cipherMap);
-        return nullptr;
-    }
-    cipherKeyLenTupleT t = it->second;
-    return create(std::get<0>(t), std::get<1>(t), arch);
-}
-
-template<class INTERFACE>
-INTERFACE*
-CipherFactory<INTERFACE>::create(const CipherMode   mode,
-                                 const CipherKeyLen keyLen)
-{
-    m_cipher_mode = mode;
-    m_keyLen      = keyLen;
-    m_arch        = m_currentArch;
-    getCipher();
-    return m_iCipher;
 };
 
-template<class INTERFACE>
-INTERFACE*
-CipherFactory<INTERFACE>::create(const CipherMode    mode,
-                                 const CipherKeyLen  keyLen,
-                                 alc_cipher_state_t* pCipherState)
+// Specialized strategy for GCM with external state parameter
+struct GcmWithStateStrategy
 {
-    m_cipher_mode  = mode;
-    m_keyLen       = keyLen;
-    m_arch         = m_currentArch;
-    m_cipher_state = pCipherState;
-    getCipher();
-    return m_iCipher;
+    using CreatorFn = iCipherAead* (*)(alc_cipher_state_t*);
+
+    static constexpr CreatorFn creators[NUM_KEY_LENS][NUM_ARCHS] = {
+        // eKey128Bit row
+        { [](alc_cipher_state_t* s) -> iCipherAead* {
+             return new GcmT<CipherKeyLen::eKey128Bit,
+                             CpuCipherFeatures::eAesni>(s);
+         },
+          [](alc_cipher_state_t* s) -> iCipherAead* {
+              return new GcmT<CipherKeyLen::eKey128Bit,
+                              CpuCipherFeatures::eVaes256>(s);
+          },
+          [](alc_cipher_state_t* s) -> iCipherAead* {
+              return new GcmT<CipherKeyLen::eKey128Bit,
+                              CpuCipherFeatures::eVaes512>(s);
+          } },
+        // eKey192Bit row
+        { [](alc_cipher_state_t* s) -> iCipherAead* {
+             return new GcmT<CipherKeyLen::eKey192Bit,
+                             CpuCipherFeatures::eAesni>(s);
+         },
+          [](alc_cipher_state_t* s) -> iCipherAead* {
+              return new GcmT<CipherKeyLen::eKey192Bit,
+                              CpuCipherFeatures::eVaes256>(s);
+          },
+          [](alc_cipher_state_t* s) -> iCipherAead* {
+              return new GcmT<CipherKeyLen::eKey192Bit,
+                              CpuCipherFeatures::eVaes512>(s);
+          } },
+        // eKey256Bit row
+        { [](alc_cipher_state_t* s) -> iCipherAead* {
+             return new GcmT<CipherKeyLen::eKey256Bit,
+                             CpuCipherFeatures::eAesni>(s);
+         },
+          [](alc_cipher_state_t* s) -> iCipherAead* {
+              return new GcmT<CipherKeyLen::eKey256Bit,
+                              CpuCipherFeatures::eVaes256>(s);
+          },
+          [](alc_cipher_state_t* s) -> iCipherAead* {
+              return new GcmT<CipherKeyLen::eKey256Bit,
+                              CpuCipherFeatures::eVaes512>(s);
+          } },
+    };
+
+    static iCipherAead* dispatch(CipherKeyLen        keyLen,
+                                 CpuCipherFeatures   arch,
+                                 alc_cipher_state_t* state)
+    {
+        int keyIdx  = keyLenToIndex(keyLen);
+        int archIdx = archToIndex(arch);
+        if (keyIdx < 0 || archIdx < 0) {
+            printf("\n Error: Invalid key length or architecture ");
+            return nullptr;
+        }
+        return creators[keyIdx][archIdx](state);
+    }
 };
 
-template<class INTERFACE>
-INTERFACE*
-CipherFactory<INTERFACE>::create(const CipherMode        mode,
-                                 const CipherKeyLen      keyLen,
-                                 const CpuCipherFeatures arch)
+// Strategy for generic ciphers (CBC, CTR, OFB, CFB) with mode as template param
+template<CipherMode Mode>
+struct GenericCipherStrategy
 {
-    m_cipher_mode = mode;
-    m_keyLen      = keyLen;
-    m_arch        = arch;
+    using CreatorFn = iCipher* (*)();
 
-    // limit based on arch available in the cpu.
-    if (m_arch > m_currentArch) {
-#if 0 /* when default feature set to highest level, avoid multiple warnings */
-        std::cout << "\n warning! requested ISA is not supported by platform, "
-                     "lowering to ISA supported "
-                  << std::endl;
-#endif
-        m_arch = m_currentArch;
+    static constexpr CreatorFn creators[NUM_KEY_LENS][NUM_ARCHS] = {
+        // eKey128Bit row
+        { []() -> iCipher* {
+             return new AesGenericCiphersT<Mode,
+                                          CipherKeyLen::eKey128Bit,
+                                          CpuCipherFeatures::eAesni>();
+         },
+          []() -> iCipher* {
+              return new AesGenericCiphersT<Mode,
+                                           CipherKeyLen::eKey128Bit,
+                                           CpuCipherFeatures::eVaes256>();
+          },
+          []() -> iCipher* {
+              return new AesGenericCiphersT<Mode,
+                                           CipherKeyLen::eKey128Bit,
+                                           CpuCipherFeatures::eVaes512>();
+          } },
+        // eKey192Bit row
+        { []() -> iCipher* {
+             return new AesGenericCiphersT<Mode,
+                                          CipherKeyLen::eKey192Bit,
+                                          CpuCipherFeatures::eAesni>();
+         },
+          []() -> iCipher* {
+              return new AesGenericCiphersT<Mode,
+                                           CipherKeyLen::eKey192Bit,
+                                           CpuCipherFeatures::eVaes256>();
+          },
+          []() -> iCipher* {
+              return new AesGenericCiphersT<Mode,
+                                           CipherKeyLen::eKey192Bit,
+                                           CpuCipherFeatures::eVaes512>();
+          } },
+        // eKey256Bit row
+        { []() -> iCipher* {
+             return new AesGenericCiphersT<Mode,
+                                          CipherKeyLen::eKey256Bit,
+                                          CpuCipherFeatures::eAesni>();
+         },
+          []() -> iCipher* {
+              return new AesGenericCiphersT<Mode,
+                                           CipherKeyLen::eKey256Bit,
+                                           CpuCipherFeatures::eVaes256>();
+          },
+          []() -> iCipher* {
+              return new AesGenericCiphersT<Mode,
+                                           CipherKeyLen::eKey256Bit,
+                                           CpuCipherFeatures::eVaes512>();
+          } },
+    };
+
+    static iCipher* dispatch(CipherKeyLen keyLen, CpuCipherFeatures arch)
+    {
+        int keyIdx  = keyLenToIndex(keyLen);
+        int archIdx = archToIndex(arch);
+        if (keyIdx < 0 || archIdx < 0) {
+            printf("\n Error: Invalid key length or architecture ");
+            return nullptr;
+        }
+        return creators[keyIdx][archIdx]();
     }
+};
 
-    getCipher();
-    return m_iCipher;
-}
+// Strategy for XTS (only supports 128 and 256 bit keys)
+struct XtsStrategy
+{
+    using CreatorFn = iCipher* (*)();
 
-template<class INTERFACE>
+    // Only 128 and 256 bit keys supported, nullptr for 192
+    static constexpr CreatorFn creators[NUM_KEY_LENS][NUM_ARCHS] = {
+        // eKey128Bit row
+        { []() -> iCipher* {
+             return new XtsT<CipherKeyLen::eKey128Bit,
+                             CpuCipherFeatures::eAesni>();
+         },
+          []() -> iCipher* {
+              return new XtsT<CipherKeyLen::eKey128Bit,
+                              CpuCipherFeatures::eVaes256>();
+          },
+          []() -> iCipher* {
+              return new XtsT<CipherKeyLen::eKey128Bit,
+                              CpuCipherFeatures::eVaes512>();
+          } },
+        // eKey192Bit row - not supported
+        { nullptr, nullptr, nullptr },
+        // eKey256Bit row
+        { []() -> iCipher* {
+             return new XtsT<CipherKeyLen::eKey256Bit,
+                             CpuCipherFeatures::eAesni>();
+         },
+          []() -> iCipher* {
+              return new XtsT<CipherKeyLen::eKey256Bit,
+                              CpuCipherFeatures::eVaes256>();
+          },
+          []() -> iCipher* {
+              return new XtsT<CipherKeyLen::eKey256Bit,
+                              CpuCipherFeatures::eVaes512>();
+          } },
+    };
+
+    static iCipher* dispatch(CipherKeyLen keyLen, CpuCipherFeatures arch)
+    {
+        int keyIdx  = keyLenToIndex(keyLen);
+        int archIdx = archToIndex(arch);
+        if (keyIdx < 0 || archIdx < 0 || creators[keyIdx][archIdx] == nullptr) {
+            printf("\n Error: key length not supported for XTS ");
+            return nullptr;
+        }
+        return creators[keyIdx][archIdx]();
+    }
+};
+
+// Strategy for XTS Block (segmented capability) - only supports 128 and 256 bit keys
+struct XtsBlockStrategy
+{
+    using CreatorFn = iCipherSegment* (*)();
+
+    static constexpr CreatorFn creators[NUM_KEY_LENS][NUM_ARCHS] = {
+        // eKey128Bit row
+        { []() -> iCipherSegment* {
+             return new XtsBlockT<CipherKeyLen::eKey128Bit,
+                                  CpuCipherFeatures::eAesni>();
+         },
+          []() -> iCipherSegment* {
+              return new XtsBlockT<CipherKeyLen::eKey128Bit,
+                                   CpuCipherFeatures::eVaes256>();
+          },
+          []() -> iCipherSegment* {
+              return new XtsBlockT<CipherKeyLen::eKey128Bit,
+                                   CpuCipherFeatures::eVaes512>();
+          } },
+        // eKey192Bit row - not supported
+        { nullptr, nullptr, nullptr },
+        // eKey256Bit row
+        { []() -> iCipherSegment* {
+             return new XtsBlockT<CipherKeyLen::eKey256Bit,
+                                  CpuCipherFeatures::eAesni>();
+         },
+          []() -> iCipherSegment* {
+              return new XtsBlockT<CipherKeyLen::eKey256Bit,
+                                   CpuCipherFeatures::eVaes256>();
+          },
+          []() -> iCipherSegment* {
+              return new XtsBlockT<CipherKeyLen::eKey256Bit,
+                                   CpuCipherFeatures::eVaes512>();
+          } },
+    };
+
+    static iCipherSegment* dispatch(CipherKeyLen keyLen, CpuCipherFeatures arch)
+    {
+        int keyIdx  = keyLenToIndex(keyLen);
+        int archIdx = archToIndex(arch);
+        if (keyIdx < 0 || archIdx < 0 || creators[keyIdx][archIdx] == nullptr) {
+            printf("\n Error: key length not supported for XTS Block ");
+            return nullptr;
+        }
+        return creators[keyIdx][archIdx]();
+    }
+};
+
+// CCM Strategy - only supports eAesni architecture
+struct CcmStrategy
+{
+    using CreatorFn = iCipherAead* (*)();
+
+    static constexpr CreatorFn creators[NUM_KEY_LENS] = {
+        []() -> iCipherAead* {
+            return new Ccm<CipherKeyLen::eKey128Bit, CpuCipherFeatures::eAesni>();
+        },
+        []() -> iCipherAead* {
+            return new Ccm<CipherKeyLen::eKey192Bit, CpuCipherFeatures::eAesni>();
+        },
+        []() -> iCipherAead* {
+            return new Ccm<CipherKeyLen::eKey256Bit, CpuCipherFeatures::eAesni>();
+        },
+    };
+
+    static iCipherAead* dispatch(CipherKeyLen keyLen)
+    {
+        int keyIdx = keyLenToIndex(keyLen);
+        if (keyIdx < 0) {
+            printf("\n Error: Invalid key length for CCM ");
+            return nullptr;
+        }
+        return creators[keyIdx]();
+    }
+};
+
+// CPU feature detection
 CpuCipherFeatures
-CipherFactory<INTERFACE>::getCpuCipherFeature()
+getCpuCipherFeature()
 {
-    CpuCipherFeatures cpu_feature =
-        CpuCipherFeatures::eReference; // If no arch features present,means
-                                       // no acceleration, Fall back to
-                                       // reference
+    CpuCipherFeatures cpu_feature = CpuCipherFeatures::eReference;
 
     if (CpuId::cpuHasAesni() && CpuId::cpuHasAvx2()) {
         cpu_feature = CpuCipherFeatures::eAesni;
@@ -590,89 +421,127 @@ CipherFactory<INTERFACE>::getCpuCipherFeature()
     return cpu_feature;
 }
 
-template<>
-void
-CipherFactory<iCipher>::initCipherMap()
+// Cached CPU feature - initialized once
+CpuCipherFeatures
+getCachedCpuFeature()
 {
-    m_cipherMap = {
-        { "aes-cbc-128", { CipherMode::eAesCBC, CipherKeyLen::eKey128Bit } },
-        { "aes-cbc-192", { CipherMode::eAesCBC, CipherKeyLen::eKey192Bit } },
-        { "aes-cbc-256", { CipherMode::eAesCBC, CipherKeyLen::eKey256Bit } },
-
-        { "aes-ofb-128", { CipherMode::eAesOFB, CipherKeyLen::eKey128Bit } },
-        { "aes-ofb-192", { CipherMode::eAesOFB, CipherKeyLen::eKey192Bit } },
-        { "aes-ofb-256", { CipherMode::eAesOFB, CipherKeyLen::eKey256Bit } },
-
-        { "aes-ctr-128", { CipherMode::eAesCTR, CipherKeyLen::eKey128Bit } },
-        { "aes-ctr-192", { CipherMode::eAesCTR, CipherKeyLen::eKey192Bit } },
-        { "aes-ctr-256", { CipherMode::eAesCTR, CipherKeyLen::eKey256Bit } },
-
-        { "aes-cfb-128", { CipherMode::eAesCFB, CipherKeyLen::eKey128Bit } },
-        { "aes-cfb-192", { CipherMode::eAesCFB, CipherKeyLen::eKey192Bit } },
-        { "aes-cfb-256", { CipherMode::eAesCFB, CipherKeyLen::eKey256Bit } },
-
-        { "aes-xts-128", { CipherMode::eAesXTS, CipherKeyLen::eKey128Bit } },
-        { "aes-xts-256", { CipherMode::eAesXTS, CipherKeyLen::eKey256Bit } },
-
-        { "chacha20", { CipherMode::eCHACHA20, CipherKeyLen::eKey256Bit } },
-    };
+    static CpuCipherFeatures s_cpuFeatures = getCpuCipherFeature();
+    return s_cpuFeatures;
 }
 
-template<>
-void
-CipherFactory<iCipherSeg>::initCipherMap()
+} // anonymous namespace
+
+iCipherAead*
+createCipherAead(const CipherMode    mode,
+                 const CipherKeyLen  keyLen,
+                 alc_cipher_state_t* pCipherState)
 {
-    m_cipherMap = {
-        { "aes-xts-128", { CipherMode::eAesXTS, CipherKeyLen::eKey128Bit } },
-        { "aes-xts-256", { CipherMode::eAesXTS, CipherKeyLen::eKey256Bit } },
-    };
-}
+    CpuCipherFeatures arch = getCachedCpuFeature();
 
-template<>
-void
-CipherFactory<iCipherAead>::initCipherMap()
-{
-    m_cipherMap = {
-        { "aes-gcm-128", { CipherMode::eAesGCM, CipherKeyLen::eKey128Bit } },
-        { "aes-gcm-192", { CipherMode::eAesGCM, CipherKeyLen::eKey192Bit } },
-        { "aes-gcm-256", { CipherMode::eAesGCM, CipherKeyLen::eKey256Bit } },
-
-        { "aes-ccm-128", { CipherMode::eAesCCM, CipherKeyLen::eKey128Bit } },
-        { "aes-ccm-192", { CipherMode::eAesCCM, CipherKeyLen::eKey192Bit } },
-        { "aes-ccm-256", { CipherMode::eAesCCM, CipherKeyLen::eKey256Bit } },
-
-        { "aes-siv-128", { CipherMode::eAesSIV, CipherKeyLen::eKey128Bit } },
-        { "aes-siv-192", { CipherMode::eAesSIV, CipherKeyLen::eKey192Bit } },
-        { "aes-siv-256", { CipherMode::eAesSIV, CipherKeyLen::eKey256Bit } },
-
-        { "chachapoly",
-          { CipherMode::eCHACHA20_POLY1305, CipherKeyLen::eKey256Bit } },
-    };
-}
-
-template<class INTERFACE>
-void
-CipherFactory<INTERFACE>::clearCipherMap()
-{
-    m_cipherMap.clear();
-}
-
-template<class INTERFACE>
-CipherFactory<INTERFACE>::CipherFactory()
-{
-    initCipherMap();
-};
-
-template<class INTERFACE>
-CipherFactory<INTERFACE>::~CipherFactory()
-{
-    clearCipherMap();
-    if (m_iCipher != nullptr) {
-        delete m_iCipher;
+    if (keyLenToIndex(keyLen) < 0) {
+        printf("\n Error: key length not supported ");
+        return nullptr;
     }
-};
 
-template class CipherFactory<iCipherAead>;
-template class CipherFactory<iCipher>;
-template class CipherFactory<iCipherSeg>;
+    if (arch < CpuCipherFeatures::eAesni) {
+        printf("\n Error: Reference kernel not supported ");
+        return nullptr;
+    }
+
+    switch (mode) {
+        case CipherMode::eAesGCM:
+            return GcmWithStateStrategy::dispatch(keyLen, arch, pCipherState);
+
+        case CipherMode::eAesCCM:
+            // CCM only supports eAesni architecture
+            return CcmStrategy::dispatch(keyLen);
+
+        case CipherMode::eAesSIV:
+            return CipherStrategy<iCipherAead, Siv>::dispatch(keyLen, arch);
+
+        case CipherMode::eCHACHA20_POLY1305:
+            // ChaCha20-Poly1305 only supports 256-bit keys
+            if (keyLen != CipherKeyLen::eKey256Bit) {
+                printf("\n Error: ChaCha20-Poly1305 only supports 256-bit keys ");
+                return nullptr;
+            }
+            if (arch >= CpuCipherFeatures::eVaes512) {
+                return new vaes512::ChaChaPoly();
+            }
+            return new ref::ChaChaPoly();
+
+        default:
+            printf("\n Error: AEAD cipher mode not supported ");
+            return nullptr;
+    }
+}
+
+iCipher*
+createCipher(const CipherMode mode, const CipherKeyLen keyLen)
+{
+    CpuCipherFeatures arch = getCachedCpuFeature();
+
+    if (keyLenToIndex(keyLen) < 0) {
+        printf("\n Error: key length not supported ");
+        return nullptr;
+    }
+
+    if (arch < CpuCipherFeatures::eAesni) {
+        printf("\n Error: Reference kernel not supported ");
+        return nullptr;
+    }
+
+    switch (mode) {
+        case CipherMode::eAesCBC:
+            return GenericCipherStrategy<CipherMode::eAesCBC>::dispatch(keyLen, arch);
+
+        case CipherMode::eAesCTR:
+            return GenericCipherStrategy<CipherMode::eAesCTR>::dispatch(keyLen, arch);
+
+        case CipherMode::eAesOFB:
+            return GenericCipherStrategy<CipherMode::eAesOFB>::dispatch(keyLen, arch);
+
+        case CipherMode::eAesCFB:
+            return GenericCipherStrategy<CipherMode::eAesCFB>::dispatch(keyLen, arch);
+
+        case CipherMode::eAesXTS:
+            return XtsStrategy::dispatch(keyLen, arch);
+
+        case CipherMode::eCHACHA20:
+            // ChaCha20 only supports 256-bit keys
+            if (keyLen != CipherKeyLen::eKey256Bit) {
+                printf("\n Error: ChaCha20 only supports 256-bit keys ");
+                return nullptr;
+            }
+            if (arch >= CpuCipherFeatures::eVaes512) {
+                return new vaes512::ChaCha256();
+            }
+            return new ref::ChaCha256();
+
+        default:
+            printf("\n Error: Cipher mode not supported ");
+            return nullptr;
+    }
+}
+
+iCipherSegment*
+createCipherSeg(const CipherMode mode, const CipherKeyLen keyLen)
+{
+    CpuCipherFeatures arch = getCachedCpuFeature();
+
+    if (arch < CpuCipherFeatures::eAesni) {
+        printf("\n Error: Reference kernel not supported ");
+        return nullptr;
+    }
+
+    switch (mode) {
+        case CipherMode::eAesXTS:
+            return XtsBlockStrategy::dispatch(keyLen, arch);
+
+        default:
+            printf("\n Error: Cipher mode not supported for segmented ");
+            return nullptr;
+    }
+}
+
 } // namespace alcp::cipher

@@ -29,7 +29,7 @@
 #include "alcp/error.h"
 
 #include "alcp/base.hh"
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/cipher/cipher_wrapper.hh"
 #include "alcp/utils/bits.hh"
 #include "alcp/utils/constants.hh"
@@ -648,17 +648,13 @@ Rijndael::expandKeys(const Uint8* pUserKey) noexcept
 void
 Rijndael::initRijndael(const Uint8* pKey, const Uint64 keyLen)
 {
-    setKeyLen(keyLen);
-    setKey(pKey);
-    setUp();
+    setKey(pKey, static_cast<int>(keyLen));
 }
 
 void
 Rijndael::initRijndael(const Uint8* pKey, Uint8* pExpKey, const Uint64 keyLen)
 {
-    setKeyLen(keyLen);
-    setKey(pKey, pExpKey, keyLen);
-    setUp();
+    setKey(pKey, pExpKey, static_cast<int>(keyLen));
 }
 
 Rijndael::Rijndael()

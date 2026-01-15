@@ -26,7 +26,7 @@
  *
  */
 
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/cipher/aes_gcm.hh"
 
 #include "gtest/gtest.h"
@@ -170,32 +170,25 @@ known_answer_map_t KATDataset{
 // clang-format on
 
 /**
- * @brief Key Size to Mode string
+ * @brief Key Size to CipherKeyLen
  *
  * @param keySize Key size in Bytes
- * @return std::string, mode
+ * @return CipherKeyLen enum
  */
-std::string
-keyToModStr(Uint64 keySize)
+CipherKeyLen
+keyToKeyLen(Uint64 keySize)
 {
-    std::string mode_str = "";
     switch (keySize) {
         case 16:
-            mode_str = "aes-gcm-128";
-            break;
+            return CipherKeyLen::eKey128Bit;
         case 24:
-            mode_str = "aes-gcm-192";
-            break;
+            return CipherKeyLen::eKey192Bit;
         case 32:
-            mode_str = "aes-gcm-256";
-            break;
+            return CipherKeyLen::eKey256Bit;
         default:
-            mode_str = "aes-gcm-128";
-            std::cout
-                << "Mode string defaulting to 'aes-gcm-128', invalid keysize"
-                << std::endl;
+            std::cout << "Defaulting to 128-bit, invalid keysize" << std::endl;
+            return CipherKeyLen::eKey128Bit;
     }
-    return mode_str;
 }
 
 template<typename T>
@@ -224,9 +217,7 @@ class GCM_KAT
     : public testing::TestWithParam<std::pair<const std::string, param_tuple>>
 {
   public:
-    // GCM_KAT() {}
-    CipherFactory<iCipherAead>* alcpCipher = nullptr;
-    iCipherAead*                pGcmObj    = nullptr;
+    iCipherAead* pGcmObj = nullptr;
     std::vector<Uint8> m_key, m_nonce, m_aad, m_plaintext, m_ciphertext, m_tag;
     std::string        m_test_name;
     alc_error_t        m_err;
@@ -254,8 +245,7 @@ class GCM_KAT
         /* Initialization */
 
         // Setup GCM Object
-        alcpCipher = new CipherFactory<iCipherAead>;
-        pGcmObj    = alcpCipher->create(keyToModStr(key.size()));
+        pGcmObj = createCipherAead(CipherMode::eAesGCM, keyToKeyLen(key.size()));
 
         ASSERT_TRUE(pGcmObj != nullptr);
 
@@ -275,7 +265,7 @@ class GCM_KAT
     }
 
     // Teardown Encrypt/Decrypt by verifying the Tag.
-    void TearDown() override { delete alcpCipher; }
+    void TearDown() override { delete pGcmObj; }
 };
 
 TEST(GCM, Instantiation)
@@ -287,51 +277,45 @@ TEST(GCM, Instantiation)
                     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
 
     {
-        auto        alcpCipher = new CipherFactory<iCipherAead>;
-        auto        aead       = alcpCipher->create("aes-gcm-128");
-        alc_error_t err        = ALC_ERROR_NONE;
+        auto        aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+        alc_error_t err  = ALC_ERROR_NONE;
 
         if (aead == nullptr) {
-            delete alcpCipher;
             FAIL();
         }
         aead->init(key, 128, nullptr, 0);
 
         EXPECT_EQ(err, ALC_ERROR_NONE);
 
-        delete alcpCipher;
+        delete aead;
     }
 
     {
-        auto        alcpCipher = new CipherFactory<iCipherAead>;
-        auto        aead       = alcpCipher->create("aes-gcm-192");
-        alc_error_t err        = ALC_ERROR_NONE;
+        auto        aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey192Bit);
+        alc_error_t err  = ALC_ERROR_NONE;
 
         if (aead == nullptr) {
-            delete alcpCipher;
             FAIL();
         }
         aead->init(key, 192, nullptr, 0);
 
         EXPECT_EQ(err, ALC_ERROR_NONE);
 
-        delete alcpCipher;
+        delete aead;
     }
 
     {
-        auto        alcpCipher = new CipherFactory<iCipherAead>;
-        auto        aead       = alcpCipher->create("aes-gcm-256");
-        alc_error_t err        = ALC_ERROR_NONE;
+        auto        aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey256Bit);
+        alc_error_t err  = ALC_ERROR_NONE;
 
         if (aead == nullptr) {
-            delete alcpCipher;
             FAIL();
         }
         err = aead->init(key, 256, nullptr, 0);
 
         EXPECT_EQ(err, ALC_ERROR_NONE);
 
-        delete alcpCipher;
+        delete aead;
     }
 }
 
@@ -445,11 +429,9 @@ TEST(GCM, EncryptUpdateMultiple_KAT_51B)
     std::vector<Uint8> out_ctext(51);
     std::vector<Uint8> out_tag(16);
 
-    auto alcpCipher = new CipherFactory<iCipherAead>;
-    auto aead       = alcpCipher->create("aes-gcm-128");
+    auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
 
     if (aead == nullptr) {
-        delete alcpCipher;
         FAIL();
     }
 
@@ -480,7 +462,7 @@ TEST(GCM, EncryptUpdateMultiple_KAT_51B)
     EXPECT_EQ(err, ALC_ERROR_NONE);
     EXPECT_EQ(out_tag, expected_tag);
 
-    delete alcpCipher;
+    delete aead;
 }
 
 TEST_P(GCM_KAT, Decrypt)
@@ -527,11 +509,9 @@ TEST(GCM, InvalidTagLen)
     Uint8       tag[17];
     Uint8       cipherText[sizeof(pt)];
 
-    auto alcpCipher = new CipherFactory<iCipherAead>;
-    auto aead       = alcpCipher->create("aes-gcm-128");
+    auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
 
     if (aead == nullptr) {
-        delete alcpCipher;
         FAIL();
     }
     err = aead->init(key, 128, iv, 7);
@@ -547,7 +527,7 @@ TEST(GCM, InvalidTagLen)
     err = aead->getTag(tag, 17);
     EXPECT_EQ(err, ALC_ERROR_INVALID_SIZE);
 
-    delete alcpCipher;
+    delete aead;
 }
 
 TEST(GCM, EncryptUpdateSingle)
@@ -580,11 +560,9 @@ TEST(GCM, EncryptUpdateSingle)
     std::vector<Uint8> out(48);
     std::vector<Uint8> tag_out(16);
 
-    auto alcpCipher = new CipherFactory<iCipherAead>;
-    auto aead       = alcpCipher->create("aes-gcm-128");
+    auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
 
     if (aead == nullptr) {
-        delete alcpCipher;
         FAIL();
     }
     err = aead->init(getPtr(key), 128, getPtr(nonce), nonce.size());
@@ -603,7 +581,7 @@ TEST(GCM, EncryptUpdateSingle)
 
     EXPECT_EQ(tag_out, tag);
 
-    delete alcpCipher;
+    delete aead;
 }
 
 TEST(GCM, EncryptUpdateMultiple)
@@ -636,11 +614,9 @@ TEST(GCM, EncryptUpdateMultiple)
     std::vector<Uint8> out(48);
     std::vector<Uint8> tag_out(16);
 
-    auto alcpCipher = new CipherFactory<iCipherAead>;
-    auto aead       = alcpCipher->create("aes-gcm-128");
+    auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
 
     if (aead == nullptr) {
-        delete alcpCipher;
         FAIL();
     }
     err = aead->init(getPtr(key), 128, getPtr(nonce), nonce.size());
@@ -665,7 +641,7 @@ TEST(GCM, EncryptUpdateMultiple)
 
     EXPECT_EQ(tag_out, tag);
 
-    delete alcpCipher;
+    delete aead;
 }
 
 TEST(GCM, DecryptUpdateSingle)
@@ -697,11 +673,9 @@ TEST(GCM, DecryptUpdateSingle)
 
     std::vector<Uint8> out(48);
 
-    auto alcpCipher = new CipherFactory<iCipherAead>;
-    auto aead       = alcpCipher->create("aes-gcm-128");
+    auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
 
     if (aead == nullptr) {
-        delete alcpCipher;
         FAIL();
     }
     err = aead->init(getPtr(key), 128, getPtr(nonce), nonce.size());
@@ -719,7 +693,7 @@ TEST(GCM, DecryptUpdateSingle)
 
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
-    delete alcpCipher;
+    delete aead;
 }
 
 TEST(GCM, DecryptUpdateMultiple)
@@ -751,11 +725,9 @@ TEST(GCM, DecryptUpdateMultiple)
 
     std::vector<Uint8> out(48);
 
-    auto alcpCipher = new CipherFactory<iCipherAead>;
-    auto aead       = alcpCipher->create("aes-gcm-128");
+    auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
 
     if (aead == nullptr) {
-        delete alcpCipher;
         FAIL();
     }
     err = aead->init(getPtr(key), 128, getPtr(nonce), nonce.size());
@@ -779,7 +751,7 @@ TEST(GCM, DecryptUpdateMultiple)
 
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
-    delete alcpCipher;
+    delete aead;
 }
 
 // Unit Test to mimic test_quic_multistream openssl tests
@@ -819,11 +791,9 @@ TEST(GCM, EncryptUpdateMultipleStream)
     std::vector<Uint8> out(48);
     std::vector<Uint8> tag_out(16);
 
-    auto alcpCipher = new CipherFactory<iCipherAead>;
-    auto aead       = alcpCipher->create("aes-gcm-128");
+    auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
 
     if (aead == nullptr) {
-        delete alcpCipher;
         FAIL();
     }
     err = aead->init(getPtr(key), 128, getPtr(nonce), nonce.size());
@@ -847,7 +817,7 @@ TEST(GCM, EncryptUpdateMultipleStream)
 
     EXPECT_EQ(tag_out, tag);
 
-    delete alcpCipher;
+    delete aead;
 }
 
 TEST(GCM, DecryptUpdateMultipleStream)
@@ -885,11 +855,9 @@ TEST(GCM, DecryptUpdateMultipleStream)
     std::vector<Uint8> out(48);
     std::vector<Uint8> tag_out(16);
 
-    auto alcpCipher = new CipherFactory<iCipherAead>;
-    auto aead       = alcpCipher->create("aes-gcm-128");
+    auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
 
     if (aead == nullptr) {
-        delete alcpCipher;
         FAIL();
     }
     err = aead->init(getPtr(key), 128, getPtr(nonce), nonce.size());
@@ -913,7 +881,7 @@ TEST(GCM, DecryptUpdateMultipleStream)
 
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
-    delete alcpCipher;
+    delete aead;
 }
 
 TEST(GCM, KeyCaching)
@@ -998,24 +966,22 @@ TEST(GCM, KeyCaching)
     struct KeySizeTest
     {
         size_t                   key_bits;
-        std::string              mode;
+        CipherKeyLen             keyLen;
         std::vector<TestVector>* vectors;
     };
 
     std::vector<KeySizeTest> key_sizes = {
-        { 128, "aes-gcm-128", &test_vectors_128 },
-        { 192, "aes-gcm-192", &test_vectors_192 },
-        { 256, "aes-gcm-256", &test_vectors_256 }
+        { 128, CipherKeyLen::eKey128Bit, &test_vectors_128 },
+        { 192, CipherKeyLen::eKey192Bit, &test_vectors_192 },
+        { 256, CipherKeyLen::eKey256Bit, &test_vectors_256 }
     };
 
     for (const auto& ks : key_sizes) {
-        auto               alcpCipher = new CipherFactory<iCipherAead>;
-        auto               aead       = alcpCipher->create(ks.mode);
+        auto               aead = createCipherAead(CipherMode::eAesGCM, ks.keyLen);
         std::vector<Uint8> output(16, 0);
         Uint64             outlen{};
 
         if (aead == nullptr) {
-            delete alcpCipher;
             FAIL();
         }
 
@@ -1057,6 +1023,6 @@ TEST(GCM, KeyCaching)
         EXPECT_EQ(output, v[2].ciphertext)
             << "Failed for " << ks.key_bits << "-bit key+IV change";
 
-        delete alcpCipher;
+        delete aead;
     }
 }

@@ -324,12 +324,22 @@ getPtr(std::vector<T>& vect)
 }
 
 using namespace alcp::cipher;
+
+// Helper function to convert key size (in bytes) to CipherKeyLen
+static inline CipherKeyLen keySizeToKeyLen(size_t keySize) {
+    switch (keySize) {
+        case 16: return CipherKeyLen::eKey128Bit;
+        case 24: return CipherKeyLen::eKey192Bit;
+        case 32: return CipherKeyLen::eKey256Bit;
+        default: return CipherKeyLen::eKey128Bit;
+    }
+}
+
 class CCM_KAT
     : public testing::TestWithParam<std::pair<const std::string, param_tuple>>
 {
   public:
-    CipherFactory<iCipherAead>* alcpCipher = nullptr;
-    iCipherAead*                pCcmObj    = nullptr;
+        iCipherAead*                pCcmObj    = nullptr;
     std::vector<Uint8> m_key, m_nonce, m_aad, m_plaintext, m_ciphertext, m_tag;
     std::string        m_test_name;
     alc_error_t        m_err;
@@ -353,13 +363,12 @@ class CCM_KAT
         m_test_name  = std::move(test_name);
 
         // Setup CCM Object
-        alcpCipher = new CipherFactory<iCipherAead>;
         // FIXME: Add feature selection
-        pCcmObj = alcpCipher->create(keyToModStr(m_key.size()));
+        pCcmObj = createCipherAead(CipherMode::eAesCCM, keySizeToKeyLen(m_key.size()));
 
         ASSERT_TRUE(pCcmObj != nullptr);
     }
-    void TearDown() override { delete alcpCipher; }
+    void TearDown() override { delete pCcmObj; }
 };
 
 TEST(CCM, Initiantiation)
@@ -368,15 +377,13 @@ TEST(CCM, Initiantiation)
                     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
 
     // Setup CCM Object
-    auto alcpCipher = new CipherFactory<iCipherAead>;
-    // FIXME: Add feature selection
-    auto pCcmObj = alcpCipher->create(keyToModStr(sizeof(key)));
+        // FIXME: Add feature selection
+    auto pCcmObj = createCipherAead(CipherMode::eAesCCM, keySizeToKeyLen(sizeof(key)));
     // clang-format on
     if (pCcmObj == nullptr) {
-        delete alcpCipher;
         FAIL();
     }
-    delete alcpCipher;
+    delete pCcmObj;
 }
 
 // Test disabled as ZeroLength checks moved to C_API
@@ -751,12 +758,10 @@ TEST(CCM, InvalidTagLen)
                     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
 
     // Setup CCM Object
-    auto alcpCipher = new CipherFactory<iCipherAead>;
-    // FIXME: Add feature selection
-    auto pCcmObj = alcpCipher->create(keyToModStr(sizeof(key)));
+        // FIXME: Add feature selection
+    auto pCcmObj = createCipherAead(CipherMode::eAesCCM, keySizeToKeyLen(sizeof(key)));
 
     if (pCcmObj == nullptr) {
-        delete alcpCipher;
         FAIL();
     }
     alc_error_t err;
@@ -766,7 +771,7 @@ TEST(CCM, InvalidTagLen)
 
     EXPECT_EQ(err, ALC_ERROR_INVALID_ARG);
 
-    delete alcpCipher;
+    delete pCcmObj;
 }
 
 TEST(CCM, InvalidNonceLen)
@@ -778,12 +783,10 @@ TEST(CCM, InvalidNonceLen)
     std::vector<Uint8> nonce(14, 0);
 
     // Setup CCM Object
-    auto alcpCipher = new CipherFactory<iCipherAead>;
-    // FIXME: Add feature selection
-    auto pCcmObj = alcpCipher->create(keyToModStr(sizeof(key)));
+        // FIXME: Add feature selection
+    auto pCcmObj = createCipherAead(CipherMode::eAesCCM, keySizeToKeyLen(sizeof(key)));
 
     if (pCcmObj == nullptr) {
-        delete alcpCipher;
         FAIL();
     }
     alc_error_t err;
@@ -802,5 +805,5 @@ TEST(CCM, InvalidNonceLen)
 
     EXPECT_EQ(err, ALC_ERROR_INVALID_SIZE);
 
-    delete alcpCipher;
+    delete pCcmObj;
 }

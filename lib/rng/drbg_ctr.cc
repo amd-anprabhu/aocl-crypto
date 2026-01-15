@@ -30,7 +30,6 @@
 // steps are also shown as in the documentation as part of the code for future
 // matching and references
 #include "alcp/rng/drbg_ctr.hh"
-#include "alcp/cipher/aes.hh"
 #include "alcp/utils/bignum.hh"
 #include "alcp/utils/copy.hh"
 

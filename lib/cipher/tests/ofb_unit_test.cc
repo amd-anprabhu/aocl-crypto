@@ -32,7 +32,7 @@
 
 #include <gtest/gtest.h>
 
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/cipher/cipher_wrapper.hh"
 #include "debug_defs.hh"
 #include "dispatcher.hh"
@@ -40,8 +40,11 @@
 
 #undef DEBUG
 
-using alcp::cipher::CipherFactory;
+// Factory removed
 using alcp::cipher::iCipher;
+using alcp::cipher::createCipher;
+using alcp::cipher::CipherMode;
+using alcp::cipher::CipherKeyLen;
 namespace alcp::cipher::unittest::ofb {
 std::vector<Uint8> key = { 0x0d, 0x3c, 0x13, 0x53, 0xea, 0x0f, 0x01, 0x06,
                            0x83, 0x47, 0x98, 0xc8, 0x6d, 0x3d, 0xc7, 0x4e };
@@ -114,23 +117,21 @@ using namespace alcp::cipher::unittest::ofb;
 
 TEST(OFB, creation)
 {
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto ofb        = alcpCipher->create("aes-ofb-128");
+        auto ofb        = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
     if (ofb == nullptr) {
-        delete alcpCipher;
+        delete ofb;
         FAIL();
     }
-    delete alcpCipher;
+    delete ofb;
 }
 
 TEST(OFB, BasicEncryption)
 {
 
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto ofb        = alcpCipher->create("aes-ofb-128");
+        auto ofb        = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
 
     if (ofb == nullptr) {
-        delete alcpCipher;
+        delete ofb;
         FAIL();
     }
     std::vector<Uint8> output(cipherText.size());
@@ -140,17 +141,16 @@ TEST(OFB, BasicEncryption)
     Uint64 outlen = 0;
     ofb->encrypt(&plainText[0], &output[0], plainText.size(), &outlen);
 
-    delete alcpCipher;
+    delete ofb;
     EXPECT_EQ(cipherText, output);
 }
 
 TEST(OFB, BasicDecryption)
 {
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto ofb        = alcpCipher->create("aes-ofb-128");
+        auto ofb        = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
 
     if (ofb == nullptr) {
-        delete alcpCipher;
+        delete ofb;
         FAIL();
     }
     std::vector<Uint8> output(plainText.size());
@@ -160,7 +160,7 @@ TEST(OFB, BasicDecryption)
     Uint64 outlen = 0;
     ofb->decrypt(&cipherText[0], &output[0], cipherText.size(), &outlen);
 
-    delete alcpCipher;
+    delete ofb;
     EXPECT_EQ(plainText, output);
 }
 
@@ -169,11 +169,10 @@ TEST(OFB, MultiUpdateEncryption)
 #ifndef OFB_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto ofb        = alcpCipher->create("aes-ofb-128");
+        auto ofb        = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
 
     if (ofb == nullptr) {
-        delete alcpCipher;
+        delete ofb;
         FAIL();
     }
     std::vector<Uint8> output(cipherText.size());
@@ -196,7 +195,7 @@ TEST(OFB, MultiUpdateEncryption)
         EXPECT_FALSE(alcp_is_error(err));
     }
 
-    delete alcpCipher;
+    delete ofb;
     EXPECT_EQ(cipherText, output);
 }
 
@@ -205,11 +204,10 @@ TEST(OFB, MultiUpdateDecryption)
 #ifndef OFB_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto ofb        = alcpCipher->create("aes-ofb-128");
+        auto ofb        = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
 
     if (ofb == nullptr) {
-        delete alcpCipher;
+        delete ofb;
         FAIL();
     }
     std::vector<Uint8> output(cipherText.size());
@@ -230,7 +228,7 @@ TEST(OFB, MultiUpdateDecryption)
         EXPECT_FALSE(alcp_is_error(err));
     }
 
-    delete alcpCipher;
+    delete ofb;
     EXPECT_EQ(plainText, output);
 }
 
@@ -256,11 +254,10 @@ TEST(OFB, RandomEncryptDecryptTest)
                                                plainText_vect.end());
         std::vector<Uint8>       plainTextOut(plainTextVect.size());
 
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto ofb        = alcpCipher->create("aes-ofb-256");
+                auto ofb        = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey256Bit);
 
         if (ofb == nullptr) {
-            delete alcpCipher;
+            delete ofb;
             FAIL();
         }
         alc_error_t s = ofb->init(key_256, 256, &iv[0], sizeof(iv));
@@ -291,7 +288,7 @@ TEST(OFB, RandomEncryptDecryptTest)
             std::cout << "RANDOM_TEST: Decrypt Failure!" << std::endl;
         }
 
-        delete alcpCipher;
+        delete ofb;
         EXPECT_EQ(plainTextVect, plainTextOut);
 #ifdef DEBUG
         auto ret = std::mismatch(

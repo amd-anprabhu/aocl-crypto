@@ -11,14 +11,14 @@
  * 3. Neither the name of the copyright holder nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  * without specific prior written permission.
- *-
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
  * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
  * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS!
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
@@ -49,100 +49,72 @@ union len_aad_processed
 
 using utils::CpuArchFeature;
 
+/**
+ * @brief Unified ChaCha20-Poly1305 template class
+ *
+ * Inherits from ChaCha256T which provides StateManager, KeyManager, and IvManager
+ * components via the ChaCha20 base class.
+ *
+ * Template parameters:
+ * - arch: CPU architecture features (eVaes512 or eReference)
+ */
+template<CpuCipherFeatures arch>
+class ALCP_API_EXPORT ChaChPolyT
+    : public ChaCha256T<arch>
+    , public alcp::mac::poly1305::Poly1305<CpuArchFeature::eDynamic>
+    , public iCipherAead
+{
+  protected:
+    Uint8                             m_poly1305_key[32]{};
+    static constexpr Uint8            m_zero_padding[16]{};
+    len_input_processed               m_len_input_processed{};
+    len_aad_processed                 m_len_aad_processed{};
+
+    alc_error_t setIvInternal(const Uint8* iv, Uint64 ivLen);
+    alc_error_t setKeyInternal(const Uint8* key, Uint64 keylen);
+
+  public:
+    ChaChPolyT() = default;
+    ~ChaChPolyT() = default;
+
+  public:
+    // iCipherAead auth methods
+    alc_error_t setAad(const Uint8* pInput, Uint64 aadLen) override;
+    alc_error_t setTagLength(Uint64 tagLength) override;
+    alc_error_t getTag(Uint8* pOutput, Uint64 tagLen) override;
+
+    // iCipher methods
+    alc_error_t init(const Uint8* pKey,
+                     Uint64       keyLen,
+                     const Uint8* pIv,
+                     Uint64       ivLen) override;
+    alc_error_t encrypt(const Uint8* pPlainText,
+                        Uint8*       pCipherText,
+                        Uint64       len,
+                        Uint64*      outlen) override;
+
+    alc_error_t decrypt(const Uint8* pCipherText,
+                        Uint8*       pPlainText,
+                        Uint64       len,
+                        Uint64*      outlen) override;
+    alc_error_t finish() override { return ALC_ERROR_NONE; }
+    alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
+    {
+        return ALC_ERROR_NONE;
+    }
+};
+
+template<CpuCipherFeatures arch>
+using ChaChaPoly = ChaChPolyT<arch>;
+
 namespace vaes512 {
-    class ALCP_API_EXPORT ChaChaPlusPoly
-        : public ChaCha256
-        , public alcp::mac::poly1305::Poly1305<CpuArchFeature::eDynamic>
-    {
-      protected:
-        Uint8               m_poly1305_key[32]{};
-        const Uint8         m_zero_padding[16]{};
-        len_input_processed m_len_input_processed{};
-        len_aad_processed   m_len_aad_processed{};
-
-      public:
-        ChaChaPlusPoly(Uint32 keyLen_in_bytes){};
-        virtual ~ChaChaPlusPoly() = default;
-
-        alc_error_t setIv(const Uint8* iv, Uint64 ivLen);
-        alc_error_t setKey(const Uint8* key, Uint64 keylen);
-    };
-
-    class ALCP_API_EXPORT ChaChaPoly
-        : public ChaChaPlusPoly
-        , public virtual iCipher
-    {
-
-      public:
-        ChaChaPoly(Uint32 keyLen_in_bytes)
-            : ChaChaPlusPoly(keyLen_in_bytes){}; /* fixed keyLen*/
-        virtual ~ChaChaPoly() = default;
-        alc_error_t init(const Uint8* pKey,
-                         Uint64       keyLen,
-                         const Uint8* pIv,
-                         Uint64       ivLen) override;
-        alc_error_t flush(const Uint8** pPlainText, const Uint64* pLengths, Uint64 numBuffers) override { return ALC_ERROR_NOT_SUPPORTED; }
-        alc_error_t dequeue(Uint8** pCipherText, Uint64 numBuffers, const Uint64* pLengths) override { return ALC_ERROR_NOT_SUPPORTED; }
-        alc_error_t multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint8 ** pIv, Uint64 ivLen, Uint64 numBuffers) override {
-            return ALC_ERROR_NOT_SUPPORTED;
-        }
-    };
-
-    AEAD_AUTH_CLASS_GEN(ChaChaPolyAuth, ChaChaPoly, virtual iCipherAuth);
-
-    CIPHER_CLASS_GEN_(ChaChaPoly256,
-                      ChaChaPolyAuth,
-                      virtual iCipherAead,
-                      256 / 8);
-
+    using ChaChaPoly256 = ChaChPolyT<CpuCipherFeatures::eVaes512>;
+    using ChaChaPoly = ChaChaPoly256;
 } // namespace vaes512
 
 namespace ref {
-
-    class ALCP_API_EXPORT ChaChaPlusPoly
-        : public ChaCha256
-        , public alcp::mac::poly1305::Poly1305<CpuArchFeature::eDynamic>
-    {
-      protected:
-        Uint8               m_poly1305_key[32]{};
-        const Uint8         m_zero_padding[16]{};
-        len_input_processed m_len_input_processed{};
-        len_aad_processed   m_len_aad_processed{};
-
-      public:
-        ChaChaPlusPoly(Uint32 keyLen_in_bytes){};
-        virtual ~ChaChaPlusPoly() = default;
-
-        alc_error_t setIv(const Uint8* iv, Uint64 ivLen);
-        alc_error_t setKey(const Uint8* key, Uint64 keylen);
-    };
-
-    class ALCP_API_EXPORT ChaChaPoly
-        : public ChaChaPlusPoly
-        , public virtual iCipher
-    {
-
-      public:
-        ChaChaPoly(Uint32 keyLen_in_bytes)
-            : ChaChaPlusPoly(keyLen_in_bytes){}; /* fixed keyLen*/
-        virtual ~ChaChaPoly() = default;
-        alc_error_t init(const Uint8* pKey,
-                         Uint64       keyLen,
-                         const Uint8* pIv,
-                         Uint64       ivLen) override;
-        alc_error_t flush(const Uint8** pPlainText, const Uint64* pLengths, Uint64 numBuffers) override { return ALC_ERROR_NOT_SUPPORTED; }
-        alc_error_t dequeue(Uint8** pCipherText, Uint64 numBuffers, const Uint64* pLengths) override { return ALC_ERROR_NOT_SUPPORTED; }
-        alc_error_t multibufferInit(const Uint8* pKey, Uint64 keyLen, const Uint8** pIv, Uint64 ivLen, Uint64 numBuffers) override {
-            return ALC_ERROR_NOT_SUPPORTED;
-        }
-    };
-
-    AEAD_AUTH_CLASS_GEN(ChaChaPolyAuth, ChaChaPoly, virtual iCipherAuth);
-
-    CIPHER_CLASS_GEN_(ChaChaPoly256,
-                      ChaChaPolyAuth,
-                      virtual iCipherAead,
-                      256 / 8);
+    using ChaChaPoly256 = ChaChPolyT<CpuCipherFeatures::eReference>;
+    using ChaChaPoly = ChaChaPoly256;
 } // namespace ref
 
 } // namespace alcp::cipher

@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "alcp/cipher.hh"
+#include "alcp/cipher/rijndael.hh"
 #include <immintrin.h>
 
 namespace alcp::cipher { namespace vaes {

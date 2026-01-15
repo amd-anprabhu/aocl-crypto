@@ -26,8 +26,10 @@
  *
  */
 
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/types.hh"
+#include "alcp/cipher.hh"
+#include "alcp/cipher/rijndael.hh"
 
 #include "avx512.hh"
 #include "vaes_avx512.hh"

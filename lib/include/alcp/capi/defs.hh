@@ -43,13 +43,62 @@
         printf("\n");                                                          \
     } while (0)
 
+// Branch prediction hints for likely/unlikely paths
+#if defined(__GNUC__) || defined(__clang__)
+#define ALCP_LIKELY(x)   __builtin_expect(!!(x), 1)
+#define ALCP_UNLIKELY(x) __builtin_expect(!!(x), 0)
+#else
+#define ALCP_LIKELY(x)   (x)
+#define ALCP_UNLIKELY(x) (x)
+#endif
+
+// Original macro - used for non-critical paths where null is possible
 #define ALCP_BAD_PTR_ERR_RET(ptr)                                              \
     if (nullptr == ptr) {                                                      \
         return ALC_ERROR_INVALID_DATA;                                         \
     }
 
+// Optimized macro with branch prediction hint - null is UNLIKELY
+// Use in hot paths where ptr should almost never be null
+#define ALCP_BAD_PTR_ERR_RET_UNLIKELY(ptr)                                     \
+    if (ALCP_UNLIKELY(nullptr == ptr)) {                                       \
+        return ALC_ERROR_INVALID_DATA;                                         \
+    }
+
+// Consolidated null check for multiple pointers in hot path
+// Combines checks to reduce branch overhead
+#define ALCP_BAD_PTR2_ERR_RET(ptr1, ptr2)                                      \
+    if (ALCP_UNLIKELY(nullptr == ptr1 || nullptr == ptr2)) {                   \
+        return ALC_ERROR_INVALID_DATA;                                         \
+    }
+
+#define ALCP_BAD_PTR3_ERR_RET(ptr1, ptr2, ptr3)                                \
+    if (ALCP_UNLIKELY(nullptr == ptr1 || nullptr == ptr2 ||                    \
+                      nullptr == ptr3)) {                                      \
+        return ALC_ERROR_INVALID_DATA;                                         \
+    }
+
+#define ALCP_BAD_PTR4_ERR_RET(ptr1, ptr2, ptr3, ptr4)                          \
+    if (ALCP_UNLIKELY(nullptr == ptr1 || nullptr == ptr2 ||                    \
+                      nullptr == ptr3 || nullptr == ptr4)) {                   \
+        return ALC_ERROR_INVALID_DATA;                                         \
+    }
+
+#define ALCP_BAD_PTR5_ERR_RET(ptr1, ptr2, ptr3, ptr4, ptr5)                    \
+    if (ALCP_UNLIKELY(nullptr == ptr1 || nullptr == ptr2 ||                    \
+                      nullptr == ptr3 || nullptr == ptr4 ||                    \
+                      nullptr == ptr5)) {                                      \
+        return ALC_ERROR_INVALID_DATA;                                         \
+    }
+
 #define ALCP_ZERO_LEN_ERR_RET(len)                                             \
     if (0 == len) {                                                            \
+        return ALC_ERROR_INVALID_SIZE;                                         \
+    }
+
+// Optimized length check with branch prediction
+#define ALCP_ZERO_LEN_ERR_RET_UNLIKELY(len)                                    \
+    if (ALCP_UNLIKELY(0 == len)) {                                             \
         return ALC_ERROR_INVALID_SIZE;                                         \
     }
 

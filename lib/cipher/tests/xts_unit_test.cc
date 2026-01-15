@@ -220,21 +220,20 @@ TEST(XTS, initiantiation_with_valid_input)
                     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
 
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for (CpuCipherFeatures feature : cpu_features) {
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto xts        = alcpCipher->create("aes-xts-128", feature);
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+                auto xts        = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
 
         alc_error_t err = ALC_ERROR_NONE;
 
         if (xts == nullptr) {
-            delete alcpCipher;
+            delete xts;
             FAIL();
         }
         err = xts->init(key, 128, nullptr, 0);
 
         EXPECT_EQ(err, ALC_ERROR_NONE);
 
-        delete alcpCipher;
+        delete xts;
     }
 }
 
@@ -253,13 +252,12 @@ TEST(XTS, valid_all_sizes_encrypt_decrypt_test)
                          0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x00 };
     // clang-format on
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
         for (int i = 16; i < 512 * 20; i++) {
-            auto alcpCipher = new CipherFactory<iCipher>;
-            auto xts        = alcpCipher->create("aes-xts-256", feature);
+                        auto xts        = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey256Bit);
 
             if (xts == nullptr) {
-                delete alcpCipher;
+                delete xts;
                 FAIL();
             }
             alc_error_t err = xts->init(key, 256, iv, 16);
@@ -284,7 +282,7 @@ TEST(XTS, valid_all_sizes_encrypt_decrypt_test)
             EXPECT_TRUE(err == ALC_ERROR_NONE);
             EXPECT_EQ(plainText, pt);
 
-            delete alcpCipher;
+            delete xts;
         }
     }
 }
@@ -340,7 +338,7 @@ TEST(XTS, encrypt_huge)
     alc_error_t err = ALC_ERROR_NONE;
 
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
@@ -349,11 +347,10 @@ TEST(XTS, encrypt_huge)
                    feature)
             << std::endl;
 #endif
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto xts        = alcpCipher->create("aes-xts-128", feature);
+                auto xts        = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
 
         if (xts == nullptr) {
-            delete alcpCipher;
+            delete xts;
             FAIL();
         }
         err = xts->init(key, 128, iv, 16);
@@ -370,7 +367,7 @@ TEST(XTS, encrypt_huge)
 
         EXPECT_TRUE(err == ALC_ERROR_NONE);
 
-        delete alcpCipher;
+        delete xts;
 
         ASSERT_EQ(output_buffer, cipherText);
     }
@@ -426,14 +423,13 @@ TEST(XTS, decrypt_huge)
     };
     alc_error_t                    err          = ALC_ERROR_NONE;
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
         std::vector<Uint8> output_buffer(cipherText.size(), 0xff);
 
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto xts        = alcpCipher->create("aes-xts-128", feature);
+                auto xts        = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
 
         if (xts == nullptr) {
-            delete alcpCipher;
+            delete xts;
             FAIL();
         }
         err = xts->init(key, 128, iv, 16);
@@ -448,7 +444,7 @@ TEST(XTS, decrypt_huge)
 
         EXPECT_TRUE(err == ALC_ERROR_NONE);
 
-        delete alcpCipher;
+        delete xts;
         ASSERT_EQ(output_buffer, plainText);
     }
 }
@@ -507,14 +503,13 @@ TEST(XTS, encrypt_huge_multi_update)
     alc_error_t err = ALC_ERROR_NONE;
 
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
 
         std::vector<Uint8> output_buffer(plainText.size(), 0xff);
-        auto               alcpCipher = new CipherFactory<iCipher>;
-        auto               xts = alcpCipher->create("aes-xts-128", feature);
+                auto               xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
 
         if (xts == nullptr) {
-            delete alcpCipher;
+            delete xts;
             FAIL();
         }
         err = xts->init(key, 128, iv, 16);
@@ -558,7 +553,7 @@ TEST(XTS, encrypt_huge_multi_update)
               << "Second:" << ret.second - output_buffer.begin() << std::endl;
 #endif
 
-        delete alcpCipher;
+        delete xts;
         ASSERT_EQ(output_buffer, cipherText);
     }
 }
@@ -615,16 +610,15 @@ TEST(XTS, encrypt_huge_multi_update_serial)
         0x4e, 0x28, 0x0e, 0x2b, 0x11, 0x04, 0x8e, 0xe4, 0xab, 0x6e, 0xe1
     };
     alc_error_t err = ALC_ERROR_NONE;
+    Uint64      outlen;
 
     std::vector<Uint8> output_buffer(plainText.size(), 0xff);
 
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for (CpuCipherFeatures feature : cpu_features) {
-        auto alcpCipher = new CipherFactory<iCipherSeg>;
-        auto xts        = alcpCipher->create("aes-xts-128", feature);
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+                auto xts        = createCipherSeg(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
 
         if (xts == nullptr) {
-            delete alcpCipher;
             FAIL();
         }
         err = xts->init(key, 128, iv, 16);
@@ -647,22 +641,22 @@ TEST(XTS, encrypt_huge_multi_update_serial)
         EXPECT_EQ(err, ALC_ERROR_NONE);
 
         err = xts->encrypt(
-            &(plainText[0]) + (1 * 16), &(output_buffer[0]) + (1 * 16), 16);
+            &(plainText[0]) + (1 * 16), &(output_buffer[0]) + (1 * 16), 16, &outlen);
 
         EXPECT_EQ(err, ALC_ERROR_NONE);
 
         err = xts->encrypt(
-            &(plainText[0]) + (2 * 16), &(output_buffer[0]) + (2 * 16), 16);
+            &(plainText[0]) + (2 * 16), &(output_buffer[0]) + (2 * 16), 16, &outlen);
 
         EXPECT_EQ(err, ALC_ERROR_NONE);
 
         err = xts->encrypt(
-            &(plainText[0]) + (3 * 16), &(output_buffer[0]) + (3 * 16), 16);
+            &(plainText[0]) + (3 * 16), &(output_buffer[0]) + (3 * 16), 16, &outlen);
 
         EXPECT_EQ(err, ALC_ERROR_NONE);
 
         err = xts->encrypt(
-            &(plainText[0]) + (4 * 16), &(output_buffer[0]) + (4 * 16), 16);
+            &(plainText[0]) + (4 * 16), &(output_buffer[0]) + (4 * 16), 16, &outlen);
 
         EXPECT_EQ(err, ALC_ERROR_NONE);
 
@@ -672,17 +666,17 @@ TEST(XTS, encrypt_huge_multi_update_serial)
         EXPECT_EQ(err, ALC_ERROR_NONE);
 
         err = xts->encrypt(
-            &(plainText[0]) + (7 * 16), &(output_buffer[0]) + (7 * 16), 16);
+            &(plainText[0]) + (7 * 16), &(output_buffer[0]) + (7 * 16), 16, &outlen);
 
         EXPECT_EQ(err, ALC_ERROR_NONE);
 
         err = xts->encrypt(
-            &(plainText[0]) + (8 * 16), &(output_buffer[0]) + (8 * 16), 16);
+            &(plainText[0]) + (8 * 16), &(output_buffer[0]) + (8 * 16), 16, &outlen);
 
         EXPECT_EQ(err, ALC_ERROR_NONE);
 
         err = xts->encrypt(
-            &(plainText[0]) + (9 * 16), &(output_buffer[0]) + (9 * 16), 16);
+            &(plainText[0]) + (9 * 16), &(output_buffer[0]) + (9 * 16), 16, &outlen);
 
         EXPECT_EQ(err, ALC_ERROR_NONE);
 
@@ -699,7 +693,7 @@ TEST(XTS, encrypt_huge_multi_update_serial)
     std::cout << "First:" << ret.first - cipherText.begin()
               << "Second:" << ret.second - output_buffer.begin() << std::endl;
 #endif
-        delete alcpCipher;
+        delete xts;
         ASSERT_EQ(output_buffer, cipherText);
     }
 }
@@ -761,7 +755,7 @@ TEST(XTS, encrypt_huge_multi_update_arbitrary)
 
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
 
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
@@ -770,11 +764,9 @@ TEST(XTS, encrypt_huge_multi_update_arbitrary)
                    feature)
             << std::endl;
 #endif
-        auto alcpCipher = new CipherFactory<iCipherSeg>;
-        auto xts        = alcpCipher->create("aes-xts-128", feature);
+                auto xts        = createCipherSeg(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
 
         if (xts == nullptr) {
-            delete alcpCipher;
             FAIL();
         }
         err = xts->init(key, 128, iv, 16);
@@ -821,7 +813,7 @@ TEST(XTS, encrypt_huge_multi_update_arbitrary)
     std::cout << "First:" << ret.first - cipherText.begin()
               << "Second:" << ret.second - output_buffer.begin() << std::endl;
 #endif
-        delete alcpCipher;
+        delete xts;
         ASSERT_EQ(output_buffer, cipherText);
     }
 }
@@ -878,16 +870,15 @@ TEST(XTS, decrypt_huge_multi_update)
         0x4e, 0x28, 0x0e, 0x2b, 0x11, 0x04, 0x8e, 0xe4, 0xab, 0x6e, 0xe1
     };
     alc_error_t err = ALC_ERROR_NONE;
+    Uint64      outlen;
 
     std::vector<Uint8> output_buffer(cipherText.size(), 0xff);
 
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for (CpuCipherFeatures feature : cpu_features) {
-        auto alcpCipher = new CipherFactory<iCipherSeg>;
-        auto xts        = alcpCipher->create("aes-xts-128", feature);
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+                auto xts        = createCipherSeg(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
 
         if (xts == nullptr) {
-            delete alcpCipher;
             FAIL();
         }
         err = xts->init(key, 128, iv, 16);
@@ -906,7 +897,7 @@ TEST(XTS, decrypt_huge_multi_update)
                 multi_update_size = cipherText.size();
             }
             while (multi_update_size > 0) {
-                err = xts->decrypt(curr_ct, curr_ot, 16);
+                err = xts->decrypt(curr_ct, curr_ot, 16, &outlen);
 
                 EXPECT_FALSE(alcp_is_error(err));
                 multi_update_size -= 16;
@@ -915,12 +906,12 @@ TEST(XTS, decrypt_huge_multi_update)
             }
             // Last 2 blocks if available
             if (extra_update_size) {
-                err = xts->decrypt(curr_ct, curr_ot, extra_update_size);
+                err = xts->decrypt(curr_ct, curr_ot, extra_update_size, &outlen);
 
                 EXPECT_FALSE(alcp_is_error(err));
             }
         }
-        delete alcpCipher;
+        delete xts;
         ASSERT_EQ(output_buffer, plainText);
     }
 }
@@ -958,8 +949,7 @@ class XTS_KAT
     : public testing::TestWithParam<std::pair<const std::string, param_tuple>>
 {
   public:
-    CipherFactory<iCipher>* alcpCipher = nullptr;
-    iCipher*                pXtsObj    = nullptr;
+        iCipher*                pXtsObj    = nullptr;
     std::vector<Uint8> m_key, m_tweak, _key, m_iv, m_plaintext, m_ciphertext;
     Uint64             m_key_size = 0;
     std::string        m_test_name;
@@ -987,12 +977,12 @@ class XTS_KAT
 
         // As m_key has both keys, the key size is double, hence /2
         // Setup XTS Object
-        alcpCipher = new CipherFactory<iCipher>;
-        pXtsObj    = alcpCipher->create(keyToModStr(m_key_size));
+        // Factory removed - using direct creation
+        pXtsObj = createCipher(CipherMode::eAesXTS, m_key_size == 16 ? CipherKeyLen::eKey128Bit : CipherKeyLen::eKey256Bit);
 
         ASSERT_TRUE(pXtsObj != nullptr);
     }
-    void TearDown() override { delete alcpCipher; }
+    void TearDown() override { delete pXtsObj; }
 };
 
 INSTANTIATE_TEST_SUITE_P(

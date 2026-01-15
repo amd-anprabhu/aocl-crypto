@@ -29,15 +29,17 @@
 #pragma once
 
 #include "alcp/base.hh"
-#include "alcp/cipher/aes.hh"
 #include "alcp/cipher/aes_generic.hh"
+#include "alcp/cipher/cipher_common.hh"
 #include "alcp/cipher/common.hh"
+#include "alcp/cipher/rijndael.hh"
 #include "alcp/utils/cpuid.hh"
 
 #include "alcp/cipher/aes_cmac_siv_arch.hh"
 
 #include "alcp/mac/cmac.hh"
 #include "alcp/utils/copy.hh"
+#include <memory>
 #include <new>
 #include <vector>
 
@@ -46,22 +48,36 @@ using Cmac = alcp::mac::Cmac;
 namespace alcp::cipher {
 // cpuid namespace
 using utils::CpuId;
-class ALCP_API_EXPORT Siv
-    : public Aes
-    , public virtual iCipher
+
+/**
+ * @brief Unified SIV cipher class
+ *
+ * Inherits from Rijndael for key expansion and uses composition
+ * for state and IV management. Keys are managed internally via
+ * m_key1/m_key2 arrays for the dual-key SIV construction.
+ * 
+ * Template parameters:
+ * - keyLenBits: Key length (128, 192, or 256 bits)
+ * - arch: CPU architecture features
+ */
+template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+class SivT
+    : public Rijndael
+    , public iCipherAead
 {
-  public:
-    alc_error_t init(const Uint8* pKey,
-                     Uint64       keyLen,
-                     const Uint8* pIv,
-                     Uint64       ivLen) override;
+  private:
+    // Composed components
+    StateManager m_stateManager;
+    IvManager    m_ivManager;
+
+    // Internal CTR cipher for encryption/decryption
+    std::unique_ptr<AesGenericCiphersT<CipherMode::eAesCTR, keyLenBits, arch>> ctrobj;
 
   protected:
     // FIXME: simplify the vector code, unnecessary complication! Just allocate
     // max data size
     std::vector<std::vector<Uint8>> m_additionalDataProcessed =
         std::vector<std::vector<Uint8>>(10);
-    // alignas(16) Uint8 m_additionalDataProcessed[MAX_ADD_SIZE] = {};
 
     alignas(16) Uint8 m_cmacTemp[SIZE_CMAC] = {};
     Uint64 m_additionalDataProcessedSize    = {};
@@ -84,48 +100,31 @@ class ALCP_API_EXPORT Siv
     alc_error_t setKeys(const Uint8 key1[], Uint64 length);
     alc_error_t s2v(const Uint8 plainText[], Uint64 size);
 
-    Siv(Uint32 keyLen_in_bytes)
-        : Aes(keyLen_in_bytes)
-    {
-    }
-    ~Siv();
-};
-
-// SIV authentication class
-class ALCP_API_EXPORT SivHash
-    : public Siv
-    , public virtual iCipherAuth
-{
   public:
-    SivHash(Uint32 keyLen_in_bytes)
-        : Siv(keyLen_in_bytes)
+    SivT()
+        : Rijndael()
+        , m_ivManager(16, 16) // SIV uses fixed 16-byte IV (synthetic IV)
+        , ctrobj(std::make_unique<AesGenericCiphersT<CipherMode::eAesCTR, keyLenBits, arch>>())
     {
     }
-    ~SivHash() {}
+    ~SivT()
+    {
+        memset(m_key1, 0, 32);
+        memset(m_key2, 0, 32);
+        // ctrobj automatically deleted by unique_ptr
+    }
 
+  public:
+    // iCipherAead auth methods
     alc_error_t setAad(const Uint8* pInput, Uint64 aadLen) override;
     alc_error_t getTag(Uint8* pTag, Uint64 tagLen) override;
     alc_error_t setTagLength(Uint64 tagLen) override;
-};
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
-class SivT
-    : public SivHash
-    , public virtual iCipherAead
-{
-  private:
-    AesGenericCiphersT<CipherMode::eAesCTR, keyLenBits, arch>* ctrobj;
-
-  public:
-    SivT()
-        : SivHash((static_cast<Uint32>(keyLenBits)) / 8)
-    {
-        ctrobj =
-            new AesGenericCiphersT<CipherMode::eAesCTR, keyLenBits, arch>();
-    }
-    ~SivT() { delete ctrobj; }
-
-  public:
+    // iCipher methods
+    alc_error_t init(const Uint8* pKey,
+                     Uint64       keyLen,
+                     const Uint8* pIv,
+                     Uint64       ivLen) override;
     alc_error_t encrypt(const Uint8* pInput,
                         Uint8*       pOutput,
                         Uint64       len,
@@ -134,22 +133,23 @@ class SivT
                         Uint8*       pPlainText,
                         Uint64       len,
                         Uint64*      outlen) override;
-    alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
+    alc_error_t finish() override { return ALC_ERROR_NONE; }
     alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
     {
         return ALC_ERROR_NOT_SUPPORTED;
     }
-    // Explicit overrides to resolve diamond inheritance ambiguity
+
+    // Multibuffer methods (direct class methods, no interface)
     alc_error_t flush(const Uint8**  pPlainText,
                       const Uint64*  pLengths,
-                      Uint64         numBuffers) override final
+                      Uint64         numBuffers)
     {
         return ctrobj->flush(pPlainText, pLengths, numBuffers);
     }
 
     alc_error_t dequeue(Uint8**       pCipherText,
                         Uint64        numBuffers,
-                        const Uint64* pLengths) override final
+                        const Uint64* pLengths)
     {
         return ctrobj->dequeue(pCipherText, numBuffers, pLengths);
     }
@@ -157,10 +157,13 @@ class SivT
                                 Uint64        keyLen,
                                 const Uint8** pIv,
                                 Uint64        ivLen,
-                                Uint64        numBuffers) override
+                                Uint64        numBuffers)
     {
         return ctrobj->multibufferInit(pKey, keyLen, pIv, ivLen, numBuffers);
     }
 };
+
+template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+using Siv = SivT<keyLenBits, arch>;
 
 } // namespace alcp::cipher

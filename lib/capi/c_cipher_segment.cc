@@ -78,16 +78,19 @@ alcp_cipher_segment_request(const alc_cipher_mode_t mode,
 
     ALCP_ZERO_LEN_ERR_RET(keyLen);
 
-    auto alcpCipher       = new CipherFactory<iCipherSeg>;
-    ctx->m_cipher_factory = static_cast<void*>(alcpCipher);
+    // Store mode and keyLen for later use
+    ctx->m_cipherMode = getCipherMode(mode);
+    ctx->m_keyLen     = getKeyLen(keyLen);
 
-    auto aead = alcpCipher->create(getCipherMode(mode), getKeyLen(keyLen));
+    // Direct cipher creation (no factory)
+    auto cipher = createCipherSeg(ctx->m_cipherMode, ctx->m_keyLen);
 
-    if (aead == nullptr) {
+    if (cipher == nullptr) {
         printf("\n cipher algo create failed");
         return ALC_ERROR_GENERIC;
     }
-    ctx->m_cipher = static_cast<void*>(aead);
+    ctx->m_cipher     = cipher;  // iCipherSegment inherits from iCipher
+    ctx->m_cipherType = CipherType::eCipherSegment;
 
     return err;
 }
@@ -108,16 +111,12 @@ alcp_cipher_segment_init(const alc_cipher_handle_p pCipherHandle,
     ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return ALC_ERROR_BAD_STATE;
-    }
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
-
-    auto i = static_cast<iCipherSeg*>(ctx->m_cipher);
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipherSegment);
 
     // init can be called to setKey or setIv or both
     if ((pKey != NULL && keyLen != 0) || (pIv != NULL && ivLen != 0)) {
-        err = i->init(pKey, keyLen, pIv, ivLen);
+        err = static_cast<iCipherSegment*>(ctx->m_cipher)->init(pKey, keyLen, pIv, ivLen);
     } else {
         err = ALC_ERROR_INVALID_ARG;
     }
@@ -147,8 +146,9 @@ alcp_cipher_segment_encrypt_xts(const alc_cipher_handle_p pCipherHandle,
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
 
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
-    auto i = static_cast<iCipherSeg*>(ctx->m_cipher);
-    return i->encryptSegment(
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipherSegment);
+
+    return static_cast<iCipherSegment*>(ctx->m_cipher)->encryptSegment(
         pPlainText, pCipherText, currPlainTextLen, startBlockNum);
 }
 
@@ -175,8 +175,9 @@ alcp_cipher_segment_decrypt_xts(const alc_cipher_handle_p pCipherHandle,
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
 
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
-    auto i = static_cast<iCipherSeg*>(ctx->m_cipher);
-    return i->decryptSegment(
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipherSegment);
+
+    return static_cast<iCipherSegment*>(ctx->m_cipher)->decryptSegment(
         pCipherText, pPlainText, currCipherTextLen, startBlockNum);
 }
 
@@ -190,16 +191,18 @@ alcp_cipher_segment_finish(const alc_cipher_handle_p pCipherHandle)
         return;
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return;
-    }
-    auto alcpCipher =
-        static_cast<CipherFactory<iCipherSeg>*>(ctx->m_cipher_factory);
 
-    if (alcpCipher != nullptr) {
-        delete alcpCipher;
+    // Validate type before deleting
+    if (ctx->m_cipherType != CipherType::eCipherSegment) {
+        return; // Wrong type, don't delete
     }
 
-    ctx->~Context();
+    // Delete cipher object directly (no factory to delete)
+    auto cipher = static_cast<iCipherSegment*>(ctx->m_cipher);
+    if (cipher != nullptr) {
+        delete cipher;
+        ctx->m_cipher     = nullptr;
+        ctx->m_cipherType = CipherType::eNone;
+    }
 }
 EXTERN_C_END

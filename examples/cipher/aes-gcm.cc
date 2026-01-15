@@ -57,8 +57,7 @@ main()
     memset(inputText, 10, dataLen);
     memset(aad, 30, 16);
 
-    auto alcpCipher = new CipherFactory<iCipherAead>;
-    auto aead       = alcpCipher->create("aes-gcm-192");
+    auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey192Bit);
 
     if (aead == nullptr) {
         printf("\n cipher create failed\n");
@@ -91,7 +90,7 @@ main()
         goto dealloc;
     }
 
-    err = aead->finish(NULL);
+    err = aead->finish();
     if (err != ALC_ERROR_NONE) {
         printf("\n cipher finish failed\n");
         goto dealloc;
@@ -123,7 +122,7 @@ main()
     }
     printf("Decrypt succeeded\n");
 
-    err = aead->finish(NULL);
+    err = aead->finish();
     if (err != ALC_ERROR_NONE) {
         printf("\n cipher finish for decrypt failed\n");
         goto dealloc;
@@ -137,7 +136,8 @@ main()
     }
 
 dealloc:
-    delete alcpCipher;
+    if (aead != nullptr)
+        delete aead;
     delete[] inputText;
     delete[] cipherText;
     delete[] outputText;

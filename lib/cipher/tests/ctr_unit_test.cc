@@ -40,7 +40,10 @@
 
 #undef DEBUG
 
-using alcp::cipher::CipherFactory;
+// Factory removed
+using alcp::cipher::createCipher;
+using alcp::cipher::CipherMode;
+using alcp::cipher::CipherKeyLen;
 using alcp::cipher::iCipher;
 namespace alcp::cipher::unittest::ctr {
 std::vector<Uint8> key = { 0x78, 0xfd, 0x59, 0x2e, 0x80, 0x4d, 0x37, 0x66,
@@ -168,7 +171,7 @@ using namespace alcp::cipher::unittest::ctr;
 TEST(CTR, creation)
 {
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
@@ -177,23 +180,23 @@ TEST(CTR, creation)
                    feature)
             << std::endl;
 #endif
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto ctr        = alcpCipher->create("aes-ctr-128", feature);
+        // Factory removed
+        auto ctr        = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
         if (ctr == nullptr) {
-            delete alcpCipher;
+            delete ctr;
             FAIL();
         }
-        delete alcpCipher;
+        delete ctr;
     }
 }
 
 TEST(CTR, BasicEncryption)
 {
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto ctr        = alcpCipher->create("aes-ctr-128");
+    // Factory removed
+    auto ctr        = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
 
     if (ctr == nullptr) {
-        delete alcpCipher;
+        delete ctr;
         FAIL();
     }
     std::vector<Uint8> output(cipherText.size());
@@ -215,17 +218,17 @@ TEST(CTR, BasicEncryption)
 
     EXPECT_FALSE(alcp_is_error(err));
 
-    delete alcpCipher;
+    delete ctr;
     EXPECT_EQ(cipherText, output);
 }
 
 TEST(CTR, BasicDecryption)
 {
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto ctr        = alcpCipher->create("aes-ctr-128");
+    // Factory removed
+    auto ctr        = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
 
     if (ctr == nullptr) {
-        delete alcpCipher;
+        delete ctr;
         FAIL();
     }
     std::vector<Uint8> output(plainText.size());
@@ -249,7 +252,7 @@ TEST(CTR, BasicDecryption)
 
     EXPECT_FALSE(alcp_is_error(err));
 
-    delete alcpCipher;
+    delete ctr;
     EXPECT_EQ(plainText, output);
 }
 
@@ -262,12 +265,12 @@ TEST(CTR, MultiUpdateEncryption)
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
 
     // Test for all arch
-    for (CpuCipherFeatures feature : cpu_features) {
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto ctr        = alcpCipher->create("aes-ctr-128", feature);
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+        // Factory removed
+        auto ctr        = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
 
         if (ctr == nullptr) {
-            delete alcpCipher;
+            delete ctr;
             FAIL();
         }
         std::vector<Uint8> output(plainText.size());
@@ -285,7 +288,7 @@ TEST(CTR, MultiUpdateEncryption)
             }
             EXPECT_FALSE(alcp_is_error(err));
         }
-        delete alcpCipher;
+        delete ctr;
         EXPECT_EQ(cipherText, output);
     }
 }
@@ -298,12 +301,12 @@ TEST(CTR, MultiUpdateDecryption)
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
 
     // Test for all arch
-    for (CpuCipherFeatures feature : cpu_features) {
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto ctr        = alcpCipher->create("aes-ctr-128", feature);
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+        // Factory removed
+        auto ctr        = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
 
         if (ctr == nullptr) {
-            delete alcpCipher;
+            delete ctr;
             FAIL();
         }
         std::vector<Uint8> output(plainText.size());
@@ -323,7 +326,7 @@ TEST(CTR, MultiUpdateDecryption)
             }
             EXPECT_FALSE(alcp_is_error(err));
         }
-        delete alcpCipher;
+        delete ctr;
         EXPECT_EQ(plainText, output)
             << "FAIL CPU_FEATURE:"
             << std::underlying_type<CpuCipherFeatures>::type(feature);
@@ -351,7 +354,7 @@ TEST(CTR, RandomEncryptDecryptTest)
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
 
     for (int i = (cTextSize - 16); i > 16; i -= 16)
-        for (CpuCipherFeatures feature : cpu_features) {
+        for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
 #ifdef DEBUG
             std::cout
                 << "Cpu Feature:"
@@ -363,11 +366,10 @@ TEST(CTR, RandomEncryptDecryptTest)
             const std::vector<Uint8> plainTextVect(plain_text_vect.begin() + i,
                                                    plain_text_vect.end());
             std::vector<Uint8>       plainTextOut(plainTextVect.size());
-            auto                     alcpCipher = new CipherFactory<iCipher>;
-            auto ctr = alcpCipher->create("aes-ctr-256", feature);
+            auto ctr = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey256Bit);
 
             if (ctr == nullptr) {
-                delete alcpCipher;
+                delete ctr;
                 FAIL();
             }
             alc_error_t err = ctr->init(key_256, 256, &iv[0], sizeof(iv));
@@ -410,7 +412,7 @@ TEST(CTR, RandomEncryptDecryptTest)
 
             EXPECT_FALSE(alcp_is_error(err));
 
-            delete alcpCipher;
+            delete ctr;
             EXPECT_EQ(plainTextVect, plainTextOut);
 #ifdef DEBUG
             auto ret = std::mismatch(plainTextVect.begin(),

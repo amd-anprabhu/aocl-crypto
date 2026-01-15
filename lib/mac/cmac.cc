@@ -38,14 +38,13 @@ namespace alcp::mac {
 using utils::CpuId;
 Cmac::Cmac()
 {
-    setMode(alcp::cipher::CipherMode::eCipherModeNone);
 }
 
 Cmac::Cmac(const Cmac& cmac)
 {
     utils::CopyBytes(m_k1, cmac.m_k1, cAESBlockSize);
     utils::CopyBytes(m_k2, cmac.m_k2, cAESBlockSize);
-    m_encrypt_keys = cmac.m_cipher_key_data.m_enc_key;
+    m_encrypt_keys = cmac.m_encrypt_keys;
     utils::CopyBytes(m_buff, cmac.m_buff, cAESBlockSize);
     m_buff_offset = cmac.m_buff_offset;
     utils::CopyBytes(m_buffEnc, cmac.m_buffEnc, cAESBlockSize);
@@ -61,7 +60,7 @@ Cmac::~Cmac()
 void
 Cmac::getSubkeys()
 {
-    avx2::get_subkeys(m_k1, m_k2, m_encrypt_keys, m_nrounds);
+    avx2::get_subkeys(m_k1, m_k2, m_encrypt_keys, getRounds());
     return;
 }
 
@@ -139,7 +138,7 @@ Cmac::update(const Uint8* pMsgBuf, Uint64 size)
                      m_buff,
                      m_encrypt_keys,
                      m_pBuffEnc,
-                     m_nrounds,
+                     getRounds(),
                      static_cast<Uint32>(n_blocks));
     } else {
         // Using a separate pointer for pMsgBuf pointer operations so
@@ -147,11 +146,11 @@ Cmac::update(const Uint8* pMsgBuf, Uint64 size)
         const Uint8* p_plaintext = pMsgBuf;
         // Reference Algorithm for AES CMAC block processing
         alcp::cipher::xor_a_b(m_pBuffEnc, m_buff, m_pBuffEnc, cAESBlockSize);
-        encryptBlock(m_buffEnc, m_encrypt_keys, m_nrounds);
+        encryptBlock(m_buffEnc, m_encrypt_keys, getRounds());
         for (Uint64 i = 0; i < n_blocks; i++) {
             alcp::cipher::xor_a_b(
                 m_pBuffEnc, p_plaintext, m_pBuffEnc, cAESBlockSize);
-            encryptBlock(m_buffEnc, m_encrypt_keys, m_nrounds);
+            encryptBlock(m_buffEnc, m_encrypt_keys, getRounds());
             p_plaintext += cAESBlockSize;
         }
     }
@@ -194,7 +193,7 @@ Cmac::finalize(Uint8* pMsgBuf, Uint64 size)
                        cAESBlockSize,
                        m_k1,
                        m_k2,
-                       m_nrounds,
+                       getRounds(),
                        m_pBuffEnc,
                        m_encrypt_keys);
         utils::CopyBytes(pMsgBuf, m_pBuffEnc, size);
@@ -221,7 +220,7 @@ Cmac::finalize(Uint8* pMsgBuf, Uint64 size)
     cipher::xor_a_b(m_pBuffEnc, m_buff, m_pBuffEnc, cAESBlockSize);
     // Encrypt the data from temp_enc_result and store it back to
     // temp_enc_result
-    encryptBlock(m_buffEnc, m_encrypt_keys, m_nrounds);
+    encryptBlock(m_buffEnc, m_encrypt_keys, getRounds());
 
     utils::CopyBytes(pMsgBuf, m_pBuffEnc, size);
 
@@ -232,19 +231,17 @@ Cmac::finalize(Uint8* pMsgBuf, Uint64 size)
 alc_error_t
 Cmac::init(const Uint8* pKey, Uint64 keyLen)
 {
-    alc_error_t err       = ALC_ERROR_NONE;
-    m_keyLen_in_bytes_aes = keyLen;
+    alc_error_t err = ALC_ERROR_NONE;
 
     if ((keyLen != 32) && (keyLen != 24) && (keyLen != 16)) {
         return ALC_ERROR_INVALID_SIZE;
     }
 
-    if (Aes::setKey(pKey, keyLen * 8) != ALC_ERROR_NONE) {
-        return ALC_ERROR_INVALID_SIZE;
-    }
+    // Use Rijndael::setKey to expand keys
+    // setKey takes key length in bits
+    setKey(pKey, static_cast<int>(keyLen * 8));
 
-    m_encrypt_keys = m_cipher_key_data.m_enc_key;
-    m_nrounds      = getRounds();
+    m_encrypt_keys = getEncryptKeys();
     getSubkeys();
     reset();
     return err;

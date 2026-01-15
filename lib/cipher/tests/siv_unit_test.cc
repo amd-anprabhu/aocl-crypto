@@ -33,30 +33,27 @@ using namespace alcp::cipher;
 
 TEST(CMACSIV, Initiantiation)
 {
-    auto alcpCipher = new CipherFactory<iCipherAead>;
-    auto siv        = alcpCipher->create("aes-siv-128"); // KeySize is 128 bits
+        auto siv        = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
     if (siv == nullptr) {
-        delete alcpCipher;
         FAIL();
     }
-    delete alcpCipher;
+    delete siv;
 }
 
 TEST(CMACSIV, setKeys)
 {
     const int cKeySize          = 16;
     Uint8     key[cKeySize * 2] = {};
-    auto      alcpCipher        = new CipherFactory<iCipherAead>;
-    auto      siv = alcpCipher->create("aes-siv-128"); // KeySize is 128 bits
+        auto      siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (siv == nullptr) {
-        delete alcpCipher;
+        delete siv;
         FAIL();
     }
     alc_error_t err = siv->init(key, cKeySize * 8, nullptr, 0);
     EXPECT_TRUE(err == ALC_ERROR_NONE);
 
-    delete alcpCipher;
+    delete siv;
 }
 
 TEST(CMACSIV, addAdditionalInput)
@@ -64,11 +61,10 @@ TEST(CMACSIV, addAdditionalInput)
     const int cKeySize = 16, cAadSize = 32;
     Uint8     key[cKeySize * 2] = {};
     Uint8     aad[cAadSize]     = {};
-    auto      alcpCipher        = new CipherFactory<iCipherAead>;
-    auto      siv = alcpCipher->create("aes-siv-128"); // KeySize is 128 bits
+        auto      siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (siv == nullptr) {
-        delete alcpCipher;
+        delete siv;
         FAIL();
     }
     alc_error_t err = siv->init(key, cKeySize * 8, nullptr, 0);
@@ -76,7 +72,7 @@ TEST(CMACSIV, addAdditionalInput)
     err = siv->setAad(aad, cAadSize);
     EXPECT_TRUE(err == ALC_ERROR_NONE);
 
-    delete alcpCipher;
+    delete siv;
 }
 
 TEST(CMACSIV, encTest1)
@@ -102,11 +98,10 @@ TEST(CMACSIV, encTest1)
         0x95, 0x0a, 0xcd, 0x32, 0x0a, 0x2e, 0xcc, 0x93
     };
     std::vector<Uint8> v_act(16, 0);
-    auto               alcpCipher = new CipherFactory<iCipherAead>;
-    auto siv = alcpCipher->create("aes-siv-128"); // KeySize is 128 bits
+        auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (siv == nullptr) {
-        delete alcpCipher;
+        delete siv;
         FAIL();
     }
     alc_error_t err = siv->init(key, cKeySize * 8, nullptr, 0);
@@ -129,7 +124,7 @@ TEST(CMACSIV, encTest1)
 
     EXPECT_TRUE(err == ALC_ERROR_NONE);
 
-    delete alcpCipher;
+    delete siv;
 }
 
 TEST(CMACSIV, encTest2)
@@ -170,11 +165,10 @@ TEST(CMACSIV, encTest2)
         0x06, 0xf4, 0xd1, 0x4b, 0xff, 0x2f, 0xbd, 0x0f
     };
     std::vector<Uint8> v_act(16, 0);
-    auto               alcpCipher = new CipherFactory<iCipherAead>;
-    auto siv = alcpCipher->create("aes-siv-128"); // KeySize is 128 bits
+        auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (siv == nullptr) {
-        delete alcpCipher;
+        delete siv;
         FAIL();
     }
     alc_error_t err = siv->init(key, cKeySize * 8, nullptr, 0);
@@ -201,7 +195,7 @@ TEST(CMACSIV, encTest2)
     EXPECT_TRUE(err == ALC_ERROR_NONE);
     EXPECT_EQ(v_exp, v_act);
 
-    delete alcpCipher;
+    delete siv;
 }
 
 // FIXME: To bringup decrypt test, proper padding support is needed from API
@@ -229,11 +223,10 @@ TEST(CMACSIV, decTest1)
         0x95, 0x0a, 0xcd, 0x32, 0x0a, 0x2e, 0xcc, 0x93
     };
     std::vector<Uint8> v_act(16, 0);
-    auto               alcpCipher = new CipherFactory<iCipherAead>;
-    auto siv = alcpCipher->create("aes-siv-128"); // KeySize is 128 bits
+        auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (siv == nullptr) {
-        delete alcpCipher;
+        delete siv;
         FAIL();
     }
     alc_error_t err = siv->init(key, cKeySize * 8, nullptr, 0);
@@ -255,7 +248,7 @@ TEST(CMACSIV, decTest1)
 
     EXPECT_TRUE(err == ALC_ERROR_NONE);
 
-    delete alcpCipher;
+    delete siv;
 }
 
 TEST(CMACSIV, decTest2)
@@ -297,11 +290,10 @@ TEST(CMACSIV, decTest2)
         0x06, 0xf4, 0xd1, 0x4b, 0xff, 0x2f, 0xbd, 0x0f
     };
     std::vector<Uint8> v_act(16, 0);
-    auto               alcpCipher = new CipherFactory<iCipherAead>;
-    auto siv = alcpCipher->create("aes-siv-128"); // KeySize is 128 bits
+        auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (siv == nullptr) {
-        delete alcpCipher;
+        delete siv;
         FAIL();
     }
     alc_error_t err = siv->init(key, cKeySize * 8, nullptr, 0);
@@ -326,6 +318,6 @@ TEST(CMACSIV, decTest2)
     err = siv->getTag(&v_act[0], v_act.size());
     EXPECT_TRUE(err == ALC_ERROR_NONE);
     EXPECT_EQ(v_exp, v_act);
-    delete alcpCipher;
+    delete siv;
 }
 #endif

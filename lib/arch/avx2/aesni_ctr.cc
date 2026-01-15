@@ -30,7 +30,7 @@
 
 #include "alcp/cipher/aesni.hh" // template code in aes_ctr.hh needs aesni.hh
 
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/cipher/aes_ctr.hh"
 
 #include <cstdint>

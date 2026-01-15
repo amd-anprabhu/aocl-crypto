@@ -41,8 +41,11 @@
 #include "alcp/alcp.h"
 #include "rng_base.hh"
 
-using alcp::cipher::CipherFactory;
+// Factory removed
 using alcp::cipher::iCipher;
+using alcp::cipher::createCipher;
+using alcp::cipher::CipherMode;
+using alcp::cipher::CipherKeyLen;
 
 // Parameter structure for parameterized tests
 struct MultibufferTestParams

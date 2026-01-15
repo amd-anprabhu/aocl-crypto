@@ -29,7 +29,7 @@
 #pragma once
 #include "alcp/alcp.h"
 #include "alcp/base.hh"
-#include "alcp/cipher/aes.hh"
+#include "alcp/cipher/rijndael.hh"
 #include "mac.hh"
 #include <immintrin.h>
 #include <memory>
@@ -37,7 +37,7 @@
 namespace alcp::mac {
 class Cmac final
     : public IMac
-    , public cipher::Aes
+    , public cipher::Rijndael
 {
   public:
     ALCP_API_EXPORT Cmac();

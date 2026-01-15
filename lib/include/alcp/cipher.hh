@@ -36,12 +36,6 @@
 #include "alcp/base.hh"
 #include "alcp/error.h"
 
-#include <array>
-#include <cstdint>
-#include <functional>
-#include <iostream>
-#include <map>
-#include <tuple>
 
 #include "alcp/utils/cpuid.hh"
 
@@ -74,10 +68,8 @@ namespace alcp { namespace cipher {
         eCipherModeMax,
     };
 
-    using cipherKeyLenTupleT = std::tuple<const CipherMode, const CipherKeyLen>;
-    using cipherAlgoMapT     = std::map<const string, const cipherKeyLenTupleT>;
 
-    // non-aead cipher interface
+    // Base cipher interface
     class ALCP_API_EXPORT iCipher
     {
 
@@ -88,19 +80,52 @@ namespace alcp { namespace cipher {
         virtual alc_error_t init(const Uint8* pKey,
                                  Uint64       keyLen,
                                  const Uint8* pIv,
-                                 Uint64       ivLen)      = 0;
-        virtual alc_error_t decrypt(const Uint8* pSrc,
+                                 Uint64       ivLen) = 0;
+
+        virtual alc_error_t encrypt(const Uint8* pSrc,
                                     Uint8*       pDst,
                                     Uint64       len,
                                     Uint64*      outlen) = 0;
-        virtual alc_error_t encrypt(const Uint8* pSrt,
-                                    Uint8*       pDrc,
+
+        virtual alc_error_t decrypt(const Uint8* pSrc,
+                                    Uint8*       pDst,
                                     Uint64       len,
                                     Uint64*      outlen) = 0;
 
         virtual alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) = 0;
 
-        virtual alc_error_t finish(const void*)                = 0;
+        virtual alc_error_t finish() = 0;
+    };
+
+    /**
+     * @brief Interface for multibuffer cipher operations
+     *
+     * Enables parallel encryption/decryption of multiple independent buffers
+     * using a single key but different IVs. Supported only by CBC and CFB modes.
+     *
+     * Usage:
+     *   1. Call multibufferInit() with key and array of IVs
+     *   2. Call flush() to queue plaintext buffers
+     *   3. Call dequeue() to encrypt and retrieve ciphertext
+     *
+     * @note This interface is inherited only by cipher classes that support it.
+     *       Use dynamic_cast<iMultibuffer*> to check support at runtime.
+     */
+    class ALCP_API_EXPORT iMultibuffer
+    {
+      public:
+        virtual ~iMultibuffer() = default;
+
+        /**
+         * @brief Initialize multibuffer operation with key and multiple IVs
+         *
+         * @param pKey       Pointer to encryption key
+         * @param keyLen     Key length in bits
+         * @param pIv        Array of IV pointers (one per buffer)
+         * @param ivLen      Length of each IV in bytes
+         * @param numBuffers Number of buffers (max 127)
+         * @return ALC_ERROR_NONE on success
+         */
         virtual alc_error_t multibufferInit(const Uint8*  pKey,
                                             Uint64        keyLen,
                                             const Uint8** pIv,
@@ -128,115 +153,78 @@ namespace alcp { namespace cipher {
                                     const Uint64* pLengths)           = 0;
     };
 
-    // iCipher segments
-    class ALCP_API_EXPORT iCipherSeg
+    // Segmented cipher interface (supports block-level operations)
+    class ALCP_API_EXPORT iCipherSegment : public iCipher
     {
-
       public:
-        virtual ~iCipherSeg() = default;
+        virtual ~iCipherSegment() = default;
 
-        // Set key & iv
-        virtual alc_error_t init(const Uint8* pKey,
-                                 Uint64       keyLen,
-                                 const Uint8* pIv,
-                                 Uint64       ivLen)                          = 0;
-        virtual alc_error_t decrypt(const Uint8* pSrc,
-                                    Uint8*       pDst,
-                                    Uint64       len)                         = 0;
-        virtual alc_error_t encrypt(const Uint8* pSrt,
-                                    Uint8*       pDrc,
-                                    Uint64       len)                         = 0;
+        virtual alc_error_t encryptSegment(const Uint8* pSrc,
+                                           Uint8*       pDst,
+                                           Uint64       len,
+                                           Uint64       startBlockNum) = 0;
+
         virtual alc_error_t decryptSegment(const Uint8* pSrc,
                                            Uint8*       pDst,
                                            Uint64       len,
-                                           Uint64       startBlockNum)        = 0;
-        virtual alc_error_t encryptSegment(const Uint8* pSrt,
-                                           Uint8*       pDrc,
-                                           Uint64       len,
-                                           Uint64       startBlockNum)        = 0;
-        virtual alc_error_t finish(const void*)                         = 0;
-        virtual alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) = 0;
+                                           Uint64       startBlockNum) = 0;
     };
 
-    // Additional Authentication functionality used for AEAD schemes
-    class iCipherAuth
+    // AEAD cipher interface (includes authentication methods)
+    class ALCP_API_EXPORT iCipherAead : public iCipher
     {
       public:
-        virtual ~iCipherAuth()                                       = default;
+        virtual ~iCipherAead() = default;
+
+        // Authentication methods
         virtual alc_error_t setAad(const Uint8* pAad, Uint64 aadLen) = 0;
         virtual alc_error_t getTag(Uint8* pTag, Uint64 tagLen)       = 0;
-        // FIXME: Clean up setting lengths
-        /* setPlaintextLength and setTageLength to be one single api */
-        /* setLength(void*ctx, typeofLen, Uint64 len) */
-        virtual alc_error_t setPlainTextLength(Uint64 plaintextLen)
-        {
-            // Only supported in CCM. Will be overridden there.
-            return ALC_ERROR_EXISTS;
-        }
-        virtual alc_error_t setTagLength(Uint64 tagLen) = 0;
+        virtual alc_error_t setTagLength(Uint64 tagLen)              = 0;
     };
 
-    // aead cipher interface
-    class ALCP_API_EXPORT iCipherAead
-        : public virtual iCipher
-        , public virtual iCipherAuth // authenication class - used for Aead
-                                     // modes
+    // CCM-specific interface for plaintext length requirement
+    // CCM mode requires knowing the plaintext length before encryption
+    class ALCP_API_EXPORT iCipherCcm : public iCipherAead
     {
       public:
-        virtual ~iCipherAead()                           = default;
+        virtual ~iCipherCcm() = default;
 
-        // Multi-buffer interface - default to NOT_SUPPORTED for AEAD modes
-        // AEAD modes (GCM, CCM, etc.) have additional authentication requirements
-        // that make multi-buffer processing more complex
-        virtual alc_error_t flush(const Uint8**  pPlainText,
-                                  const Uint64*  pLengths,
-                                  Uint64         numBuffers) override
-        {
-            return ALC_ERROR_NOT_SUPPORTED;
-        }
-        virtual alc_error_t dequeue(Uint8**       pCipherText,
-                                    Uint64        numBuffers,
-                                    const Uint64* pLengths) override
-        {
-            return ALC_ERROR_NOT_SUPPORTED;
-        }
-
+        // CCM-specific: set plaintext length before encryption (multi-update)
+        virtual alc_error_t setPlainTextLength(Uint64 plaintextLen) = 0;
     };
 
-    /* Cipher Factory for different Aead and non-Aead modes */
-    template<class INTERFACE>
-    class ALCP_API_EXPORT CipherFactory
-    {
-      private:
-        CpuCipherFeatures m_currentArch = getCpuCipherFeature();
-        CpuCipherFeatures m_arch =
-            m_currentArch; // Default to detected arch to avoid wrong dispatch
-        INTERFACE*          m_iCipher      = nullptr;
-        cipherAlgoMapT      m_cipherMap    = {};
-        alc_cipher_state_t* m_cipher_state = nullptr;
+    /* Direct cipher creation functions */
 
-      public:
-        CipherFactory();
-        ~CipherFactory();
+    /**
+     * @brief Create AEAD cipher object directly
+     * @param mode Cipher mode (GCM, CCM, SIV, ChaCha20-Poly1305)
+     * @param keyLen Key length (128, 192, or 256 bits)
+     * @param pCipherState Optional external cipher state (for GCM)
+     * @return Pointer to created AEAD cipher, or nullptr on error
+     */
+    ALCP_API_EXPORT iCipherAead* createCipherAead(
+        CipherMode          mode,
+        CipherKeyLen        keyLen,
+        alc_cipher_state_t* pCipherState = nullptr);
 
-        CipherKeyLen m_keyLen      = CipherKeyLen::eKey128Bit;
-        CipherMode   m_cipher_mode = CipherMode::eCipherModeNone;
-        // cipher creators
-        INTERFACE* create(const string& name);
-        INTERFACE* create(const string& name, CpuCipherFeatures arch);
-        INTERFACE* create(const CipherMode mode, const CipherKeyLen keyLen);
-        INTERFACE* create(const CipherMode    mode,
-                          const CipherKeyLen  keyLen,
-                          alc_cipher_state_t* pCipherState);
-        INTERFACE* create(const CipherMode        mode,
-                          const CipherKeyLen      keyLen,
-                          const CpuCipherFeatures arch);
+    /**
+     * @brief Create non-AEAD cipher object directly
+     * @param mode Cipher mode (CBC, CTR, OFB, CFB, XTS, ChaCha20)
+     * @param keyLen Key length (128, 192, or 256 bits)
+     * @return Pointer to created cipher, or nullptr on error
+     */
+    ALCP_API_EXPORT iCipher* createCipher(CipherMode   mode,
+                                          CipherKeyLen keyLen);
 
-      private:
-        void              initCipherMap();
-        void              clearCipherMap();
-        void              getCipher();
-        CpuCipherFeatures getCpuCipherFeature();
-    };
+    /**
+     * @brief Create cipher with segmented capability
+     * @param mode Cipher mode (XTS block mode)
+     * @param keyLen Key length (128 or 256 bits)
+     * @return Pointer to iCipherSegment, or nullptr on error
+     * 
+     * @note Use encryptSegment()/decryptSegment() for block-level operations.
+     */
+    ALCP_API_EXPORT iCipherSegment* createCipherSeg(CipherMode   mode,
+                                                    CipherKeyLen keyLen);
 
 }} // namespace alcp::cipher

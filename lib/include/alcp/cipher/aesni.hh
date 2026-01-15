@@ -33,7 +33,8 @@
 
 #include "alcp/error.h"
 
-#include "aes.hh"
+#include "rijndael.hh"
+#include "alcp/cipher.hh"
 
 #include "alcp/utils/copy.hh"
 

@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "alcp/cipher/cipher_common.hh"
+#include "alcp/cipher.hh"
 #include "alcp/types.hh"
 
 namespace alcp::cipher::aesni {

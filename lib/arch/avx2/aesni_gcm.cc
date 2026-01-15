@@ -27,7 +27,7 @@
  */
 #include "avx2.hh"
 
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/cipher/aes_gcm.hh"
 #include "alcp/cipher/aesni.hh"
 #include "alcp/cipher/gmul.hh"

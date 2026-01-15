@@ -35,7 +35,7 @@
 
 //#include "alcp/base.hh"
 
-#include "aes.hh"
+#include "rijndael.hh"
 #include "aes_gcm.hh"
 #include "alcp/cipher.hh"
 

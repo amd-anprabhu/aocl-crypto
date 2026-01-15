@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "alcp/cipher/aes.hh"
 #include "alcp/cipher/cipher_common.hh"
 #include "alcp/error.h"
 
@@ -76,10 +75,9 @@ typedef struct _alc_gcm_ctx
     Int32  m_num_256blks_precomputed;
     Uint64 m_update_counter = 0;
 
-    // Streaming support for partial blocks
-    Uint8  m_partial_buffer[16];        // Buffer for incomplete blocks
-    Uint64 m_partial_buffer_len;        // Current partial data length (0-15)
-    bool   m_has_partial_data;          // Track if we have partial data
+    // GCM-specific state
+    Uint64 m_dataLen   = 0;    // Total bytes processed (for tag calculation)
+    bool   m_isEncrypt = true; // Direction: true=encrypt, false=decrypt
 
     // AAD buffering for multiple setAad calls
     std::vector<Uint8> m_aad_buffer;    // Vector for accumulated AAD data
@@ -91,34 +89,105 @@ typedef struct _alc_gcm_ctx
     __m128i m_reverse_mask_128;
     __m128i m_tag_128;
     Uint64  m_additionalDataLen;
+    Uint64  m_tagLength = 16; // Default tag length (16 bytes)
 #if !ALWAYS_COMPUTE
     _alc_cipher_gcm_key_data_t m_gcm_key_data{};
     Uint64*                    m_pHashSubkeyTable_precomputed = nullptr;
 #endif
 } alc_gcm_ctx_t;
-class ALCP_API_EXPORT Gcm
-    : public Aes
-    , public virtual iCipher
+
+/**
+ * @brief GCM cipher template class implementing iCipherAead interface
+ *
+ * Uses composition for state, key (with Rijndael), IV, and partial buffer management.
+ * KeyManager inherits from Rijndael and handles key expansion internally.
+ *
+ * @tparam keyLenBits Key length (128, 192, or 256 bits)
+ * @tparam arch CPU architecture features (eAesni, eVaes256, eVaes512)
+ */
+template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+class GcmT
+    : public virtual iCipherAead
 {
+  private:
+    // Composed components
+    StateManager  m_stateManager;
+    KeyManager    m_keyManager;
+    IvManager     m_ivManager;
+    PartialBuffer m_partialBuffer;
+
   protected:
     alc_gcm_ctx_t m_gcm_ctx;
 
   public:
-    Gcm(Uint32 keyLen_in_bytes)
-        : Aes(keyLen_in_bytes)
+    GcmT()
+        : m_keyManager(static_cast<Uint32>(keyLenBits) / 8)
+        , m_ivManager(1, MAX_CIPHER_IV_SIZE) // GCM supports variable IV (default 12 bytes)
     {
-        setMode(CipherMode::eAesGCM);
-        // default ivLength is 12 bytes or 96bits
-        m_ivLen_aes = 12;
+        initGcmContext();
+    }
 
+    GcmT(alc_cipher_state_t* pCipherState)
+        : m_keyManager(static_cast<Uint32>(keyLenBits) / 8)
+        , m_ivManager(1, MAX_CIPHER_IV_SIZE)
+    {
+        initGcmContext();
+        setTable(pCipherState);
+    }
+
+    ~GcmT()
+    {
+#if !ALWAYS_COMPUTE
+        // clear precomputed hashtable
+        if (m_gcm_ctx.m_pHashSubkeyTable_precomputed != nullptr) {
+            memset(m_gcm_ctx.m_pHashSubkeyTable_precomputed,
+                   0,
+                   sizeof(Uint64) * MAX_NUM_512_BLKS * 8);
+        }
+#endif
+        // AAD buffer cleanup is automatic with std::vector
+    }
+
+    // ===== iCipherAead interface implementation =====
+
+    alc_error_t init(const Uint8* pKey,
+                     Uint64       keyLen,
+                     const Uint8* pIv,
+                     Uint64       ivLen) override;
+
+    alc_error_t encrypt(const Uint8* pPlainText,
+                        Uint8*       pCipherText,
+                        Uint64       len,
+                        Uint64*      outlen) override;
+
+    alc_error_t decrypt(const Uint8* pCipherText,
+                        Uint8*       pPlainText,
+                        Uint64       len,
+                        Uint64*      outlen) override;
+
+    alc_error_t setAad(const Uint8* pInput, Uint64 aadLen) override;
+
+    alc_error_t getTag(Uint8* pTag, Uint64 tagLen) override;
+
+    alc_error_t setTagLength(Uint64 tagLen) override;
+
+    alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
+    {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+
+    alc_error_t finish() override { return ALC_ERROR_NONE; }
+
+  private:
+    // Initialize GCM context
+    void initGcmContext()
+    {
         m_gcm_ctx.m_num_512blks_precomputed = 0;
         m_gcm_ctx.m_num_256blks_precomputed = 0;
         m_gcm_ctx.m_update_counter          = 0;
 
-        // Initialize streaming fields
-        memset(m_gcm_ctx.m_partial_buffer, 0, 16);
-        m_gcm_ctx.m_partial_buffer_len = 0;
-        m_gcm_ctx.m_has_partial_data = false;
+        // Initialize partial buffer
+        m_partialBuffer.clear();
 
         m_gcm_ctx.m_hash_subKey_128 = _mm_setzero_si128();
         m_gcm_ctx.m_gHash_128       = _mm_setzero_si128();
@@ -133,133 +202,26 @@ class ALCP_API_EXPORT Gcm
 #endif
         m_gcm_ctx.m_tag_128           = _mm_setzero_si128();
         m_gcm_ctx.m_additionalDataLen = 0;
+        m_gcm_ctx.m_tagLength         = 16;
 
         // Initialize AAD buffering fields
         m_gcm_ctx.m_aad_buffer.clear();
         m_gcm_ctx.m_aad_processed = false;
     }
 
-    ~Gcm()
-    {
-#if !ALWAYS_COMPUTE
-        // clear precomputed hashtable
-        if (m_gcm_ctx.m_pHashSubkeyTable_precomputed != nullptr) {
-            memset(m_gcm_ctx.m_pHashSubkeyTable_precomputed,
-                   0,
-                   sizeof(Uint64) * MAX_NUM_512_BLKS * 8);
-        }
-#endif
-        // AAD buffer cleanup is automatic with std::vector
-    }
-
     void setTable(alc_cipher_state_t* pCipherState)
     {
 #if !ALWAYS_COMPUTE
         if (pCipherState != nullptr) {
-            // printf("setTable\n");
             m_gcm_ctx.m_pHashSubkeyTable_precomputed =
                 pCipherState->alcp_precomputed_table;
         }
 #endif
     }
 
-    alc_error_t init(const Uint8* pKey,
-                     Uint64       keyLen,
-                     const Uint8* pIv,
-                     Uint64       ivLen) override;
-
-    alc_error_t flush(const Uint8**  pPlainText,
-                      const Uint64*  pLengths,
-                      Uint64         numBuffers) override
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
-    alc_error_t dequeue(Uint8**       pCipherText,
-                        Uint64        numBuffers,
-                        const Uint64* pLengths) override
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
-};
-
-// GCM authentication class
-class ALCP_API_EXPORT GcmAuth
-    : public Gcm
-    , public virtual iCipherAuth
-{
-  public:
-    GcmAuth(Uint32 keyLen_in_bytes)
-        : Gcm(keyLen_in_bytes)
-    {
-    }
-    ~GcmAuth() {}
-
-    alc_error_t setAad(const Uint8* pInput, Uint64 aadLen) override;
-    alc_error_t setTagLength(Uint64 tagLen) override;
-
-  protected:
     // Helper function to process buffered AAD data
     inline alc_error_t processBufferedAad();
-};
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
-class GcmT
-    : public GcmAuth
-    , public virtual iCipherAead
-{
-  public:
-    GcmT()
-        : GcmAuth((static_cast<Uint32>(keyLenBits)) / 8)
-    {
-    }
-
-    GcmT(alc_cipher_state_t* pCipherState)
-        : GcmAuth((static_cast<Uint32>(keyLenBits)) / 8)
-    {
-        setTable(pCipherState);
-    }
-
-    ~GcmT() = default;
-
-  public:
-    alc_error_t encrypt(const Uint8* pPlainText,
-                        Uint8*       pCipherText,
-                        Uint64       len,
-                        Uint64*      outlen) override;
-    alc_error_t decrypt(const Uint8* pCipherText,
-                        Uint8*       pPlainText,
-                        Uint64       len,
-                        Uint64*      outlen) override;
-    alc_error_t getTag(Uint8* pTag, Uint64 tagLen) override;
-    alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
-    alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
-
-    // Explicit overrides to resolve diamond inheritance ambiguity
-    alc_error_t flush(const Uint8**  pPlainText,
-                      const Uint64*  pLengths,
-                      Uint64         numBuffers) override final
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
-    alc_error_t dequeue(Uint8**       pCipherText,
-                        Uint64        numBuffers,
-                        const Uint64* pLengths) override final
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
-    alc_error_t multibufferInit(const Uint8*  pKey,
-                                Uint64        keyLen,
-                                const Uint8** pIv,
-                                Uint64        ivLen,
-                                Uint64        numBuffers) override
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
-
-  private:
     // Helper functions for calling encryption/decryption backends
     alc_error_t encryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64 len);
     alc_error_t decryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64 len);

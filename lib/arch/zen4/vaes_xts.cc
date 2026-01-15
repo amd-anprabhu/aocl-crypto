@@ -28,7 +28,7 @@
 #include "avx512.hh"
 #include "vaes_avx512.hh"
 
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/types.hh"
 #include "alcp/utils/copy.hh"
 #include "cipher/avx2/aes_xts_avx2.hh"

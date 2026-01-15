@@ -29,6 +29,8 @@
 #pragma once
 
 #include "alcp/base.hh"
+#include "alcp/cipher.hh"
+#include "alcp/cipher/rijndael.hh"
 #include <immintrin.h>
 #include <stdint.h>
 

@@ -39,7 +39,10 @@
 
 #undef DEBUG
 
-using alcp::cipher::CipherFactory;
+// Factory removed
+using alcp::cipher::createCipher;
+using alcp::cipher::CipherMode;
+using alcp::cipher::CipherKeyLen;
 using alcp::cipher::iCipher;
 namespace alcp::cipher::unittest::cfb {
 std::vector<Uint8> key = { 0x4b, 0x59, 0x9b, 0x08, 0x42, 0x1c, 0x8e, 0xe5,
@@ -112,7 +115,7 @@ using namespace alcp::cipher::unittest::cfb;
 TEST(CFB, creation)
 {
     std::vector<CpuCipherFeatures> cpuFeatures = getSupportedFeatures();
-    for (CpuCipherFeatures feature : cpuFeatures) {
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpuFeatures) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
@@ -121,23 +124,23 @@ TEST(CFB, creation)
                    feature)
             << std::endl;
 #endif
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto cfb        = alcpCipher->create("aes-cfb-128", feature);
+        // Factory removed
+        auto cfb        = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
         if (cfb == nullptr) {
-            delete alcpCipher;
+            delete cfb;
             FAIL();
         }
-        delete alcpCipher;
+        delete cfb;
     }
 }
 
 TEST(CFB, BasicEncryption)
 {
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cfb        = alcpCipher->create("aes-cfb-128");
+    // Factory removed
+    auto cfb        = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
 
     if (cfb == nullptr) {
-        delete alcpCipher;
+        delete cfb;
         FAIL();
     }
 
@@ -148,17 +151,17 @@ TEST(CFB, BasicEncryption)
     Uint64 outlen = 0;
     cfb->encrypt(&plainText[0], &output[0], plainText.size(), &outlen);
 
-    delete alcpCipher;
+    delete cfb;
     EXPECT_EQ(cipherText, output);
 }
 
 TEST(CFB, BasicDecryption)
 {
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cfb        = alcpCipher->create("aes-cfb-128");
+    // Factory removed
+    auto cfb        = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
 
     if (cfb == nullptr) {
-        delete alcpCipher;
+        delete cfb;
         FAIL();
     }
 
@@ -169,7 +172,7 @@ TEST(CFB, BasicDecryption)
     Uint64 outlen = 0;
     cfb->decrypt(&cipherText[0], &output[0], cipherText.size(), &outlen);
 
-    delete alcpCipher;
+    delete cfb;
     EXPECT_EQ(plainText, output);
 }
 
@@ -178,11 +181,11 @@ TEST(CFB, MultiUpdateEncryption)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cfb        = alcpCipher->create("aes-cfb-128");
+    // Factory removed
+    auto cfb        = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
 
     if (cfb == nullptr) {
-        delete alcpCipher;
+        delete cfb;
         FAIL();
     }
     std::vector<Uint8> output(plainText.size());
@@ -200,7 +203,7 @@ TEST(CFB, MultiUpdateEncryption)
         }
         EXPECT_FALSE(alcp_is_error(err));
     }
-    delete alcpCipher;
+    delete cfb;
 
     EXPECT_EQ(cipherText, output);
 }
@@ -213,12 +216,12 @@ TEST(CFB, MultiUpdateDecryption)
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
 
     // Test for all arch
-    for (CpuCipherFeatures feature : cpu_features) {
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto cfb        = alcpCipher->create("aes-cfb-128", feature);
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+        // Factory removed
+        auto cfb        = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
 
         if (cfb == nullptr) {
-            delete alcpCipher;
+            delete cfb;
             FAIL();
         }
         std::vector<Uint8> output(plainText.size());
@@ -238,7 +241,7 @@ TEST(CFB, MultiUpdateDecryption)
             }
             EXPECT_FALSE(alcp_is_error(err));
         }
-        delete alcpCipher;
+        delete cfb;
         EXPECT_EQ(plainText, output)
             << "FAIL CPU_FEATURE:"
             << std::underlying_type<CpuCipherFeatures>::type(feature);
@@ -266,7 +269,7 @@ TEST(CFB, RandomEncryptDecryptTest)
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
 
     for (int i = (cTextSize - 16); i > 16; i -= 16)
-        for (CpuCipherFeatures feature : cpu_features) {
+        for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
 #ifdef DEBUG
             std::cout
                 << "Cpu Feature:"
@@ -278,11 +281,10 @@ TEST(CFB, RandomEncryptDecryptTest)
             const std::vector<Uint8> plainTextVect(plain_text_vect.begin() + i,
                                                    plain_text_vect.end());
             std::vector<Uint8>       plainTextOut(plainTextVect.size());
-            auto                     alcpCipher = new CipherFactory<iCipher>;
-            auto cfb = alcpCipher->create("aes-cfb-256", feature);
+            auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey256Bit);
 
             if (cfb == nullptr) {
-                delete alcpCipher;
+                delete cfb;
                 FAIL();
             }
             cfb->init(key_256, 256, &iv[0], sizeof(iv));
@@ -303,7 +305,7 @@ TEST(CFB, RandomEncryptDecryptTest)
 
             EXPECT_EQ(plainTextVect, plainTextOut);
 
-            delete alcpCipher;
+            delete cfb;
 #ifdef DEBUG
             auto ret = std::mismatch(plainTextVect.begin(),
                                      plainTextVect.end(),

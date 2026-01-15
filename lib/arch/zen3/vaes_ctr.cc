@@ -29,7 +29,7 @@
 #include "avx256.hh"
 #include "vaes.hh"
 
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/cipher/aes_ctr.hh"
 #include "alcp/types.hh"
 

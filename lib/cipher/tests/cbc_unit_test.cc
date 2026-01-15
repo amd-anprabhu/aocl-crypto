@@ -45,7 +45,10 @@
 using alcp::cipher::Cbc;
 #endif
 
-using alcp::cipher::CipherFactory;
+// Factory removed
+using alcp::cipher::createCipher;
+using alcp::cipher::CipherMode;
+using alcp::cipher::CipherKeyLen;
 using alcp::cipher::iCipher;
 namespace alcp::cipher::unittest::cbc {
 
@@ -140,7 +143,7 @@ using namespace alcp::cipher::unittest::cbc;
 TEST(CBC, creation)
 {
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
@@ -149,23 +152,23 @@ TEST(CBC, creation)
                    feature)
             << std::endl;
 #endif
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto cbc        = alcpCipher->create("aes-cbc-128", feature);
+        // Factory removed
+        auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
         if (cbc == nullptr) {
-            delete alcpCipher;
+            delete cbc;
             FAIL();
         }
-        delete alcpCipher;
+        delete cbc;
     }
 }
 
 TEST(CBC, BasicEncryption)
 {
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+    // Factory removed
+    auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
-        delete alcpCipher;
+        delete cbc;
         FAIL();
     }
     std::vector<Uint8> output(cipherText.size());
@@ -180,16 +183,16 @@ TEST(CBC, BasicEncryption)
 
     EXPECT_EQ(cipherText, output);
 
-    delete alcpCipher;
+    delete cbc;
 }
 
 TEST(CBC, BasicDecryption)
 {
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+    // Factory removed
+    auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
-        delete alcpCipher;
+        delete cbc;
         FAIL();
     }
     std::vector<Uint8> output(plainText.size());
@@ -204,16 +207,16 @@ TEST(CBC, BasicDecryption)
 
     EXPECT_EQ(plainText, output);
 
-    delete alcpCipher;
+    delete cbc;
 }
 
 TEST(CBC, ContextCopyEncryption)
 {
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+    // Factory removed
+    auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
-        delete alcpCipher;
+        delete cbc;
         FAIL();
     }
     std::vector<Uint8> output(cipherText.size());
@@ -221,11 +224,10 @@ TEST(CBC, ContextCopyEncryption)
     cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
     // Copy the context
-    auto alcpCipher2_cpy = new CipherFactory<iCipher>;
-    auto cbc_copy        = alcpCipher2_cpy->create("aes-cbc-128");
+    // Factory removed
+    auto cbc_copy        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
     if (cbc_copy == nullptr) {
-        delete alcpCipher;
-        delete alcpCipher2_cpy;
+        delete cbc;
         FAIL();
     }
     cbc->CopyCtx(cbc, cbc_copy);
@@ -238,17 +240,17 @@ TEST(CBC, ContextCopyEncryption)
 
     EXPECT_EQ(cipherText, output);
 
-    delete alcpCipher;
-    delete alcpCipher2_cpy;
+    delete cbc;
+    delete cbc_copy;
 }
 
 TEST(CBC, ContextCopyDecryption)
 {
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+    // Factory removed
+    auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
-        delete alcpCipher;
+        delete cbc;
         FAIL();
     }
     std::vector<Uint8> output(cipherText.size());
@@ -256,11 +258,10 @@ TEST(CBC, ContextCopyDecryption)
     cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
     // Copy the context
-    auto alcpCipher2_cpy = new CipherFactory<iCipher>;
-    auto cbc_copy        = alcpCipher2_cpy->create("aes-cbc-128");
+    // Factory removed
+    auto cbc_copy        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
     if (cbc_copy == nullptr) {
-        delete alcpCipher;
-        delete alcpCipher2_cpy;
+        delete cbc;
         FAIL();
     }
     cbc->CopyCtx(cbc, cbc_copy);
@@ -273,8 +274,8 @@ TEST(CBC, ContextCopyDecryption)
 
     EXPECT_EQ(plainText, output);
 
-    delete alcpCipher;
-    delete alcpCipher2_cpy;
+    delete cbc;
+    delete cbc_copy;
 }
 
 TEST(CBC, MultiUpdateEncryption)
@@ -282,11 +283,11 @@ TEST(CBC, MultiUpdateEncryption)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+    // Factory removed
+    auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
-        delete alcpCipher;
+        delete cbc;
         FAIL();
     }
     std::vector<Uint8> output(cipherText.size());
@@ -309,7 +310,7 @@ TEST(CBC, MultiUpdateEncryption)
 
     EXPECT_EQ(cipherText, output);
 
-    delete alcpCipher;
+    delete cbc;
 }
 
 TEST(CBC, MultiUpdateEncryptionSmallChunks)
@@ -317,11 +318,11 @@ TEST(CBC, MultiUpdateEncryptionSmallChunks)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+    // Factory removed
+    auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
-        delete alcpCipher;
+        delete cbc;
         FAIL();
     }
     std::vector<Uint8> output(cipherText.size());
@@ -370,7 +371,7 @@ TEST(CBC, MultiUpdateEncryptionSmallChunks)
             << "Mismatch with chunk size " << chunkSize;
     }
 
-    delete alcpCipher;
+    delete cbc;
 }
 
 TEST(CBC, MultiUpdateDecryption)
@@ -381,7 +382,7 @@ TEST(CBC, MultiUpdateDecryption)
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
 
     // Test for all arch
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
@@ -390,11 +391,11 @@ TEST(CBC, MultiUpdateDecryption)
                    feature)
             << std::endl;
 #endif
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto cbc = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+        // Factory removed
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
         if (cbc == nullptr) {
-            delete alcpCipher;
+            delete cbc;
             FAIL();
         }
         std::vector<Uint8> output(cipherText.size());
@@ -419,7 +420,7 @@ TEST(CBC, MultiUpdateDecryption)
             << "FAIL CPU_FEATURE:"
             << std::underlying_type<CpuCipherFeatures>::type(feature);
 
-        delete alcpCipher;
+        delete cbc;
     }
 }
 TEST(CBC, MultiUpdateDecryptionSmallChunks)
@@ -427,11 +428,11 @@ TEST(CBC, MultiUpdateDecryptionSmallChunks)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+    // Factory removed
+    auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
-        delete alcpCipher;
+        delete cbc;
         FAIL();
     }
     std::vector<Uint8> output(plainText.size());
@@ -480,7 +481,7 @@ TEST(CBC, MultiUpdateDecryptionSmallChunks)
             << "Mismatch with chunk size " << chunkSize;
     }
 
-    delete alcpCipher;
+    delete cbc;
 }
 
 TEST(CBC, InplaceEncryption)
@@ -491,7 +492,7 @@ TEST(CBC, InplaceEncryption)
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
 
     // Test for all arch
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
@@ -500,12 +501,12 @@ TEST(CBC, InplaceEncryption)
                    feature)
             << std::endl;
 #endif
-        auto alcpCipher = new CipherFactory<iCipher>;
+        // Factory removed
         auto cbc =
-            alcpCipher->create("aes-cbc-128", feature); // KeySize is 128 bits
+            createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
         if (cbc == nullptr) {
-            delete alcpCipher;
+            delete cbc;
             FAIL();
         }
 
@@ -527,7 +528,7 @@ TEST(CBC, InplaceEncryption)
             << "FAIL CPU_FEATURE:"
             << std::underlying_type<CpuCipherFeatures>::type(feature);
 
-        delete alcpCipher;
+        delete cbc;
     }
 }
 
@@ -539,7 +540,7 @@ TEST(CBC, InplaceDecryption)
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
 
     // Test for all arch
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
@@ -548,12 +549,12 @@ TEST(CBC, InplaceDecryption)
                    feature)
             << std::endl;
 #endif
-        auto alcpCipher = new CipherFactory<iCipher>;
+        // Factory removed
         auto cbc =
-            alcpCipher->create("aes-cbc-128", feature); // KeySize is 128 bits
+            createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
         if (cbc == nullptr) {
-            delete alcpCipher;
+            delete cbc;
             FAIL();
         }
 
@@ -575,7 +576,7 @@ TEST(CBC, InplaceDecryption)
             << "FAIL CPU_FEATURE:"
             << std::underlying_type<CpuCipherFeatures>::type(feature);
 
-        delete alcpCipher;
+        delete cbc;
     }
 }
 
@@ -591,7 +592,7 @@ TEST(CBC, PaddingEncryption)
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
 
     // Test for all arch
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
@@ -600,11 +601,11 @@ TEST(CBC, PaddingEncryption)
                    feature)
             << std::endl;
 #endif
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto cbc        = alcpCipher->create("aes-cbc-128", feature);
+        // Factory removed
+        auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
 
         if (cbc == nullptr) {
-            delete alcpCipher;
+            delete cbc;
             FAIL();
         }
         std::vector<Uint8> output(pt.size());
@@ -625,7 +626,7 @@ TEST(CBC, PaddingEncryption)
             << "FAIL CPU_FEATURE:"
             << std::underlying_type<CpuCipherFeatures>::type(feature);
 
-        delete alcpCipher;
+        delete cbc;
     }
 }
 #endif
@@ -650,7 +651,7 @@ TEST(CBC, RandomEncryptDecryptTest)
 
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
 
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
@@ -662,11 +663,11 @@ TEST(CBC, RandomEncryptDecryptTest)
         const std::vector<Uint8> plainTextVect(plain_text_vect.begin(),
                                                plain_text_vect.end());
         std::vector<Uint8>       plainTextOut(plainTextVect.size());
-        auto                     alcpCipher = new CipherFactory<iCipher>;
-        auto cbc = alcpCipher->create("aes-cbc-256", feature);
+            // Factory removed
+            auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey256Bit);
 
         if (cbc == nullptr) {
-            delete alcpCipher;
+            delete cbc;
             FAIL();
         }
         cbc->init(key_256, 256, &iv[0], sizeof(iv));
@@ -685,7 +686,7 @@ TEST(CBC, RandomEncryptDecryptTest)
                      plainTextVect.size(),
                      &decrypt_outlen);
 
-        delete alcpCipher;
+        delete cbc;
 #ifdef DEBUG
 
         if (plainTextVect != plainTextOut) {
@@ -743,32 +744,40 @@ TEST(CBC, MultiBufferRandomTest)
 
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
 
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
         /* FIXME: run this test only for zen4 for now? */
         if (feature != CpuCipherFeatures::eVaes512) {
             std::cout << "Skipping test for feature avx512 " << std::endl;
             continue;
         }
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto cbc        = alcpCipher->create("aes-cbc-256", feature);
+        // Create cipher via factory
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey256Bit);
 
         if (cbc == nullptr) {
-            delete alcpCipher;
-            FAIL();
+            FAIL() << "Failed to create CBC cipher";
         }
         cbc->init(key_256, 256, nullptr, 0);
-        cbc->multibufferInit(
+        
+        // Get iMultibuffer interface via dynamic_cast
+        auto* mb = dynamic_cast<alcp::cipher::iMultibuffer*>(cbc);
+        if (mb == nullptr) {
+            delete cbc;
+            FAIL() << "CBC cipher does not support multibuffer operations";
+        }
+        
+        // Call multibuffer methods via iMultibuffer interface
+        mb->multibufferInit(
             key_256, 256, iv_vect.data(), iv_vect.size(), num_buffers);
 
         // Create lengths array for uniform-length buffers
         std::vector<Uint64> lengths(num_buffers, cTextSize);
 
-        // Test flush and dequeue operations
+        // Test flush and dequeue operations via iMultibuffer interface
         alc_error_t err =
-            cbc->flush(plain_text_vect.data(), lengths.data(), num_buffers);
+            mb->flush(plain_text_vect.data(), lengths.data(), num_buffers);
         EXPECT_FALSE(alcp_is_error(err));
 
-        err = cbc->dequeue(cipher_text_vect.data(), num_buffers, lengths.data());
+        err = mb->dequeue(cipher_text_vect.data(), num_buffers, lengths.data());
         EXPECT_FALSE(alcp_is_error(err));
         // Verify the output
         std::vector<Uint8> plainText(cTextSize);
@@ -786,7 +795,7 @@ TEST(CBC, MultiBufferRandomTest)
             // cTextSize));
         }
 
-        delete alcpCipher;
+        delete cbc;
     }
     /* delete iv_vect */
     for (int i = 0; i < num_buffers; ++i) {
@@ -804,12 +813,12 @@ TEST(CBC, MultiUpdateArbitrarySizesVariousUpdateCounts)
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
     std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for (CpuCipherFeatures feature : cpu_features) {
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto cbc        = alcpCipher->create("aes-cbc-128", feature);
+    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+        // Factory removed
+        auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
 
         if (cbc == nullptr) {
-            delete alcpCipher;
+            delete cbc;
             continue;
         }
 
@@ -853,8 +862,8 @@ TEST(CBC, MultiUpdateArbitrarySizesVariousUpdateCounts)
 
             // Test decryption with multi-update - create separate factory for
             // second cipher
-            auto alcpCipher2 = new CipherFactory<iCipher>;
-            auto cbc2        = alcpCipher2->create("aes-cbc-128", feature);
+            // Factory removed
+            auto cbc2        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
             cbc2->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
             size_t output_offset = 0;
@@ -886,11 +895,11 @@ TEST(CBC, MultiUpdateArbitrarySizesVariousUpdateCounts)
             }
 
             // Clean up second factory
-            delete alcpCipher2;
+            delete cbc2;
         }
 
         // Factory destructor will clean up the cipher object
-        delete alcpCipher;
+        delete cbc;
     }
 }
 

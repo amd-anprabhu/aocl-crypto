@@ -26,7 +26,7 @@
  *
  */
 
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/types.hh"
 #include "vaes.hh"
 #include "vaes_avx256_core.hh"
@@ -38,7 +38,7 @@
 
 #include "alcp/base.hh"
 #include "alcp/base/error.hh"
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/cipher/aesni.hh"
 #include "alcp/types.hh"
 
