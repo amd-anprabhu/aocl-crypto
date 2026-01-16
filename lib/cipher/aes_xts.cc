@@ -65,17 +65,14 @@ Xts::init(const Uint8* pKey,
     alc_error_t err = ALC_ERROR_NONE;
 
     if (pKey != NULL && keyLen != 0) {
-        // Validate and store key via KeyManager (handles comparison and expansion internally)
-        bool keyChanged = false;
-        err = m_keyManager.setKey(pKey, keyLen, &keyChanged);
+        // Validate and store key via KeyManager (always expands the key)
+        err = m_keyManager.setKey(pKey, keyLen);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
 
-        // Expand tweak keys if key was changed (key pointers auto-populated by KeyManager)
-        if (keyChanged) {
-            expandTweakKeys(pKey + keyLen / 8, keyLen);
-        }
+        // Always expand tweak keys
+        expandTweakKeys(pKey + keyLen / 8, keyLen);
 
         m_stateManager.onKeySet();
     }

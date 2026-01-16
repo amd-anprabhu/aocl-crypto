@@ -53,9 +53,6 @@
 #include "alcp/error.h"
 #include "alcp/utils/copy.hh"
 #include "alcp/utils/cpuid.hh"
-#include "alcp/cipher/aesni_key_compare.hh"
-#include "alcp/cipher/key_compare.hh"
-#include "alcp/cipher/vaes_key_compare.hh"
 #include "alcp/utils/memory.hh"
 
 #include <cstdint>
@@ -78,33 +75,6 @@ typedef struct alc_cipher_key_data
     const Uint8* m_enc_key; // Pointer to expanded encryption key
     const Uint8* m_dec_key; // Pointer to expanded decryption key
 } alc_cipher_key_data_t;
-
-/**
- * @brief CPU-dispatched key comparison (stores new key if different)
- *
- * Compares new_key with old_key using the best available SIMD instructions.
- * If keys differ, stores new_key into old_key.
- *
- * @param new_key Pointer to the new key
- * @param old_key Pointer to the existing key (will be updated if different)
- * @param keyLenBytes Key length in bytes (16, 24, or 32)
- * @return true if keys are same, false if keys differ (and new key was stored)
- */
-static inline bool
-isSameKey(const Uint8* new_key, Uint8* old_key, Uint32 keyLenBytes)
-{
-    static bool avx512_available =
-        utils::CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-        && utils::CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_VL);
-
-    if (avx512_available) {
-        return vaes512::CompareAndStoreKey(new_key, old_key, keyLenBytes) != 0;
-    } else if (utils::CpuId::cpuHasAesni()) {
-        return aesni::CompareAndStoreKey(new_key, old_key, keyLenBytes) != 0;
-    } else {
-        return CompareAndStoreKey(new_key, old_key, keyLenBytes) != 0;
-    }
-}
 
 /**
  * @brief Cipher operation state enumeration
@@ -259,14 +229,13 @@ class KeyManager : public Rijndael
      * @brief Set, validate, and expand the encryption key
      * @param pKey Pointer to key data
      * @param keyLenBits Key length in bits (128, 192, or 256)
-     * @param pKeyChanged Optional output: true if key is new/different, false if same
      * @return ALC_ERROR_NONE on success
      *
-     * When the key is new or different, this method automatically expands
-     * the key via Rijndael::setKey(). The expanded keys can be accessed
-     * via getEncryptKeys() and getDecryptKeys().
+     * This method always expands the key via Rijndael::setKey().
+     * The expanded keys can be accessed via getEncryptKeys() and
+     * getDecryptKeys().
      */
-    alc_error_t setKey(const Uint8* pKey, Uint64 keyLenBits, bool* pKeyChanged = nullptr)
+    alc_error_t setKey(const Uint8* pKey, Uint64 keyLenBits)
     {
         if (pKey == nullptr) {
             return ALC_ERROR_INVALID_ARG;
@@ -282,28 +251,7 @@ class KeyManager : public Rijndael
             return ALC_ERROR_INVALID_SIZE;
         }
 
-        // Check if same key using CPU-optimized comparison
-        if (m_isKeySet && m_keyLenBytes == keyLenBytes) {
-            if (alcp::cipher::isSameKey(pKey, m_originalKey, keyLenBytes)) {
-                // Keys are same - no expansion needed
-                if (pKeyChanged != nullptr) {
-                    *pKeyChanged = false;
-                }
-                return ALC_ERROR_NONE;
-            }
-            // Key was different and already stored by isSameKey
-            // Expand the new key via Rijndael
-            Rijndael::setKey(pKey, static_cast<int>(keyLenBits));
-            // Update cipher key data pointers
-            m_cipherKeyData.m_enc_key = getEncryptKeys();
-            m_cipherKeyData.m_dec_key = getDecryptKeys();
-            if (pKeyChanged != nullptr) {
-                *pKeyChanged = true;
-            }
-            return ALC_ERROR_NONE;
-        }
-
-        // First time setting key - copy and expand
+        // Copy the key and expand
         utils::CopyBytes(m_originalKey, pKey, keyLenBytes);
         m_keyLenBytes = keyLenBytes;
         m_isKeySet    = true;
@@ -315,31 +263,7 @@ class KeyManager : public Rijndael
         m_cipherKeyData.m_enc_key = getEncryptKeys();
         m_cipherKeyData.m_dec_key = getDecryptKeys();
 
-        if (pKeyChanged != nullptr) {
-            *pKeyChanged = true;
-        }
-
         return ALC_ERROR_NONE;
-    }
-
-    /**
-     * @brief Check if new key is same as stored key
-     * @param pKey Pointer to key data
-     * @param keyLenBytes Key length in bytes
-     * @return true if keys are identical
-     */
-    bool isSameKey(const Uint8* pKey, Uint32 keyLenBytes) const
-    {
-        if (!m_isKeySet || keyLenBytes != m_keyLenBytes) {
-            return false;
-        }
-
-        // Constant-time comparison to avoid timing side-channels
-        Uint8 diff = 0;
-        for (Uint32 i = 0; i < keyLenBytes; i++) {
-            diff |= (m_originalKey[i] ^ pKey[i]);
-        }
-        return diff == 0;
     }
 
     void setExpectedKeyLen(Uint32 keyLenBytes)
