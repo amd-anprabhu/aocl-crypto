@@ -321,6 +321,515 @@ TEST(CFB, RandomEncryptDecryptTest)
         }
 }
 
+// ============================================================================
+// Comprehensive Corner Case Tests for CFB
+// ============================================================================
+
+// Test all key sizes (128, 192, 256 bits)
+TEST(CFB, AllKeySizes)
+{
+    // 128-bit key
+    {
+        std::vector<Uint8> key_128(16, 0x42);
+        std::vector<Uint8> test_iv(16, 0x00);
+        std::vector<Uint8> input(32, 0x55);
+        std::vector<Uint8> output(32), decrypted(32);
+
+        auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cfb, nullptr) << "Failed to create AES-CFB-128";
+
+        cfb->init(&key_128[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        EXPECT_EQ(cfb->encrypt(&input[0], &output[0], 32, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, 32);
+
+        cfb->init(&key_128[0], 128, &test_iv[0], 16);
+        outlen = 0;
+        EXPECT_EQ(cfb->decrypt(&output[0], &decrypted[0], 32, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, input);
+        delete cfb;
+    }
+
+    // 192-bit key
+    {
+        std::vector<Uint8> key_192(24, 0x42);
+        std::vector<Uint8> test_iv(16, 0x00);
+        std::vector<Uint8> input(32, 0x55);
+        std::vector<Uint8> output(32), decrypted(32);
+
+        auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey192Bit);
+        ASSERT_NE(cfb, nullptr) << "Failed to create AES-CFB-192";
+
+        cfb->init(&key_192[0], 192, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        EXPECT_EQ(cfb->encrypt(&input[0], &output[0], 32, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, 32);
+
+        cfb->init(&key_192[0], 192, &test_iv[0], 16);
+        outlen = 0;
+        EXPECT_EQ(cfb->decrypt(&output[0], &decrypted[0], 32, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, input);
+        delete cfb;
+    }
+
+    // 256-bit key
+    {
+        std::vector<Uint8> key_256(32, 0x42);
+        std::vector<Uint8> test_iv(16, 0x00);
+        std::vector<Uint8> input(32, 0x55);
+        std::vector<Uint8> output(32), decrypted(32);
+
+        auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey256Bit);
+        ASSERT_NE(cfb, nullptr) << "Failed to create AES-CFB-256";
+
+        cfb->init(&key_256[0], 256, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        EXPECT_EQ(cfb->encrypt(&input[0], &output[0], 32, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, 32);
+
+        cfb->init(&key_256[0], 256, &test_iv[0], 16);
+        outlen = 0;
+        EXPECT_EQ(cfb->decrypt(&output[0], &decrypted[0], 32, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, input);
+        delete cfb;
+    }
+}
+
+// Test single block (16 bytes) encryption/decryption
+TEST(CFB, SingleBlock)
+{
+    std::vector<Uint8> test_key(16, 0xAA);
+    std::vector<Uint8> test_iv(16, 0xBB);
+    std::vector<Uint8> input(16, 0xCC);
+    std::vector<Uint8> output(16), decrypted(16);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    EXPECT_EQ(cfb->encrypt(&input[0], &output[0], 16, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 16);
+    EXPECT_NE(output, input); // Encrypted data should differ from plaintext
+
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    EXPECT_EQ(cfb->decrypt(&output[0], &decrypted[0], 16, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cfb;
+}
+
+// Test multiple blocks encryption/decryption
+TEST(CFB, MultipleBlocks)
+{
+    // Test various block counts
+    std::vector<size_t> block_counts = { 2, 3, 4, 5, 8, 10, 16, 32, 64, 100 };
+    
+    std::vector<Uint8> test_key(16, 0xDD);
+    std::vector<Uint8> test_iv(16, 0xEE);
+
+    for (size_t num_blocks : block_counts) {
+        size_t data_size = num_blocks * 16;
+        std::vector<Uint8> input(data_size);
+        // Fill with pattern based on position
+        for (size_t i = 0; i < data_size; i++) {
+            input[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> output(data_size), decrypted(data_size);
+
+        auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cfb, nullptr);
+
+        cfb->init(&test_key[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        EXPECT_EQ(cfb->encrypt(&input[0], &output[0], data_size, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, data_size) << "Block count: " << num_blocks;
+
+        cfb->init(&test_key[0], 128, &test_iv[0], 16);
+        outlen = 0;
+        EXPECT_EQ(cfb->decrypt(&output[0], &decrypted[0], data_size, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, input) << "Mismatch at block count: " << num_blocks;
+
+        delete cfb;
+    }
+}
+
+// Test all zeros input
+TEST(CFB, AllZerosInput)
+{
+    std::vector<Uint8> test_key(16, 0x00);
+    std::vector<Uint8> test_iv(16, 0x00);
+    std::vector<Uint8> input(64, 0x00);
+    std::vector<Uint8> output(64), decrypted(64);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    EXPECT_EQ(cfb->encrypt(&input[0], &output[0], 64, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 64);
+
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    EXPECT_EQ(cfb->decrypt(&output[0], &decrypted[0], 64, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cfb;
+}
+
+// Test all ones input (0xFF)
+TEST(CFB, AllOnesInput)
+{
+    std::vector<Uint8> test_key(16, 0xFF);
+    std::vector<Uint8> test_iv(16, 0xFF);
+    std::vector<Uint8> input(64, 0xFF);
+    std::vector<Uint8> output(64), decrypted(64);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    EXPECT_EQ(cfb->encrypt(&input[0], &output[0], 64, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 64);
+
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    EXPECT_EQ(cfb->decrypt(&output[0], &decrypted[0], 64, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cfb;
+}
+
+// Test double initialization (reinit with same and different IV)
+TEST(CFB, DoubleInit)
+{
+    std::vector<Uint8> test_key(16, 0x12);
+    std::vector<Uint8> iv1(16, 0x34);
+    std::vector<Uint8> iv2(16, 0x56);
+    std::vector<Uint8> input(32, 0x78);
+    std::vector<Uint8> output1(32), output2(32), decrypted(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // First encryption with IV1
+    cfb->init(&test_key[0], 128, &iv1[0], 16);
+    Uint64 outlen = 0;
+    cfb->encrypt(&input[0], &output1[0], 32, &outlen);
+
+    // Reinit with same IV - should produce same result
+    cfb->init(&test_key[0], 128, &iv1[0], 16);
+    outlen = 0;
+    cfb->encrypt(&input[0], &output2[0], 32, &outlen);
+    EXPECT_EQ(output1, output2) << "Same IV should produce same ciphertext";
+
+    // Reinit with different IV - should produce different result
+    cfb->init(&test_key[0], 128, &iv2[0], 16);
+    outlen = 0;
+    cfb->encrypt(&input[0], &output2[0], 32, &outlen);
+    EXPECT_NE(output1, output2) << "Different IV should produce different ciphertext";
+
+    // Verify decrypt still works after multiple inits
+    cfb->init(&test_key[0], 128, &iv1[0], 16);
+    outlen = 0;
+    cfb->decrypt(&output1[0], &decrypted[0], 32, &outlen);
+    EXPECT_EQ(decrypted, input);
+
+    delete cfb;
+}
+
+// Test consecutive encryptions
+TEST(CFB, ConsecutiveEncryptions)
+{
+    std::vector<Uint8> test_key(16, 0x9A);
+    std::vector<Uint8> test_iv(16, 0xBC);
+    std::vector<Uint8> input1(32, 0x11);
+    std::vector<Uint8> input2(48, 0x22);
+    std::vector<Uint8> output1(32), output2(48);
+    std::vector<Uint8> decrypted1(32), decrypted2(48);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // First encryption
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    cfb->encrypt(&input1[0], &output1[0], 32, &outlen);
+    EXPECT_EQ(outlen, 32);
+
+    // Second encryption with new init
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cfb->encrypt(&input2[0], &output2[0], 48, &outlen);
+    EXPECT_EQ(outlen, 48);
+
+    // Verify both decrypt correctly
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cfb->decrypt(&output1[0], &decrypted1[0], 32, &outlen);
+    EXPECT_EQ(decrypted1, input1);
+
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cfb->decrypt(&output2[0], &decrypted2[0], 48, &outlen);
+    EXPECT_EQ(decrypted2, input2);
+
+    delete cfb;
+}
+
+// Test large data (multiple MB)
+TEST(CFB, LargeData)
+{
+    const size_t MB = 1024 * 1024;
+    const size_t data_size = 2 * MB; // 2 MB
+    
+    std::vector<Uint8> test_key(32, 0xDE);
+    std::vector<Uint8> test_iv(16, 0xAD);
+    std::vector<Uint8> input(data_size);
+    std::vector<Uint8> output(data_size), decrypted(data_size);
+
+    // Fill with pattern
+    for (size_t i = 0; i < data_size; i++) {
+        input[i] = static_cast<Uint8>((i * 17) % 256);
+    }
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey256Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    cfb->init(&test_key[0], 256, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    auto err = cfb->encrypt(&input[0], &output[0], data_size, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, data_size);
+
+    cfb->init(&test_key[0], 256, &test_iv[0], 16);
+    outlen = 0;
+    err = cfb->decrypt(&output[0], &decrypted[0], data_size, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cfb;
+}
+
+// Test different IV values affect output
+TEST(CFB, IVAffectsOutput)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<std::vector<Uint8>> outputs;
+
+    // Generate 5 different IVs and encrypt
+    for (int i = 0; i < 5; i++) {
+        std::vector<Uint8> test_iv(16, static_cast<Uint8>(i));
+        std::vector<Uint8> output(32);
+
+        auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cfb, nullptr);
+
+        cfb->init(&test_key[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        cfb->encrypt(&input[0], &output[0], 32, &outlen);
+        outputs.push_back(output);
+
+        delete cfb;
+    }
+
+    // Verify all outputs are different
+    for (size_t i = 0; i < outputs.size(); i++) {
+        for (size_t j = i + 1; j < outputs.size(); j++) {
+            EXPECT_NE(outputs[i], outputs[j]) 
+                << "IV " << i << " and " << j << " produced same output";
+        }
+    }
+}
+
+// Test various data sizes (not just block multiples)
+TEST(CFB, VariousDataSizes)
+{
+    std::vector<Uint8> test_key(16, 0x73);
+    std::vector<Uint8> test_iv(16, 0x84);
+    
+    // CFB can handle any size, not just block multiples
+    std::vector<size_t> sizes = { 1, 7, 15, 16, 17, 31, 32, 33, 63, 64, 65, 100, 255, 256, 257, 1000 };
+    
+    for (size_t size : sizes) {
+        std::vector<Uint8> input(size);
+        for (size_t i = 0; i < size; i++) {
+            input[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> output(size), decrypted(size);
+
+        auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cfb, nullptr);
+
+        cfb->init(&test_key[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        auto err = cfb->encrypt(&input[0], &output[0], size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Failed for size " << size;
+        EXPECT_EQ(outlen, size) << "Output length mismatch for size " << size;
+
+        cfb->init(&test_key[0], 128, &test_iv[0], 16);
+        outlen = 0;
+        err = cfb->decrypt(&output[0], &decrypted[0], size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Decrypt failed for size " << size;
+        EXPECT_EQ(decrypted, input) << "Data mismatch for size " << size;
+
+        delete cfb;
+    }
+}
+
+// Test encrypt then decrypt with different cipher objects
+TEST(CFB, SeparateCipherObjects)
+{
+    std::vector<Uint8> test_key(16, 0xAB);
+    std::vector<Uint8> test_iv(16, 0xCD);
+    std::vector<Uint8> input(64, 0xEF);
+    std::vector<Uint8> output(64), decrypted(64);
+
+    // Create first cipher for encryption
+    auto cfb_enc = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb_enc, nullptr);
+
+    cfb_enc->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    cfb_enc->encrypt(&input[0], &output[0], 64, &outlen);
+    EXPECT_EQ(outlen, 64);
+
+    delete cfb_enc;
+
+    // Create second cipher for decryption
+    auto cfb_dec = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb_dec, nullptr);
+
+    cfb_dec->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cfb_dec->decrypt(&output[0], &decrypted[0], 64, &outlen);
+    EXPECT_EQ(decrypted, input);
+
+    delete cfb_dec;
+}
+
+// Test that same plaintext with same key/IV always produces same ciphertext
+TEST(CFB, Determinism)
+{
+    std::vector<Uint8> test_key(16, 0x11);
+    std::vector<Uint8> test_iv(16, 0x22);
+    std::vector<Uint8> input(32, 0x33);
+    std::vector<Uint8> output1(32), output2(32), output3(32);
+
+    for (int round = 0; round < 3; round++) {
+        auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cfb, nullptr);
+
+        cfb->init(&test_key[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        std::vector<Uint8>* current_output = (round == 0) ? &output1 : (round == 1) ? &output2 : &output3;
+        cfb->encrypt(&input[0], &(*current_output)[0], 32, &outlen);
+
+        delete cfb;
+    }
+
+    EXPECT_EQ(output1, output2) << "Round 1 and 2 should produce same output";
+    EXPECT_EQ(output2, output3) << "Round 2 and 3 should produce same output";
+}
+
+// Test non-block aligned data sizes
+TEST(CFB, NonBlockAlignedSizes)
+{
+    std::vector<Uint8> test_key(16, 0xAB);
+    std::vector<Uint8> test_iv(16, 0xCD);
+    
+    // Test sizes that are not multiples of 16
+    std::vector<size_t> sizes = { 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 23, 29, 31, 37, 41, 47, 53 };
+    
+    for (size_t size : sizes) {
+        std::vector<Uint8> input(size);
+        for (size_t i = 0; i < size; i++) {
+            input[i] = static_cast<Uint8>((i * 7) % 256);
+        }
+        std::vector<Uint8> output(size), decrypted(size);
+
+        auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cfb, nullptr);
+
+        cfb->init(&test_key[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        auto err = cfb->encrypt(&input[0], &output[0], size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Encrypt failed for size " << size;
+        EXPECT_EQ(outlen, size) << "Encrypt output length mismatch for size " << size;
+
+        cfb->init(&test_key[0], 128, &test_iv[0], 16);
+        outlen = 0;
+        err = cfb->decrypt(&output[0], &decrypted[0], size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Decrypt failed for size " << size;
+        EXPECT_EQ(outlen, size) << "Decrypt output length mismatch for size " << size;
+        EXPECT_EQ(decrypted, input) << "Data mismatch for size " << size;
+
+        delete cfb;
+    }
+}
+
+// Test single byte encryption/decryption
+TEST(CFB, SingleByte)
+{
+    std::vector<Uint8> test_key(16, 0x12);
+    std::vector<Uint8> test_iv(16, 0x34);
+    std::vector<Uint8> input = { 0x56 };
+    std::vector<Uint8> output(1), decrypted(1);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    EXPECT_EQ(cfb->encrypt(&input[0], &output[0], 1, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 1);
+
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    EXPECT_EQ(cfb->decrypt(&output[0], &decrypted[0], 1, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 1);
+    EXPECT_EQ(decrypted[0], input[0]);
+
+    delete cfb;
+}
+
+// Test context copy functionality
+TEST(CFB, ContextCopy)
+{
+    std::vector<Uint8> test_key(16, 0xAA);
+    std::vector<Uint8> test_iv(16, 0xBB);
+    std::vector<Uint8> input(32, 0xCC);
+    std::vector<Uint8> output(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+
+    // Copy the context
+    auto cfb_copy = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb_copy, nullptr);
+    cfb->CopyCtx(cfb, cfb_copy);
+
+    Uint64 outlen = 0;
+    cfb_copy->encrypt(&input[0], &output[0], 32, &outlen);
+    EXPECT_EQ(outlen, 32);
+
+    // Verify decryption works
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    std::vector<Uint8> decrypted(32);
+    outlen = 0;
+    cfb->decrypt(&output[0], &decrypted[0], 32, &outlen);
+    EXPECT_EQ(decrypted, input);
+
+    delete cfb;
+    delete cfb_copy;
+}
+
 int
 main(int argc, char** argv)
 {

@@ -921,6 +921,479 @@ TEST(CBC, MultiUpdateArbitrarySizesVariousUpdateCounts)
     }
 }
 
+// ============================================================================
+// Comprehensive Corner Case Tests for CBC
+// ============================================================================
+
+// Test all key sizes (128, 192, 256 bits)
+TEST(CBC, AllKeySizes)
+{
+    // 128-bit key
+    {
+        std::vector<Uint8> key_128(16, 0x42);
+        std::vector<Uint8> test_iv(16, 0x00);
+        std::vector<Uint8> input(32, 0x55);
+        std::vector<Uint8> output(32), decrypted(32);
+
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cbc, nullptr) << "Failed to create AES-CBC-128";
+
+        cbc->init(&key_128[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        EXPECT_EQ(cbc->encrypt(&input[0], &output[0], 32, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, 32);
+
+        cbc->init(&key_128[0], 128, &test_iv[0], 16);
+        outlen = 0;
+        EXPECT_EQ(cbc->decrypt(&output[0], &decrypted[0], 32, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, input);
+        delete cbc;
+    }
+
+    // 192-bit key
+    {
+        std::vector<Uint8> key_192(24, 0x42);
+        std::vector<Uint8> test_iv(16, 0x00);
+        std::vector<Uint8> input(32, 0x55);
+        std::vector<Uint8> output(32), decrypted(32);
+
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey192Bit);
+        ASSERT_NE(cbc, nullptr) << "Failed to create AES-CBC-192";
+
+        cbc->init(&key_192[0], 192, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        EXPECT_EQ(cbc->encrypt(&input[0], &output[0], 32, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, 32);
+
+        cbc->init(&key_192[0], 192, &test_iv[0], 16);
+        outlen = 0;
+        EXPECT_EQ(cbc->decrypt(&output[0], &decrypted[0], 32, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, input);
+        delete cbc;
+    }
+
+    // 256-bit key
+    {
+        std::vector<Uint8> key_256(32, 0x42);
+        std::vector<Uint8> test_iv(16, 0x00);
+        std::vector<Uint8> input(32, 0x55);
+        std::vector<Uint8> output(32), decrypted(32);
+
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey256Bit);
+        ASSERT_NE(cbc, nullptr) << "Failed to create AES-CBC-256";
+
+        cbc->init(&key_256[0], 256, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        EXPECT_EQ(cbc->encrypt(&input[0], &output[0], 32, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, 32);
+
+        cbc->init(&key_256[0], 256, &test_iv[0], 16);
+        outlen = 0;
+        EXPECT_EQ(cbc->decrypt(&output[0], &decrypted[0], 32, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, input);
+        delete cbc;
+    }
+}
+
+// Test single block (16 bytes) encryption/decryption
+TEST(CBC, SingleBlock)
+{
+    std::vector<Uint8> test_key(16, 0xAA);
+    std::vector<Uint8> test_iv(16, 0xBB);
+    std::vector<Uint8> input(16, 0xCC);
+    std::vector<Uint8> output(16), decrypted(16);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    EXPECT_EQ(cbc->encrypt(&input[0], &output[0], 16, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 16);
+    EXPECT_NE(output, input); // Encrypted data should differ from plaintext
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    EXPECT_EQ(cbc->decrypt(&output[0], &decrypted[0], 16, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cbc;
+}
+
+// Test multiple blocks encryption/decryption
+TEST(CBC, MultipleBlocks)
+{
+    // Test various block counts
+    std::vector<size_t> block_counts = { 2, 3, 4, 5, 8, 10, 16, 32, 64, 100 };
+    
+    std::vector<Uint8> test_key(16, 0xDD);
+    std::vector<Uint8> test_iv(16, 0xEE);
+
+    for (size_t num_blocks : block_counts) {
+        size_t data_size = num_blocks * 16;
+        std::vector<Uint8> input(data_size);
+        // Fill with pattern based on position
+        for (size_t i = 0; i < data_size; i++) {
+            input[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> output(data_size), decrypted(data_size);
+
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cbc, nullptr);
+
+        cbc->init(&test_key[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        EXPECT_EQ(cbc->encrypt(&input[0], &output[0], data_size, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, data_size) << "Block count: " << num_blocks;
+
+        cbc->init(&test_key[0], 128, &test_iv[0], 16);
+        outlen = 0;
+        EXPECT_EQ(cbc->decrypt(&output[0], &decrypted[0], data_size, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, input) << "Mismatch at block count: " << num_blocks;
+
+        delete cbc;
+    }
+}
+
+// Test all zeros input
+TEST(CBC, AllZerosInput)
+{
+    std::vector<Uint8> test_key(16, 0x00);
+    std::vector<Uint8> test_iv(16, 0x00);
+    std::vector<Uint8> input(64, 0x00);
+    std::vector<Uint8> output(64), decrypted(64);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    EXPECT_EQ(cbc->encrypt(&input[0], &output[0], 64, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 64);
+
+    // All zeros plaintext with zero key and IV should produce known result
+    // Just verify encrypt-decrypt round trip
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    EXPECT_EQ(cbc->decrypt(&output[0], &decrypted[0], 64, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cbc;
+}
+
+// Test all ones input (0xFF)
+TEST(CBC, AllOnesInput)
+{
+    std::vector<Uint8> test_key(16, 0xFF);
+    std::vector<Uint8> test_iv(16, 0xFF);
+    std::vector<Uint8> input(64, 0xFF);
+    std::vector<Uint8> output(64), decrypted(64);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    EXPECT_EQ(cbc->encrypt(&input[0], &output[0], 64, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 64);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    EXPECT_EQ(cbc->decrypt(&output[0], &decrypted[0], 64, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cbc;
+}
+
+// Test double initialization (reinit with same and different IV)
+TEST(CBC, DoubleInit)
+{
+    std::vector<Uint8> test_key(16, 0x12);
+    std::vector<Uint8> iv1(16, 0x34);
+    std::vector<Uint8> iv2(16, 0x56);
+    std::vector<Uint8> input(32, 0x78);
+    std::vector<Uint8> output1(32), output2(32), decrypted(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // First encryption with IV1
+    cbc->init(&test_key[0], 128, &iv1[0], 16);
+    Uint64 outlen = 0;
+    cbc->encrypt(&input[0], &output1[0], 32, &outlen);
+
+    // Reinit with same IV - should produce same result
+    cbc->init(&test_key[0], 128, &iv1[0], 16);
+    outlen = 0;
+    cbc->encrypt(&input[0], &output2[0], 32, &outlen);
+    EXPECT_EQ(output1, output2) << "Same IV should produce same ciphertext";
+
+    // Reinit with different IV - should produce different result
+    cbc->init(&test_key[0], 128, &iv2[0], 16);
+    outlen = 0;
+    cbc->encrypt(&input[0], &output2[0], 32, &outlen);
+    EXPECT_NE(output1, output2) << "Different IV should produce different ciphertext";
+
+    // Verify decrypt still works after multiple inits
+    cbc->init(&test_key[0], 128, &iv1[0], 16);
+    outlen = 0;
+    cbc->decrypt(&output1[0], &decrypted[0], 32, &outlen);
+    EXPECT_EQ(decrypted, input);
+
+    delete cbc;
+}
+
+// Test consecutive encryptions
+TEST(CBC, ConsecutiveEncryptions)
+{
+    std::vector<Uint8> test_key(16, 0x9A);
+    std::vector<Uint8> test_iv(16, 0xBC);
+    std::vector<Uint8> input1(32, 0x11);
+    std::vector<Uint8> input2(48, 0x22);
+    std::vector<Uint8> output1(32), output2(48);
+    std::vector<Uint8> decrypted1(32), decrypted2(48);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // First encryption
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    cbc->encrypt(&input1[0], &output1[0], 32, &outlen);
+    EXPECT_EQ(outlen, 32);
+
+    // Second encryption with new init
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cbc->encrypt(&input2[0], &output2[0], 48, &outlen);
+    EXPECT_EQ(outlen, 48);
+
+    // Verify both decrypt correctly
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cbc->decrypt(&output1[0], &decrypted1[0], 32, &outlen);
+    EXPECT_EQ(decrypted1, input1);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cbc->decrypt(&output2[0], &decrypted2[0], 48, &outlen);
+    EXPECT_EQ(decrypted2, input2);
+
+    delete cbc;
+}
+
+// Test large data (multiple MB)
+TEST(CBC, LargeData)
+{
+    const size_t MB = 1024 * 1024;
+    const size_t data_size = 2 * MB; // 2 MB
+    
+    std::vector<Uint8> test_key(32, 0xDE);
+    std::vector<Uint8> test_iv(16, 0xAD);
+    std::vector<Uint8> input(data_size);
+    std::vector<Uint8> output(data_size), decrypted(data_size);
+
+    // Fill with pattern
+    for (size_t i = 0; i < data_size; i++) {
+        input[i] = static_cast<Uint8>((i * 17) % 256);
+    }
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey256Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    cbc->init(&test_key[0], 256, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    auto err = cbc->encrypt(&input[0], &output[0], data_size, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, data_size);
+
+    cbc->init(&test_key[0], 256, &test_iv[0], 16);
+    outlen = 0;
+    err = cbc->decrypt(&output[0], &decrypted[0], data_size, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cbc;
+}
+
+// Test different IV values affect output
+TEST(CBC, IVAffectsOutput)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<std::vector<Uint8>> outputs;
+
+    // Generate 5 different IVs and encrypt
+    for (int i = 0; i < 5; i++) {
+        std::vector<Uint8> test_iv(16, static_cast<Uint8>(i));
+        std::vector<Uint8> output(32);
+
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cbc, nullptr);
+
+        cbc->init(&test_key[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        cbc->encrypt(&input[0], &output[0], 32, &outlen);
+        outputs.push_back(output);
+
+        delete cbc;
+    }
+
+    // Verify all outputs are different
+    for (size_t i = 0; i < outputs.size(); i++) {
+        for (size_t j = i + 1; j < outputs.size(); j++) {
+            EXPECT_NE(outputs[i], outputs[j]) 
+                << "IV " << i << " and " << j << " produced same output";
+        }
+    }
+}
+
+// Test boundary sizes (exact multiples of block size)
+TEST(CBC, BlockBoundarySizes)
+{
+    std::vector<Uint8> test_key(16, 0x73);
+    std::vector<Uint8> test_iv(16, 0x84);
+    
+    // Test exact block multiples
+    std::vector<size_t> sizes = { 16, 32, 48, 64, 80, 96, 112, 128, 256, 512, 1024 };
+    
+    for (size_t size : sizes) {
+        std::vector<Uint8> input(size);
+        for (size_t i = 0; i < size; i++) {
+            input[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> output(size), decrypted(size);
+
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cbc, nullptr);
+
+        cbc->init(&test_key[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        auto err = cbc->encrypt(&input[0], &output[0], size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Failed for size " << size;
+        EXPECT_EQ(outlen, size) << "Output length mismatch for size " << size;
+
+        cbc->init(&test_key[0], 128, &test_iv[0], 16);
+        outlen = 0;
+        err = cbc->decrypt(&output[0], &decrypted[0], size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Decrypt failed for size " << size;
+        EXPECT_EQ(decrypted, input) << "Data mismatch for size " << size;
+
+        delete cbc;
+    }
+}
+
+// Test CBC chaining property - changing one plaintext block affects all subsequent ciphertext blocks
+TEST(CBC, ChainingProperty)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input1(48, 0x00);
+    std::vector<Uint8> input2(48, 0x00);
+    
+    // Modify only the second block of input2
+    input2[16] = 0x01;
+    
+    std::vector<Uint8> output1(48), output2(48);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    cbc->encrypt(&input1[0], &output1[0], 48, &outlen);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cbc->encrypt(&input2[0], &output2[0], 48, &outlen);
+
+    // First block should be the same (same IV and same first plaintext block)
+    bool first_block_same = true;
+    for (int i = 0; i < 16; i++) {
+        if (output1[i] != output2[i]) {
+            first_block_same = false;
+            break;
+        }
+    }
+    EXPECT_TRUE(first_block_same) << "First block should be same";
+
+    // Second and third blocks should differ due to CBC chaining
+    bool second_block_differs = false;
+    for (int i = 16; i < 32; i++) {
+        if (output1[i] != output2[i]) {
+            second_block_differs = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(second_block_differs) << "Second block should differ";
+
+    bool third_block_differs = false;
+    for (int i = 32; i < 48; i++) {
+        if (output1[i] != output2[i]) {
+            third_block_differs = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(third_block_differs) << "Third block should differ due to chaining";
+
+    delete cbc;
+}
+
+// Test encrypt then decrypt with different cipher objects
+TEST(CBC, SeparateCipherObjects)
+{
+    std::vector<Uint8> test_key(16, 0xAB);
+    std::vector<Uint8> test_iv(16, 0xCD);
+    std::vector<Uint8> input(64, 0xEF);
+    std::vector<Uint8> output(64), decrypted(64);
+
+    // Create first cipher for encryption
+    auto cbc_enc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc_enc, nullptr);
+
+    cbc_enc->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    cbc_enc->encrypt(&input[0], &output[0], 64, &outlen);
+    EXPECT_EQ(outlen, 64);
+
+    delete cbc_enc;
+
+    // Create second cipher for decryption
+    auto cbc_dec = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc_dec, nullptr);
+
+    cbc_dec->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cbc_dec->decrypt(&output[0], &decrypted[0], 64, &outlen);
+    EXPECT_EQ(decrypted, input);
+
+    delete cbc_dec;
+}
+
+// Test that same plaintext with same key/IV always produces same ciphertext
+TEST(CBC, Determinism)
+{
+    std::vector<Uint8> test_key(16, 0x11);
+    std::vector<Uint8> test_iv(16, 0x22);
+    std::vector<Uint8> input(32, 0x33);
+    std::vector<Uint8> output1(32), output2(32), output3(32);
+
+    for (int round = 0; round < 3; round++) {
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cbc, nullptr);
+
+        cbc->init(&test_key[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        std::vector<Uint8>* current_output = (round == 0) ? &output1 : (round == 1) ? &output2 : &output3;
+        cbc->encrypt(&input[0], &(*current_output)[0], 32, &outlen);
+
+        delete cbc;
+    }
+
+    EXPECT_EQ(output1, output2) << "Round 1 and 2 should produce same output";
+    EXPECT_EQ(output2, output3) << "Round 2 and 3 should produce same output";
+}
+
 int
 main(int argc, char** argv)
 {

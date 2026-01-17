@@ -430,7 +430,7 @@ TEST_P(CCM_KAT, Encrypt)
     alc_error_t err;
 
 #ifdef CCM_MULTI_UPDATE
-    err = pCcmObj->setPlainTextLength(m_plaintext.size());
+    err = dynamic_cast<iCipherCcm*>(pCcmObj)->setPlainTextLength(m_plaintext.size());
     ASSERT_EQ(err, ALC_ERROR_NONE);
 #endif
     /* Encryption begins here */
@@ -486,7 +486,7 @@ TEST_P(CCM_KAT, Encrypt_Double)
         alc_error_t err;
 
 #ifdef CCM_MULTI_UPDATE
-        err = pCcmObj->setPlainTextLength(m_plaintext.size());
+        err = dynamic_cast<iCipherCcm*>(pCcmObj)->setPlainTextLength(m_plaintext.size());
         ASSERT_EQ(err, ALC_ERROR_NONE);
 #endif
         /* Encryption begins here */
@@ -538,7 +538,7 @@ TEST_P(CCM_KAT, Encrypt_Double)
 
         alc_error_t err;
 #ifdef CCM_MULTI_UPDATE
-        err = pCcmObj->setPlainTextLength(m_plaintext.size());
+        err = dynamic_cast<iCipherCcm*>(pCcmObj)->setPlainTextLength(m_plaintext.size());
         ASSERT_EQ(err, ALC_ERROR_NONE);
 #endif
         /* Encryption begins here */
@@ -594,7 +594,7 @@ TEST_P(CCM_KAT, Decrypt)
     alc_error_t err;
 
 #ifdef CCM_MULTI_UPDATE
-    err = pCcmObj->setPlainTextLength(m_plaintext.size());
+    err = dynamic_cast<iCipherCcm*>(pCcmObj)->setPlainTextLength(m_plaintext.size());
     ASSERT_EQ(err, ALC_ERROR_NONE);
 #endif
 
@@ -651,7 +651,7 @@ TEST_P(CCM_KAT, Decrypt_Double)
         alc_error_t err;
 
 #ifdef CCM_MULTI_UPDATE
-        err = pCcmObj->setPlainTextLength(out_plaintext.size());
+        err = dynamic_cast<iCipherCcm*>(pCcmObj)->setPlainTextLength(out_plaintext.size());
         ASSERT_EQ(err, ALC_ERROR_NONE);
 #endif
 
@@ -704,7 +704,7 @@ TEST_P(CCM_KAT, Decrypt_Double)
 
         alc_error_t err;
 #ifdef CCM_MULTI_UPDATE
-        err = pCcmObj->setPlainTextLength(out_plaintext.size());
+        err = dynamic_cast<iCipherCcm*>(pCcmObj)->setPlainTextLength(out_plaintext.size());
         ASSERT_EQ(err, ALC_ERROR_NONE);
 #endif
 
@@ -807,7 +807,7 @@ TEST(CCM, InvalidNonceLen)
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
 #ifdef CCM_MULTI_UPDATE
-    err = pCcmObj->setPlainTextLength(0);
+    err = dynamic_cast<iCipherCcm*>(pCcmObj)->setPlainTextLength(0);
     EXPECT_EQ(err, ALC_ERROR_NONE);
 #endif
     // Nonce
