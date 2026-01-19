@@ -239,4 +239,483 @@ TEST(Chacha20Poly1305, PerformanceTest)
         }
     }
 }
+
+// ============================================================================
+// Comprehensive Corner Case Tests for ChaCha20-Poly1305
+// ============================================================================
+
+// Test determinism (same inputs always produce same output)
+TEST(Chacha20Poly1305, Determinism)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<Uint8> plaintext(64, 0x42);
+    std::vector<Uint8> ciphertext1(64), ciphertext2(64), ciphertext3(64);
+    std::vector<Uint8> tag1(16), tag2(16), tag3(16);
+
+    for (int round = 0; round < 3; round++) {
+        ref::ChaChaPoly256 chacha_poly;
+        chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+        chacha_poly.setAad(AAD, sizeof(AAD));
+
+        std::vector<Uint8>* ct = (round == 0) ? &ciphertext1 : (round == 1) ? &ciphertext2 : &ciphertext3;
+        std::vector<Uint8>* tg = (round == 0) ? &tag1 : (round == 1) ? &tag2 : &tag3;
+        Uint64 outlen = 0;
+        chacha_poly.encrypt(plaintext.data(), ct->data(), plaintext.size(), &outlen);
+        chacha_poly.getTag(tg->data(), 16);
+    }
+
+    EXPECT_EQ(ciphertext1, ciphertext2) << "Round 1 and 2 should produce same ciphertext";
+    EXPECT_EQ(ciphertext2, ciphertext3) << "Round 2 and 3 should produce same ciphertext";
+    EXPECT_EQ(tag1, tag2) << "Round 1 and 2 should produce same tag";
+    EXPECT_EQ(tag2, tag3) << "Round 2 and 3 should produce same tag";
+}
+
+// Test key affects output (different keys should produce different outputs)
+TEST(Chacha20Poly1305, KeyAffectsOutput)
+{
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<Uint8> plaintext(64, 0x55);
+    std::vector<std::vector<Uint8>> outputs;
+    std::vector<std::vector<Uint8>> tags;
+
+    for (int i = 0; i < 5; i++) {
+        Uint8 key[32];
+        for (int j = 0; j < 32; j++) {
+            key[j] = static_cast<Uint8>((i + j) % 256);
+        }
+        std::vector<Uint8> ciphertext(64);
+        std::vector<Uint8> tag(16);
+
+        ref::ChaChaPoly256 chacha_poly;
+        chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+        chacha_poly.setAad(AAD, sizeof(AAD));
+
+        Uint64 outlen = 0;
+        chacha_poly.encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen);
+        chacha_poly.getTag(tag.data(), 16);
+        outputs.push_back(ciphertext);
+        tags.push_back(tag);
+    }
+
+    // Verify all outputs are different
+    for (size_t i = 0; i < outputs.size(); i++) {
+        for (size_t j = i + 1; j < outputs.size(); j++) {
+            EXPECT_NE(outputs[i], outputs[j]) 
+                << "Key " << i << " and " << j << " produced same ciphertext";
+            EXPECT_NE(tags[i], tags[j])
+                << "Key " << i << " and " << j << " produced same tag";
+        }
+    }
+}
+
+// Test nonce affects output (different nonces should produce different outputs)
+TEST(Chacha20Poly1305, NonceAffectsOutput)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<Uint8> plaintext(64, 0x66);
+    std::vector<std::vector<Uint8>> outputs;
+    std::vector<std::vector<Uint8>> tags;
+
+    for (int i = 0; i < 5; i++) {
+        Uint8 nonce[12];
+        for (int j = 0; j < 12; j++) {
+            nonce[j] = static_cast<Uint8>((i + j) % 256);
+        }
+        std::vector<Uint8> ciphertext(64);
+        std::vector<Uint8> tag(16);
+
+        ref::ChaChaPoly256 chacha_poly;
+        chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+        chacha_poly.setAad(AAD, sizeof(AAD));
+
+        Uint64 outlen = 0;
+        chacha_poly.encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen);
+        chacha_poly.getTag(tag.data(), 16);
+        outputs.push_back(ciphertext);
+        tags.push_back(tag);
+    }
+
+    // Verify all outputs are different
+    for (size_t i = 0; i < outputs.size(); i++) {
+        for (size_t j = i + 1; j < outputs.size(); j++) {
+            EXPECT_NE(outputs[i], outputs[j]) 
+                << "Nonce " << i << " and " << j << " produced same ciphertext";
+            EXPECT_NE(tags[i], tags[j])
+                << "Nonce " << i << " and " << j << " produced same tag";
+        }
+    }
+}
+
+// Test AAD affects tag (different AAD should produce different tags)
+TEST(Chacha20Poly1305, AADAffectsTag)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    std::vector<Uint8> plaintext(64, 0x77);
+    std::vector<std::vector<Uint8>> tags;
+
+    for (int i = 0; i < 5; i++) {
+        Uint8 AAD[12];
+        for (int j = 0; j < 12; j++) {
+            AAD[j] = static_cast<Uint8>((i + j) % 256);
+        }
+        std::vector<Uint8> ciphertext(64);
+        std::vector<Uint8> tag(16);
+
+        ref::ChaChaPoly256 chacha_poly;
+        chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+        chacha_poly.setAad(AAD, sizeof(AAD));
+
+        Uint64 outlen = 0;
+        chacha_poly.encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen);
+        chacha_poly.getTag(tag.data(), 16);
+        tags.push_back(tag);
+    }
+
+    // Verify all tags are different
+    for (size_t i = 0; i < tags.size(); i++) {
+        for (size_t j = i + 1; j < tags.size(); j++) {
+            EXPECT_NE(tags[i], tags[j])
+                << "AAD " << i << " and " << j << " produced same tag";
+        }
+    }
+}
+
+// Test various data sizes
+TEST(Chacha20Poly1305, VariousDataSizes)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+
+    std::vector<size_t> sizes = { 1, 7, 15, 16, 17, 31, 32, 33, 63, 64, 65, 100, 127, 128, 255, 256, 1000 };
+
+    for (size_t size : sizes) {
+        std::vector<Uint8> plaintext(size);
+        for (size_t i = 0; i < size; i++) {
+            plaintext[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> ciphertext(size), decrypted(size);
+        std::vector<Uint8> tag(16);
+
+        ref::ChaChaPoly256 chacha_enc, chacha_dec;
+        chacha_enc.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+        chacha_enc.setAad(AAD, sizeof(AAD));
+        
+        Uint64 outlen1 = 0;
+        chacha_enc.encrypt(plaintext.data(), ciphertext.data(), size, &outlen1);
+        chacha_enc.getTag(tag.data(), 16);
+
+        chacha_dec.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+        chacha_dec.setAad(AAD, sizeof(AAD));
+        
+        Uint64 outlen2 = 0;
+        chacha_dec.decrypt(ciphertext.data(), decrypted.data(), size, &outlen2);
+
+        EXPECT_EQ(decrypted, plaintext) << "Mismatch for size: " << size;
+    }
+}
+
+// Test empty AAD
+TEST(Chacha20Poly1305, EmptyAAD)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    std::vector<Uint8> plaintext(64, 0x88);
+    std::vector<Uint8> ciphertext(64), decrypted(64);
+    std::vector<Uint8> tag(16);
+
+    ref::ChaChaPoly256 chacha_enc, chacha_dec;
+    chacha_enc.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    // No AAD set
+    
+    Uint64 outlen1 = 0;
+    chacha_enc.encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen1);
+    chacha_enc.getTag(tag.data(), 16);
+
+    chacha_dec.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    // No AAD set
+    
+    Uint64 outlen2 = 0;
+    chacha_dec.decrypt(ciphertext.data(), decrypted.data(), ciphertext.size(), &outlen2);
+
+    EXPECT_EQ(decrypted, plaintext);
+}
+
+// Test large AAD
+TEST(Chacha20Poly1305, LargeAAD)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    std::vector<Uint8> AAD(1024);
+    for (size_t i = 0; i < AAD.size(); i++) {
+        AAD[i] = static_cast<Uint8>(i % 256);
+    }
+    std::vector<Uint8> plaintext(64, 0x99);
+    std::vector<Uint8> ciphertext(64), decrypted(64);
+    std::vector<Uint8> tag(16);
+
+    ref::ChaChaPoly256 chacha_enc, chacha_dec;
+    chacha_enc.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_enc.setAad(AAD.data(), AAD.size());
+    
+    Uint64 outlen1 = 0;
+    chacha_enc.encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen1);
+    chacha_enc.getTag(tag.data(), 16);
+
+    chacha_dec.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_dec.setAad(AAD.data(), AAD.size());
+    
+    Uint64 outlen2 = 0;
+    chacha_dec.decrypt(ciphertext.data(), decrypted.data(), ciphertext.size(), &outlen2);
+
+    EXPECT_EQ(decrypted, plaintext);
+}
+
+// Test single byte
+TEST(Chacha20Poly1305, SingleByte)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<Uint8> plaintext(1, 0xAA);
+    std::vector<Uint8> ciphertext(1), decrypted(1);
+    std::vector<Uint8> tag(16);
+
+    ref::ChaChaPoly256 chacha_enc, chacha_dec;
+    chacha_enc.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_enc.setAad(AAD, sizeof(AAD));
+    
+    Uint64 outlen1 = 0;
+    chacha_enc.encrypt(plaintext.data(), ciphertext.data(), 1, &outlen1);
+    chacha_enc.getTag(tag.data(), 16);
+
+    chacha_dec.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_dec.setAad(AAD, sizeof(AAD));
+    
+    Uint64 outlen2 = 0;
+    chacha_dec.decrypt(ciphertext.data(), decrypted.data(), 1, &outlen2);
+
+    EXPECT_EQ(decrypted, plaintext);
+}
+
+// Test large data (1 MB)
+TEST(Chacha20Poly1305, LargeData)
+{
+    const size_t data_size = 1024 * 1024; // 1 MB
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<Uint8> plaintext(data_size);
+    std::vector<Uint8> ciphertext(data_size), decrypted(data_size);
+    std::vector<Uint8> tag(16);
+
+    for (size_t i = 0; i < data_size; i++) {
+        plaintext[i] = static_cast<Uint8>((i * 17) % 256);
+    }
+
+    ref::ChaChaPoly256 chacha_enc, chacha_dec;
+    chacha_enc.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_enc.setAad(AAD, sizeof(AAD));
+    
+    Uint64 outlen1 = 0;
+    chacha_enc.encrypt(plaintext.data(), ciphertext.data(), data_size, &outlen1);
+    chacha_enc.getTag(tag.data(), 16);
+
+    chacha_dec.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_dec.setAad(AAD, sizeof(AAD));
+    
+    Uint64 outlen2 = 0;
+    chacha_dec.decrypt(ciphertext.data(), decrypted.data(), data_size, &outlen2);
+
+    EXPECT_EQ(decrypted, plaintext);
+}
+
+// Test plaintext affects both ciphertext and tag
+TEST(Chacha20Poly1305, PlaintextAffectsOutput)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<std::vector<Uint8>> outputs;
+    std::vector<std::vector<Uint8>> tags;
+
+    for (int i = 0; i < 5; i++) {
+        std::vector<Uint8> plaintext(64, static_cast<Uint8>(i));
+        std::vector<Uint8> ciphertext(64);
+        std::vector<Uint8> tag(16);
+
+        ref::ChaChaPoly256 chacha_poly;
+        chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+        chacha_poly.setAad(AAD, sizeof(AAD));
+
+        Uint64 outlen = 0;
+        chacha_poly.encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen);
+        chacha_poly.getTag(tag.data(), 16);
+        outputs.push_back(ciphertext);
+        tags.push_back(tag);
+    }
+
+    // Verify all outputs and tags are different
+    for (size_t i = 0; i < outputs.size(); i++) {
+        for (size_t j = i + 1; j < outputs.size(); j++) {
+            EXPECT_NE(outputs[i], outputs[j]) 
+                << "Plaintext " << i << " and " << j << " produced same ciphertext";
+            EXPECT_NE(tags[i], tags[j])
+                << "Plaintext " << i << " and " << j << " produced same tag";
+        }
+    }
+}
+
+// Test separate cipher objects produce identical results
+TEST(Chacha20Poly1305, SeparateCipherObjects)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<Uint8> plaintext(64, 0xBB);
+    std::vector<Uint8> ciphertext1(64), ciphertext2(64);
+    std::vector<Uint8> tag1(16), tag2(16);
+
+    // Encrypt with first object
+    ref::ChaChaPoly256 chacha1;
+    chacha1.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha1.setAad(AAD, sizeof(AAD));
+    Uint64 outlen1 = 0;
+    chacha1.encrypt(plaintext.data(), ciphertext1.data(), plaintext.size(), &outlen1);
+    chacha1.getTag(tag1.data(), 16);
+
+    // Encrypt with second object
+    ref::ChaChaPoly256 chacha2;
+    chacha2.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha2.setAad(AAD, sizeof(AAD));
+    Uint64 outlen2 = 0;
+    chacha2.encrypt(plaintext.data(), ciphertext2.data(), plaintext.size(), &outlen2);
+    chacha2.getTag(tag2.data(), 16);
+
+    EXPECT_EQ(ciphertext1, ciphertext2);
+    EXPECT_EQ(tag1, tag2);
+}
+
+// Test 64-byte block (one ChaCha20 block)
+TEST(Chacha20Poly1305, OneBlock)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<Uint8> plaintext(64, 0xCC);
+    std::vector<Uint8> ciphertext(64), decrypted(64);
+    std::vector<Uint8> tag(16);
+
+    ref::ChaChaPoly256 chacha_enc, chacha_dec;
+    chacha_enc.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_enc.setAad(AAD, sizeof(AAD));
+    
+    Uint64 outlen1 = 0;
+    chacha_enc.encrypt(plaintext.data(), ciphertext.data(), 64, &outlen1);
+    chacha_enc.getTag(tag.data(), 16);
+
+    chacha_dec.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_dec.setAad(AAD, sizeof(AAD));
+    
+    Uint64 outlen2 = 0;
+    chacha_dec.decrypt(ciphertext.data(), decrypted.data(), 64, &outlen2);
+
+    EXPECT_EQ(decrypted, plaintext);
+}
+
+// Test block boundary sizes (around 64-byte boundaries)
+TEST(Chacha20Poly1305, BlockBoundarySizes)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+
+    std::vector<size_t> sizes = { 63, 64, 65, 127, 128, 129, 191, 192, 193, 255, 256, 257 };
+
+    for (size_t size : sizes) {
+        std::vector<Uint8> plaintext(size, 0xDD);
+        std::vector<Uint8> ciphertext(size), decrypted(size);
+        std::vector<Uint8> tag(16);
+
+        ref::ChaChaPoly256 chacha_enc, chacha_dec;
+        chacha_enc.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+        chacha_enc.setAad(AAD, sizeof(AAD));
+        
+        Uint64 outlen1 = 0;
+        chacha_enc.encrypt(plaintext.data(), ciphertext.data(), size, &outlen1);
+        chacha_enc.getTag(tag.data(), 16);
+
+        chacha_dec.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+        chacha_dec.setAad(AAD, sizeof(AAD));
+        
+        Uint64 outlen2 = 0;
+        chacha_dec.decrypt(ciphertext.data(), decrypted.data(), size, &outlen2);
+
+        EXPECT_EQ(decrypted, plaintext) << "Mismatch for size: " << size;
+    }
+}
+
 #endif
