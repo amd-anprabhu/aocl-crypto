@@ -319,6 +319,582 @@ TEST(GCM, Instantiation)
     }
 }
 
+// ============================================================================
+// Comprehensive Corner Case Tests for GCM
+// ============================================================================
+
+// Test all key sizes (128, 192, 256 bits) with encrypt/decrypt roundtrip
+TEST(GCM, AllKeySizesRoundtrip)
+{
+    std::vector<Uint8> iv(12, 0x01);
+    std::vector<Uint8> aad(16, 0xAA);
+    std::vector<Uint8> plaintext(32, 0x55);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<Uint8> decrypted(32);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    // 128-bit key
+    {
+        std::vector<Uint8> key(16, 0x42);
+        auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(aead, nullptr);
+
+        err = aead->init(getPtr(key), 128, getPtr(iv), iv.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen = 0;
+        err = aead->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        // Decrypt with new object
+        auto aead2 = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(aead2, nullptr);
+        err = aead2->init(getPtr(key), 128, getPtr(iv), iv.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead2->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        outlen = 0;
+        err = aead2->decrypt(getPtr(ciphertext), getPtr(decrypted), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, plaintext);
+
+        delete aead;
+        delete aead2;
+    }
+
+    // 192-bit key
+    {
+        std::vector<Uint8> key(24, 0x42);
+        auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey192Bit);
+        ASSERT_NE(aead, nullptr);
+
+        err = aead->init(getPtr(key), 192, getPtr(iv), iv.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen = 0;
+        err = aead->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        // Decrypt with new object
+        auto aead2 = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey192Bit);
+        ASSERT_NE(aead2, nullptr);
+        err = aead2->init(getPtr(key), 192, getPtr(iv), iv.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead2->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        outlen = 0;
+        err = aead2->decrypt(getPtr(ciphertext), getPtr(decrypted), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, plaintext);
+
+        delete aead;
+        delete aead2;
+    }
+
+    // 256-bit key
+    {
+        std::vector<Uint8> key(32, 0x42);
+        auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey256Bit);
+        ASSERT_NE(aead, nullptr);
+
+        err = aead->init(getPtr(key), 256, getPtr(iv), iv.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen = 0;
+        err = aead->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        // Decrypt with new object
+        auto aead2 = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey256Bit);
+        ASSERT_NE(aead2, nullptr);
+        err = aead2->init(getPtr(key), 256, getPtr(iv), iv.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead2->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        outlen = 0;
+        err = aead2->decrypt(getPtr(ciphertext), getPtr(decrypted), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, plaintext);
+
+        delete aead;
+        delete aead2;
+    }
+}
+
+// Test different IV/nonce lengths
+TEST(GCM, VariousNonceLengths)
+{
+    std::vector<Uint8> key(16, 0x12);
+    std::vector<Uint8> plaintext(32, 0x34);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<Uint8> decrypted(32);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    // Test various nonce lengths: 12 (standard), 8, 16
+    std::vector<size_t> nonce_lengths = { 12, 8, 16 };
+
+    for (size_t nlen : nonce_lengths) {
+        std::vector<Uint8> nonce(nlen, static_cast<Uint8>(nlen));
+        
+        auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(aead, nullptr);
+
+        err = aead->init(getPtr(key), 128, getPtr(nonce), nonce.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Failed init for nonce length " << nlen;
+
+        Uint64 outlen = 0;
+        err = aead->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Failed encrypt for nonce length " << nlen;
+
+        err = aead->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        // Decrypt and verify
+        err = aead->init(getPtr(key), 128, getPtr(nonce), nonce.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        outlen = 0;
+        err = aead->decrypt(getPtr(ciphertext), getPtr(decrypted), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, plaintext) << "Mismatch for nonce length " << nlen;
+
+        delete aead;
+    }
+}
+
+// Test various AAD lengths
+TEST(GCM, VariousAADLengths)
+{
+    std::vector<Uint8> key(16, 0x56);
+    std::vector<Uint8> iv(12, 0x78);
+    std::vector<Uint8> plaintext(32, 0x9A);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<Uint8> decrypted(32);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    // Test various AAD lengths
+    std::vector<size_t> aad_lengths = { 0, 16, 32, 64, 128, 256 };
+
+    for (size_t alen : aad_lengths) {
+        std::vector<Uint8> aad(alen);
+        for (size_t i = 0; i < alen; i++) {
+            aad[i] = static_cast<Uint8>(i % 256);
+        }
+
+        auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(aead, nullptr);
+
+        err = aead->init(getPtr(key), 128, getPtr(iv), iv.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        if (alen > 0) {
+            err = aead->setAad(getPtr(aad), aad.size());
+            EXPECT_EQ(err, ALC_ERROR_NONE) << "Failed setAad for length " << alen;
+        }
+
+        Uint64 outlen = 0;
+        err = aead->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        // Decrypt with new object and verify
+        auto aead2 = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(aead2, nullptr);
+        err = aead2->init(getPtr(key), 128, getPtr(iv), iv.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        if (alen > 0) {
+            err = aead2->setAad(getPtr(aad), aad.size());
+            EXPECT_EQ(err, ALC_ERROR_NONE);
+        }
+        outlen = 0;
+        err = aead2->decrypt(getPtr(ciphertext), getPtr(decrypted), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, plaintext) << "Mismatch for AAD length " << alen;
+
+        delete aead;
+        delete aead2;
+    }
+}
+
+// Test various tag lengths (4, 8, 12, 13, 14, 15, 16 bytes are valid)
+TEST(GCM, ValidTagLengths)
+{
+    std::vector<Uint8> key(16, 0xBC);
+    std::vector<Uint8> iv(12, 0xDE);
+    std::vector<Uint8> plaintext(32, 0xF0);
+    std::vector<Uint8> ciphertext(32);
+    alc_error_t err;
+
+    std::vector<size_t> valid_tag_lengths = { 4, 8, 12, 13, 14, 15, 16 };
+
+    for (size_t tlen : valid_tag_lengths) {
+        std::vector<Uint8> tag(tlen);
+
+        auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(aead, nullptr);
+
+        err = aead->init(getPtr(key), 128, getPtr(iv), iv.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = aead->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        err = aead->getTag(getPtr(tag), tlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Failed getTag for length " << tlen;
+
+        delete aead;
+    }
+}
+
+// Test all zeros input (key, iv, aad, plaintext)
+TEST(GCM, AllZerosInput)
+{
+    std::vector<Uint8> key(16, 0x00);
+    std::vector<Uint8> iv(12, 0x00);
+    std::vector<Uint8> aad(16, 0x00);
+    std::vector<Uint8> plaintext(32, 0x00);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<Uint8> decrypted(32);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(aead, nullptr);
+
+    err = aead->init(getPtr(key), 128, getPtr(iv), iv.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = aead->setAad(getPtr(aad), aad.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    
+    Uint64 outlen = 0;
+    err = aead->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = aead->getTag(getPtr(tag), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt
+    err = aead->init(getPtr(key), 128, getPtr(iv), iv.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = aead->setAad(getPtr(aad), aad.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    outlen = 0;
+    err = aead->decrypt(getPtr(ciphertext), getPtr(decrypted), 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, plaintext);
+
+    delete aead;
+}
+
+// Test all ones input (0xFF)
+TEST(GCM, AllOnesInput)
+{
+    std::vector<Uint8> key(16, 0xFF);
+    std::vector<Uint8> iv(12, 0xFF);
+    std::vector<Uint8> aad(16, 0xFF);
+    std::vector<Uint8> plaintext(32, 0xFF);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<Uint8> decrypted(32);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(aead, nullptr);
+
+    err = aead->init(getPtr(key), 128, getPtr(iv), iv.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = aead->setAad(getPtr(aad), aad.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    
+    Uint64 outlen = 0;
+    err = aead->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = aead->getTag(getPtr(tag), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt
+    err = aead->init(getPtr(key), 128, getPtr(iv), iv.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = aead->setAad(getPtr(aad), aad.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    outlen = 0;
+    err = aead->decrypt(getPtr(ciphertext), getPtr(decrypted), 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, plaintext);
+
+    delete aead;
+}
+
+// Test multiple blocks (various block counts)
+TEST(GCM, MultipleBlocks)
+{
+    std::vector<Uint8> key(16, 0x11);
+    std::vector<Uint8> iv(12, 0x22);
+    std::vector<Uint8> aad(16, 0x33);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    std::vector<size_t> block_counts = { 1, 2, 4, 8, 16, 32, 64 };
+
+    for (size_t num_blocks : block_counts) {
+        size_t data_size = num_blocks * 16;
+        std::vector<Uint8> plaintext(data_size);
+        for (size_t i = 0; i < data_size; i++) {
+            plaintext[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> ciphertext(data_size);
+        std::vector<Uint8> decrypted(data_size);
+
+        auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(aead, nullptr);
+
+        err = aead->init(getPtr(key), 128, getPtr(iv), iv.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = aead->encrypt(getPtr(plaintext), getPtr(ciphertext), data_size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Encrypt failed for block count: " << num_blocks;
+        err = aead->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        // Decrypt with new object
+        auto aead2 = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(aead2, nullptr);
+        err = aead2->init(getPtr(key), 128, getPtr(iv), iv.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead2->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        outlen = 0;
+        err = aead2->decrypt(getPtr(ciphertext), getPtr(decrypted), data_size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, plaintext) << "Mismatch for block count " << num_blocks;
+
+        delete aead;
+        delete aead2;
+    }
+}
+
+// Test large data (1 MB)
+TEST(GCM, LargeData)
+{
+    const size_t data_size = 1024 * 1024; // 1 MB
+    std::vector<Uint8> key(32, 0x44);
+    std::vector<Uint8> iv(12, 0x55);
+    std::vector<Uint8> aad(32, 0x66);
+    std::vector<Uint8> plaintext(data_size);
+    std::vector<Uint8> ciphertext(data_size);
+    std::vector<Uint8> decrypted(data_size);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    for (size_t i = 0; i < data_size; i++) {
+        plaintext[i] = static_cast<Uint8>((i * 17) % 256);
+    }
+
+    auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey256Bit);
+    ASSERT_NE(aead, nullptr);
+
+    err = aead->init(getPtr(key), 256, getPtr(iv), iv.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = aead->setAad(getPtr(aad), aad.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    Uint64 outlen = 0;
+    err = aead->encrypt(getPtr(plaintext), getPtr(ciphertext), data_size, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = aead->getTag(getPtr(tag), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt with new object
+    auto aead2 = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey256Bit);
+    ASSERT_NE(aead2, nullptr);
+    err = aead2->init(getPtr(key), 256, getPtr(iv), iv.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = aead2->setAad(getPtr(aad), aad.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    outlen = 0;
+    err = aead2->decrypt(getPtr(ciphertext), getPtr(decrypted), data_size, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, plaintext);
+
+    delete aead;
+    delete aead2;
+}
+
+// Test IV affects output (different IVs should produce different ciphertexts)
+TEST(GCM, IVAffectsOutput)
+{
+    std::vector<Uint8> key(16, 0x77);
+    std::vector<Uint8> plaintext(32, 0x88);
+    std::vector<Uint8> tag(16);
+    std::vector<std::vector<Uint8>> outputs;
+    alc_error_t err;
+
+    for (int i = 0; i < 5; i++) {
+        std::vector<Uint8> iv(12, static_cast<Uint8>(i));
+        std::vector<Uint8> ciphertext(32);
+
+        auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(aead, nullptr);
+
+        err = aead->init(getPtr(key), 128, getPtr(iv), iv.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = aead->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        outputs.push_back(ciphertext);
+        delete aead;
+    }
+
+    // Verify all outputs are different
+    for (size_t i = 0; i < outputs.size(); i++) {
+        for (size_t j = i + 1; j < outputs.size(); j++) {
+            EXPECT_NE(outputs[i], outputs[j]) 
+                << "IV " << i << " and " << j << " produced same ciphertext";
+        }
+    }
+}
+
+// Test AAD affects tag (different AADs should produce different tags)
+TEST(GCM, AADAffectsTag)
+{
+    std::vector<Uint8> key(16, 0x99);
+    std::vector<Uint8> iv(12, 0xAA);
+    std::vector<Uint8> plaintext(32, 0xBB);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<std::vector<Uint8>> tags;
+    alc_error_t err;
+
+    for (int i = 0; i < 5; i++) {
+        std::vector<Uint8> aad(16, static_cast<Uint8>(i));
+        std::vector<Uint8> tag(16);
+
+        auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(aead, nullptr);
+
+        err = aead->init(getPtr(key), 128, getPtr(iv), iv.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = aead->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        tags.push_back(tag);
+        delete aead;
+    }
+
+    // Verify all tags are different
+    for (size_t i = 0; i < tags.size(); i++) {
+        for (size_t j = i + 1; j < tags.size(); j++) {
+            EXPECT_NE(tags[i], tags[j]) 
+                << "AAD " << i << " and " << j << " produced same tag";
+        }
+    }
+}
+
+// Test separate cipher objects for encrypt and decrypt
+TEST(GCM, SeparateCipherObjects)
+{
+    std::vector<Uint8> key(16, 0xCC);
+    std::vector<Uint8> iv(12, 0xDD);
+    std::vector<Uint8> aad(16, 0xEE);
+    std::vector<Uint8> plaintext(64, 0xFF);
+    std::vector<Uint8> ciphertext(64);
+    std::vector<Uint8> decrypted(64);
+    std::vector<Uint8> tag_enc(16);
+    alc_error_t err;
+
+    // Encrypt with first cipher object
+    auto aead_enc = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(aead_enc, nullptr);
+
+    err = aead_enc->init(getPtr(key), 128, getPtr(iv), iv.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = aead_enc->setAad(getPtr(aad), aad.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    Uint64 outlen = 0;
+    err = aead_enc->encrypt(getPtr(plaintext), getPtr(ciphertext), 64, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = aead_enc->getTag(getPtr(tag_enc), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    delete aead_enc;
+
+    // Decrypt with second cipher object
+    auto aead_dec = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(aead_dec, nullptr);
+
+    err = aead_dec->init(getPtr(key), 128, getPtr(iv), iv.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = aead_dec->setAad(getPtr(aad), aad.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    outlen = 0;
+    err = aead_dec->decrypt(getPtr(ciphertext), getPtr(decrypted), 64, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, plaintext);
+
+    delete aead_dec;
+}
+
+// Test determinism (same inputs always produce same output)
+TEST(GCM, Determinism)
+{
+    std::vector<Uint8> key(16, 0x11);
+    std::vector<Uint8> iv(12, 0x22);
+    std::vector<Uint8> aad(16, 0x33);
+    std::vector<Uint8> plaintext(32, 0x44);
+    std::vector<Uint8> ciphertext1(32), ciphertext2(32), ciphertext3(32);
+    std::vector<Uint8> tag1(16), tag2(16), tag3(16);
+    alc_error_t err;
+
+    for (int round = 0; round < 3; round++) {
+        auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(aead, nullptr);
+
+        err = aead->init(getPtr(key), 128, getPtr(iv), iv.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        std::vector<Uint8>* ct = (round == 0) ? &ciphertext1 : (round == 1) ? &ciphertext2 : &ciphertext3;
+        std::vector<Uint8>* tg = (round == 0) ? &tag1 : (round == 1) ? &tag2 : &tag3;
+        err = aead->encrypt(getPtr(plaintext), getPtr(*ct), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = aead->getTag(getPtr(*tg), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        delete aead;
+    }
+
+    EXPECT_EQ(ciphertext1, ciphertext2) << "Round 1 and 2 should produce same ciphertext";
+    EXPECT_EQ(ciphertext2, ciphertext3) << "Round 2 and 3 should produce same ciphertext";
+    EXPECT_EQ(tag1, tag2) << "Round 1 and 2 should produce same tag";
+    EXPECT_EQ(tag2, tag3) << "Round 2 and 3 should produce same tag";
+}
+
 #if 0
 // Linux specific test
 #ifdef __linux__
