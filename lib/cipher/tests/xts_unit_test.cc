@@ -1040,3 +1040,558 @@ TEST_P(XTS_KAT, valid_encrypt_decrypt_test)
     EXPECT_EQ(m_plaintext, outpt);
 }
 #endif
+
+// ============================================================================
+// Comprehensive Corner Case Tests for XTS
+// ============================================================================
+
+// Test both key sizes (128 and 256 bits) with encrypt/decrypt roundtrip
+TEST(XTS, AllKeySizesRoundtrip)
+{
+    std::vector<Uint8> iv(16, 0x01);
+    std::vector<Uint8> plaintext(64);
+    alc_error_t err;
+
+    for (size_t i = 0; i < plaintext.size(); i++) {
+        plaintext[i] = static_cast<Uint8>(i % 256);
+    }
+
+    // 128-bit key (XTS uses double key, so 32 bytes total)
+    {
+        std::vector<Uint8> key(32, 0x42);
+        std::vector<Uint8> ciphertext(64), decrypted(64);
+
+        auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(xts, nullptr);
+
+        err = xts->init(key.data(), 128, iv.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen = 0;
+        err = xts->encrypt(plaintext.data(), ciphertext.data(), 64, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        // Decrypt with new object
+        auto xts2 = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(xts2, nullptr);
+        err = xts2->init(key.data(), 128, iv.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen2 = 0;
+        err = xts2->decrypt(ciphertext.data(), decrypted.data(), 64, &outlen2);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, plaintext);
+
+        delete xts;
+        delete xts2;
+    }
+
+    // 256-bit key (XTS uses double key, so 64 bytes total)
+    {
+        std::vector<Uint8> key(64, 0x43);
+        std::vector<Uint8> ciphertext(64), decrypted(64);
+
+        auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey256Bit);
+        ASSERT_NE(xts, nullptr);
+
+        err = xts->init(key.data(), 256, iv.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen = 0;
+        err = xts->encrypt(plaintext.data(), ciphertext.data(), 64, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        // Decrypt with new object
+        auto xts2 = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey256Bit);
+        ASSERT_NE(xts2, nullptr);
+        err = xts2->init(key.data(), 256, iv.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen2 = 0;
+        err = xts2->decrypt(ciphertext.data(), decrypted.data(), 64, &outlen2);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, plaintext);
+
+        delete xts;
+        delete xts2;
+    }
+}
+
+// Test minimum plaintext size (16 bytes = 1 block)
+TEST(XTS, MinimumPlaintextSize)
+{
+    std::vector<Uint8> key(32, 0x11);
+    std::vector<Uint8> iv(16, 0x22);
+    std::vector<Uint8> plaintext(16, 0x33);
+    std::vector<Uint8> ciphertext(16), decrypted(16);
+    alc_error_t err;
+
+    auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(xts, nullptr);
+
+    err = xts->init(key.data(), 128, iv.data(), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen = 0;
+    err = xts->encrypt(plaintext.data(), ciphertext.data(), 16, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt
+    auto xts2 = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(xts2, nullptr);
+    err = xts2->init(key.data(), 128, iv.data(), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen2 = 0;
+    err = xts2->decrypt(ciphertext.data(), decrypted.data(), 16, &outlen2);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, plaintext);
+
+    delete xts;
+    delete xts2;
+}
+
+// Test non-block-aligned plaintext sizes (ciphertext stealing)
+TEST(XTS, NonBlockAlignedPlaintext)
+{
+    std::vector<Uint8> key(32, 0x44);
+    std::vector<Uint8> iv(16, 0x55);
+    alc_error_t err;
+
+    // XTS requires minimum 16 bytes, and handles non-aligned via ciphertext stealing
+    std::vector<size_t> sizes = { 17, 23, 31, 33, 47, 63, 65, 100, 255, 1000 };
+
+    for (size_t size : sizes) {
+        std::vector<Uint8> plaintext(size);
+        for (size_t i = 0; i < size; i++) {
+            plaintext[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> ciphertext(size), decrypted(size);
+
+        auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(xts, nullptr);
+
+        err = xts->init(key.data(), 128, iv.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen = 0;
+        err = xts->encrypt(plaintext.data(), ciphertext.data(), size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Encrypt failed for size: " << size;
+
+        // Decrypt
+        auto xts2 = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(xts2, nullptr);
+        err = xts2->init(key.data(), 128, iv.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen2 = 0;
+        err = xts2->decrypt(ciphertext.data(), decrypted.data(), size, &outlen2);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, plaintext) << "Mismatch for size: " << size;
+
+        delete xts;
+        delete xts2;
+    }
+}
+
+// Test all zeros input
+TEST(XTS, AllZerosInput)
+{
+    std::vector<Uint8> key(32, 0x00);
+    std::vector<Uint8> iv(16, 0x00);
+    std::vector<Uint8> plaintext(64, 0x00);
+    std::vector<Uint8> ciphertext(64), decrypted(64);
+    alc_error_t err;
+
+    auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(xts, nullptr);
+
+    err = xts->init(key.data(), 128, iv.data(), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen = 0;
+    err = xts->encrypt(plaintext.data(), ciphertext.data(), 64, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt
+    auto xts2 = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(xts2, nullptr);
+    err = xts2->init(key.data(), 128, iv.data(), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen2 = 0;
+    err = xts2->decrypt(ciphertext.data(), decrypted.data(), 64, &outlen2);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, plaintext);
+
+    delete xts;
+    delete xts2;
+}
+
+// Test determinism (same inputs always produce same output)
+TEST(XTS, Determinism)
+{
+    std::vector<Uint8> key(32, 0x66);
+    std::vector<Uint8> iv(16, 0x77);
+    std::vector<Uint8> plaintext(64, 0x88);
+    std::vector<Uint8> ciphertext1(64), ciphertext2(64), ciphertext3(64);
+    alc_error_t err;
+
+    for (int round = 0; round < 3; round++) {
+        auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(xts, nullptr);
+
+        err = xts->init(key.data(), 128, iv.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        std::vector<Uint8>* ct = (round == 0) ? &ciphertext1 : (round == 1) ? &ciphertext2 : &ciphertext3;
+        err = xts->encrypt(plaintext.data(), ct->data(), 64, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        delete xts;
+    }
+
+    EXPECT_EQ(ciphertext1, ciphertext2) << "Round 1 and 2 should produce same ciphertext";
+    EXPECT_EQ(ciphertext2, ciphertext3) << "Round 2 and 3 should produce same ciphertext";
+}
+
+// Test IV affects output (different IVs should produce different ciphertexts)
+TEST(XTS, IVAffectsOutput)
+{
+    std::vector<Uint8> key(32, 0x99);
+    std::vector<Uint8> plaintext(64, 0xAA);
+    std::vector<std::vector<Uint8>> outputs;
+    alc_error_t err;
+
+    for (int i = 0; i < 5; i++) {
+        std::vector<Uint8> iv(16, static_cast<Uint8>(i));
+        std::vector<Uint8> ciphertext(64);
+
+        auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(xts, nullptr);
+
+        err = xts->init(key.data(), 128, iv.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = xts->encrypt(plaintext.data(), ciphertext.data(), 64, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        outputs.push_back(ciphertext);
+        delete xts;
+    }
+
+    // Verify all outputs are different
+    for (size_t i = 0; i < outputs.size(); i++) {
+        for (size_t j = i + 1; j < outputs.size(); j++) {
+            EXPECT_NE(outputs[i], outputs[j]) 
+                << "IV " << i << " and " << j << " produced same ciphertext";
+        }
+    }
+}
+
+// Test key affects output (different keys should produce different outputs)
+TEST(XTS, KeyAffectsOutput)
+{
+    std::vector<Uint8> iv(16, 0xBB);
+    std::vector<Uint8> plaintext(64, 0xCC);
+    std::vector<std::vector<Uint8>> outputs;
+    alc_error_t err;
+
+    for (int i = 0; i < 5; i++) {
+        std::vector<Uint8> key(32, static_cast<Uint8>(i));
+        std::vector<Uint8> ciphertext(64);
+
+        auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(xts, nullptr);
+
+        err = xts->init(key.data(), 128, iv.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = xts->encrypt(plaintext.data(), ciphertext.data(), 64, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        outputs.push_back(ciphertext);
+        delete xts;
+    }
+
+    // Verify all outputs are different
+    for (size_t i = 0; i < outputs.size(); i++) {
+        for (size_t j = i + 1; j < outputs.size(); j++) {
+            EXPECT_NE(outputs[i], outputs[j]) 
+                << "Key " << i << " and " << j << " produced same ciphertext";
+        }
+    }
+}
+
+// Test separate cipher objects produce identical results
+TEST(XTS, SeparateCipherObjects)
+{
+    std::vector<Uint8> key(32, 0xDD);
+    std::vector<Uint8> iv(16, 0xEE);
+    std::vector<Uint8> plaintext(64, 0xFF);
+    std::vector<Uint8> ciphertext1(64), ciphertext2(64);
+    alc_error_t err;
+
+    // Encrypt with first cipher object
+    auto xts1 = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(xts1, nullptr);
+    err = xts1->init(key.data(), 128, iv.data(), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen1 = 0;
+    err = xts1->encrypt(plaintext.data(), ciphertext1.data(), 64, &outlen1);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    delete xts1;
+
+    // Encrypt with second cipher object
+    auto xts2 = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(xts2, nullptr);
+    err = xts2->init(key.data(), 128, iv.data(), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen2 = 0;
+    err = xts2->encrypt(plaintext.data(), ciphertext2.data(), 64, &outlen2);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    delete xts2;
+
+    // Same inputs should produce same outputs
+    EXPECT_EQ(ciphertext1, ciphertext2);
+}
+
+// Test cipher object reuse with different keys
+TEST(XTS, ReuseWithDifferentKeys)
+{
+    std::vector<Uint8> iv(16, 0x11);
+    std::vector<Uint8> plaintext(64, 0x22);
+    std::vector<Uint8> ciphertext1(64), ciphertext2(64);
+    alc_error_t err;
+
+    auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(xts, nullptr);
+
+    // First encryption with key1
+    {
+        std::vector<Uint8> key1(32, 0x01);
+        err = xts->init(key1.data(), 128, iv.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen = 0;
+        err = xts->encrypt(plaintext.data(), ciphertext1.data(), 64, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+    }
+
+    // Second encryption with key2 (same object)
+    {
+        std::vector<Uint8> key2(32, 0x02);
+        err = xts->init(key2.data(), 128, iv.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen = 0;
+        err = xts->encrypt(plaintext.data(), ciphertext2.data(), 64, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+    }
+
+    // Different keys should produce different outputs
+    EXPECT_NE(ciphertext1, ciphertext2);
+
+    delete xts;
+}
+
+// Test cipher object reuse with different IVs
+TEST(XTS, ReuseWithDifferentIVs)
+{
+    std::vector<Uint8> key(32, 0x33);
+    std::vector<Uint8> plaintext(64, 0x44);
+    std::vector<Uint8> ciphertext1(64), ciphertext2(64);
+    alc_error_t err;
+
+    auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(xts, nullptr);
+
+    // First encryption with iv1
+    {
+        std::vector<Uint8> iv1(16, 0x01);
+        err = xts->init(key.data(), 128, iv1.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen = 0;
+        err = xts->encrypt(plaintext.data(), ciphertext1.data(), 64, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+    }
+
+    // Second encryption with iv2 (same object)
+    {
+        std::vector<Uint8> iv2(16, 0x02);
+        err = xts->init(key.data(), 128, iv2.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen = 0;
+        err = xts->encrypt(plaintext.data(), ciphertext2.data(), 64, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+    }
+
+    // Different IVs should produce different outputs
+    EXPECT_NE(ciphertext1, ciphertext2);
+
+    delete xts;
+}
+
+// Test multiple blocks (various block counts)
+TEST(XTS, MultipleBlocks)
+{
+    std::vector<Uint8> key(32, 0x55);
+    std::vector<Uint8> iv(16, 0x66);
+    alc_error_t err;
+
+    std::vector<size_t> block_counts = { 1, 2, 4, 8, 16, 32 };
+
+    for (size_t num_blocks : block_counts) {
+        size_t data_size = num_blocks * 16;
+        std::vector<Uint8> plaintext(data_size);
+        for (size_t i = 0; i < data_size; i++) {
+            plaintext[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> ciphertext(data_size), decrypted(data_size);
+
+        auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(xts, nullptr);
+
+        err = xts->init(key.data(), 128, iv.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen = 0;
+        err = xts->encrypt(plaintext.data(), ciphertext.data(), data_size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Encrypt failed for block count: " << num_blocks;
+
+        // Decrypt
+        auto xts2 = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(xts2, nullptr);
+        err = xts2->init(key.data(), 128, iv.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen2 = 0;
+        err = xts2->decrypt(ciphertext.data(), decrypted.data(), data_size, &outlen2);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, plaintext) << "Mismatch for block count " << num_blocks;
+
+        delete xts;
+        delete xts2;
+    }
+}
+
+// Test large data (1 MB) with 256-bit key
+TEST(XTS, LargeDataWith256BitKey)
+{
+    const size_t data_size = 1024 * 1024; // 1 MB
+    std::vector<Uint8> key(64, 0x77); // 256-bit key (double = 64 bytes)
+    std::vector<Uint8> iv(16, 0x88);
+    std::vector<Uint8> plaintext(data_size);
+    std::vector<Uint8> ciphertext(data_size), decrypted(data_size);
+    alc_error_t err;
+
+    for (size_t i = 0; i < data_size; i++) {
+        plaintext[i] = static_cast<Uint8>((i * 17) % 256);
+    }
+
+    auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey256Bit);
+    ASSERT_NE(xts, nullptr);
+
+    err = xts->init(key.data(), 256, iv.data(), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen = 0;
+    err = xts->encrypt(plaintext.data(), ciphertext.data(), data_size, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt
+    auto xts2 = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey256Bit);
+    ASSERT_NE(xts2, nullptr);
+    err = xts2->init(key.data(), 256, iv.data(), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen2 = 0;
+    err = xts2->decrypt(ciphertext.data(), decrypted.data(), data_size, &outlen2);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, plaintext);
+
+    delete xts;
+    delete xts2;
+}
+
+// Test plaintext affects output (different plaintexts should produce different ciphertexts)
+TEST(XTS, PlaintextAffectsOutput)
+{
+    std::vector<Uint8> key(32, 0x99);
+    std::vector<Uint8> iv(16, 0xAA);
+    std::vector<std::vector<Uint8>> outputs;
+    alc_error_t err;
+
+    for (int i = 0; i < 5; i++) {
+        std::vector<Uint8> plaintext(64, static_cast<Uint8>(i));
+        std::vector<Uint8> ciphertext(64);
+
+        auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(xts, nullptr);
+
+        err = xts->init(key.data(), 128, iv.data(), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = xts->encrypt(plaintext.data(), ciphertext.data(), 64, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        outputs.push_back(ciphertext);
+        delete xts;
+    }
+
+    // Verify all outputs are different
+    for (size_t i = 0; i < outputs.size(); i++) {
+        for (size_t j = i + 1; j < outputs.size(); j++) {
+            EXPECT_NE(outputs[i], outputs[j]) 
+                << "Plaintext " << i << " and " << j << " produced same ciphertext";
+        }
+    }
+}
+
+// Test exactly 2 blocks (32 bytes)
+TEST(XTS, TwoBlocks)
+{
+    std::vector<Uint8> key(32, 0xBB);
+    std::vector<Uint8> iv(16, 0xCC);
+    std::vector<Uint8> plaintext(32, 0xDD);
+    std::vector<Uint8> ciphertext(32), decrypted(32);
+    alc_error_t err;
+
+    auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(xts, nullptr);
+
+    err = xts->init(key.data(), 128, iv.data(), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen = 0;
+    err = xts->encrypt(plaintext.data(), ciphertext.data(), 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt
+    auto xts2 = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(xts2, nullptr);
+    err = xts2->init(key.data(), 128, iv.data(), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen2 = 0;
+    err = xts2->decrypt(ciphertext.data(), decrypted.data(), 32, &outlen2);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, plaintext);
+
+    delete xts;
+    delete xts2;
+}
+
+// Test encryption doesn't modify input
+TEST(XTS, EncryptDoesNotModifyInput)
+{
+    std::vector<Uint8> key(32, 0xEE);
+    std::vector<Uint8> iv(16, 0xFF);
+    std::vector<Uint8> plaintext(64);
+    for (size_t i = 0; i < 64; i++) {
+        plaintext[i] = static_cast<Uint8>(i);
+    }
+    std::vector<Uint8> original_plaintext = plaintext;
+    std::vector<Uint8> ciphertext(64);
+    alc_error_t err;
+
+    auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(xts, nullptr);
+
+    err = xts->init(key.data(), 128, iv.data(), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen = 0;
+    err = xts->encrypt(plaintext.data(), ciphertext.data(), 64, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Verify input was not modified
+    EXPECT_EQ(plaintext, original_plaintext);
+
+    delete xts;
+}
