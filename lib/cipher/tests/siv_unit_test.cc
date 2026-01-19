@@ -321,3 +321,601 @@ TEST(CMACSIV, decTest2)
     delete siv;
 }
 #endif
+
+// ============================================================================
+// Comprehensive Corner Case Tests for SIV
+// ============================================================================
+
+template<typename T>
+T*
+getPtr(std::vector<T>& vect)
+{
+    if (vect.size() == 0) {
+        return nullptr;
+    } else {
+        return &vect[0];
+    }
+}
+
+// Test all key sizes (128, 192, 256 bits) with encryption
+TEST(CMACSIV, AllKeySizesEncrypt)
+{
+    std::vector<Uint8> aad(16, 0xAA);
+    std::vector<Uint8> plaintext(32, 0x55);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    // 128-bit key (SIV uses double key size, so 32 bytes total)
+    {
+        std::vector<Uint8> key(32, 0x42);
+        auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(siv, nullptr);
+
+        err = siv->init(getPtr(key), 128, nullptr, 0);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen = 0;
+        err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        delete siv;
+    }
+
+    // 192-bit key (SIV uses double key size, so 48 bytes total)
+    {
+        std::vector<Uint8> key(48, 0x42);
+        std::fill(ciphertext.begin(), ciphertext.end(), 0);
+        
+        auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey192Bit);
+        ASSERT_NE(siv, nullptr);
+
+        err = siv->init(getPtr(key), 192, nullptr, 0);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen = 0;
+        err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        delete siv;
+    }
+
+    // 256-bit key (SIV uses double key size, so 64 bytes total)
+    {
+        std::vector<Uint8> key(64, 0x42);
+        std::fill(ciphertext.begin(), ciphertext.end(), 0);
+
+        auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey256Bit);
+        ASSERT_NE(siv, nullptr);
+
+        err = siv->init(getPtr(key), 256, nullptr, 0);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        Uint64 outlen = 0;
+        err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        delete siv;
+    }
+}
+
+// Test various AAD lengths
+TEST(CMACSIV, VariousAADLengths)
+{
+    std::vector<Uint8> key(32, 0x56);
+    std::vector<Uint8> plaintext(32, 0x9A);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    // Test various AAD lengths
+    std::vector<size_t> aad_lengths = { 1, 15, 16, 17, 31, 32, 33, 64, 128 };
+
+    for (size_t alen : aad_lengths) {
+        std::vector<Uint8> aad(alen);
+        for (size_t i = 0; i < alen; i++) {
+            aad[i] = static_cast<Uint8>(i % 256);
+        }
+        std::fill(ciphertext.begin(), ciphertext.end(), 0);
+
+        auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(siv, nullptr);
+
+        err = siv->init(getPtr(key), 128, nullptr, 0);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        err = siv->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Failed setAad for length " << alen;
+
+        Uint64 outlen = 0;
+        err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        delete siv;
+    }
+}
+
+// Test encryption without AAD
+TEST(CMACSIV, EncryptWithoutAAD)
+{
+    std::vector<Uint8> key(32, 0x11);
+    std::vector<Uint8> plaintext(32, 0x22);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(siv, nullptr);
+
+    err = siv->init(getPtr(key), 128, nullptr, 0);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // No AAD set - encrypt directly
+    Uint64 outlen = 0;
+    err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = siv->getTag(getPtr(tag), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    delete siv;
+}
+
+// Test multiple AAD components (nonce-misuse resistance)
+TEST(CMACSIV, MultipleAADComponents)
+{
+    std::vector<Uint8> key(32, 0x33);
+    std::vector<Uint8> aad1(16, 0x44);
+    std::vector<Uint8> aad2(24, 0x55);
+    std::vector<Uint8> aad3(10, 0x66);
+    std::vector<Uint8> plaintext(48, 0x77);
+    std::vector<Uint8> ciphertext(48);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(siv, nullptr);
+
+    err = siv->init(getPtr(key), 128, nullptr, 0);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Add multiple AAD components
+    err = siv->setAad(getPtr(aad1), aad1.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = siv->setAad(getPtr(aad2), aad2.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = siv->setAad(getPtr(aad3), aad3.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    Uint64 outlen = 0;
+    err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext), 48, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = siv->getTag(getPtr(tag), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    delete siv;
+}
+
+// Test all zeros input (key, aad, plaintext)
+TEST(CMACSIV, AllZerosInput)
+{
+    std::vector<Uint8> key(32, 0x00);
+    std::vector<Uint8> aad(16, 0x00);
+    std::vector<Uint8> plaintext(32, 0x00);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(siv, nullptr);
+
+    err = siv->init(getPtr(key), 128, nullptr, 0);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = siv->setAad(getPtr(aad), aad.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    
+    Uint64 outlen = 0;
+    err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = siv->getTag(getPtr(tag), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    delete siv;
+}
+
+// Test multiple blocks (various block counts)
+TEST(CMACSIV, MultipleBlocks)
+{
+    std::vector<Uint8> key(32, 0x88);
+    std::vector<Uint8> aad(16, 0x99);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    std::vector<size_t> block_counts = { 1, 2, 4, 8, 16 };
+
+    for (size_t num_blocks : block_counts) {
+        size_t data_size = num_blocks * 16;
+        std::vector<Uint8> plaintext(data_size);
+        for (size_t i = 0; i < data_size; i++) {
+            plaintext[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> ciphertext(data_size);
+
+        auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(siv, nullptr);
+
+        err = siv->init(getPtr(key), 128, nullptr, 0);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext), data_size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Encrypt failed for block count: " << num_blocks;
+        err = siv->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        delete siv;
+    }
+}
+
+// Test large data encryption
+TEST(CMACSIV, LargeData)
+{
+    const size_t data_size = 8 * 1024; // 8 KB
+    std::vector<Uint8> key(64, 0xAA); // 256-bit SIV key (double = 64 bytes)
+    std::vector<Uint8> aad(32, 0xBB);
+    std::vector<Uint8> plaintext(data_size);
+    std::vector<Uint8> ciphertext(data_size);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    for (size_t i = 0; i < data_size; i++) {
+        plaintext[i] = static_cast<Uint8>((i * 17) % 256);
+    }
+
+    auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey256Bit);
+    ASSERT_NE(siv, nullptr);
+
+    err = siv->init(getPtr(key), 256, nullptr, 0);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = siv->setAad(getPtr(aad), aad.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    Uint64 outlen = 0;
+    err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext), data_size, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = siv->getTag(getPtr(tag), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    delete siv;
+}
+
+// Test AAD affects tag (different AADs should produce different tags)
+TEST(CMACSIV, AADAffectsTag)
+{
+    std::vector<Uint8> key(32, 0xCC);
+    std::vector<Uint8> plaintext(32, 0xDD);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<std::vector<Uint8>> tags;
+    alc_error_t err;
+
+    for (int i = 0; i < 5; i++) {
+        std::vector<Uint8> aad(16, static_cast<Uint8>(i));
+        std::vector<Uint8> tag(16);
+
+        auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(siv, nullptr);
+
+        err = siv->init(getPtr(key), 128, nullptr, 0);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        tags.push_back(tag);
+        delete siv;
+    }
+
+    // Verify all tags are different
+    for (size_t i = 0; i < tags.size(); i++) {
+        for (size_t j = i + 1; j < tags.size(); j++) {
+            EXPECT_NE(tags[i], tags[j]) 
+                << "AAD " << i << " and " << j << " produced same tag";
+        }
+    }
+}
+
+// Test determinism (same inputs always produce same output)
+TEST(CMACSIV, Determinism)
+{
+    std::vector<Uint8> key(32, 0xEE);
+    std::vector<Uint8> aad(16, 0xFF);
+    std::vector<Uint8> plaintext(32, 0x11);
+    std::vector<Uint8> ciphertext1(32), ciphertext2(32), ciphertext3(32);
+    std::vector<Uint8> tag1(16), tag2(16), tag3(16);
+    alc_error_t err;
+
+    for (int round = 0; round < 3; round++) {
+        auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(siv, nullptr);
+
+        err = siv->init(getPtr(key), 128, nullptr, 0);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        std::vector<Uint8>* ct = (round == 0) ? &ciphertext1 : (round == 1) ? &ciphertext2 : &ciphertext3;
+        std::vector<Uint8>* tg = (round == 0) ? &tag1 : (round == 1) ? &tag2 : &tag3;
+        err = siv->encrypt(getPtr(plaintext), getPtr(*ct), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->getTag(getPtr(*tg), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        delete siv;
+    }
+
+    EXPECT_EQ(ciphertext1, ciphertext2) << "Round 1 and 2 should produce same ciphertext";
+    EXPECT_EQ(ciphertext2, ciphertext3) << "Round 2 and 3 should produce same ciphertext";
+    EXPECT_EQ(tag1, tag2) << "Round 1 and 2 should produce same tag";
+    EXPECT_EQ(tag2, tag3) << "Round 2 and 3 should produce same tag";
+}
+
+// Test plaintext affects tag (different plaintexts should produce different tags)
+TEST(CMACSIV, PlaintextAffectsTag)
+{
+    std::vector<Uint8> key(32, 0x22);
+    std::vector<Uint8> aad(16, 0x33);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<std::vector<Uint8>> tags;
+    alc_error_t err;
+
+    for (int i = 0; i < 5; i++) {
+        std::vector<Uint8> plaintext(32, static_cast<Uint8>(i));
+        std::vector<Uint8> tag(16);
+
+        auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(siv, nullptr);
+
+        err = siv->init(getPtr(key), 128, nullptr, 0);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        tags.push_back(tag);
+        delete siv;
+    }
+
+    // Verify all tags are different
+    for (size_t i = 0; i < tags.size(); i++) {
+        for (size_t j = i + 1; j < tags.size(); j++) {
+            EXPECT_NE(tags[i], tags[j]) 
+                << "Plaintext " << i << " and " << j << " produced same tag";
+        }
+    }
+}
+
+// Test key affects output (different keys should produce different outputs)
+TEST(CMACSIV, KeyAffectsOutput)
+{
+    std::vector<Uint8> aad(16, 0x44);
+    std::vector<Uint8> plaintext(32, 0x55);
+    std::vector<std::vector<Uint8>> outputs;
+    alc_error_t err;
+
+    for (int i = 0; i < 5; i++) {
+        std::vector<Uint8> key(32, static_cast<Uint8>(i));
+        std::vector<Uint8> ciphertext(32);
+
+        auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(siv, nullptr);
+
+        err = siv->init(getPtr(key), 128, nullptr, 0);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        outputs.push_back(ciphertext);
+        delete siv;
+    }
+
+    // Verify all outputs are different
+    for (size_t i = 0; i < outputs.size(); i++) {
+        for (size_t j = i + 1; j < outputs.size(); j++) {
+            EXPECT_NE(outputs[i], outputs[j]) 
+                << "Key " << i << " and " << j << " produced same ciphertext";
+        }
+    }
+}
+
+// Test non-block-aligned plaintext sizes
+TEST(CMACSIV, NonBlockAlignedPlaintext)
+{
+    std::vector<Uint8> key(32, 0x66);
+    std::vector<Uint8> aad(16, 0x77);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    // Test various non-block-aligned sizes
+    std::vector<size_t> sizes = { 1, 7, 15, 17, 23, 31, 33, 47, 63, 65, 100 };
+
+    for (size_t size : sizes) {
+        std::vector<Uint8> plaintext(size);
+        for (size_t i = 0; i < size; i++) {
+            plaintext[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> ciphertext(size);
+
+        auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(siv, nullptr);
+
+        err = siv->init(getPtr(key), 128, nullptr, 0);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext), size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Encrypt failed for size: " << size;
+
+        err = siv->getTag(getPtr(tag), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        delete siv;
+    }
+}
+
+// Test single byte plaintext
+TEST(CMACSIV, SingleBytePlaintext)
+{
+    std::vector<Uint8> key(32, 0x88);
+    std::vector<Uint8> aad(16, 0x99);
+    std::vector<Uint8> plaintext(1, 0xAA);
+    std::vector<Uint8> ciphertext(1);
+    std::vector<Uint8> tag(16);
+    alc_error_t err;
+
+    auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(siv, nullptr);
+
+    err = siv->init(getPtr(key), 128, nullptr, 0);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = siv->setAad(getPtr(aad), aad.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    Uint64 outlen = 0;
+    err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext), 1, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = siv->getTag(getPtr(tag), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    delete siv;
+}
+
+// Test reusing cipher object with different keys
+TEST(CMACSIV, ReuseWithDifferentKeys)
+{
+    std::vector<Uint8> aad(16, 0xBB);
+    std::vector<Uint8> plaintext(32, 0xCC);
+    std::vector<Uint8> ciphertext1(32), ciphertext2(32);
+    std::vector<Uint8> tag1(16), tag2(16);
+    alc_error_t err;
+
+    auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(siv, nullptr);
+
+    // First encryption with key1
+    {
+        std::vector<Uint8> key1(32, 0x01);
+        
+        err = siv->init(getPtr(key1), 128, nullptr, 0);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext1), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->getTag(getPtr(tag1), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+    }
+
+    // Second encryption with key2 (same object)
+    {
+        std::vector<Uint8> key2(32, 0x02);
+
+        err = siv->init(getPtr(key2), 128, nullptr, 0);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->setAad(getPtr(aad), aad.size());
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = siv->encrypt(getPtr(plaintext), getPtr(ciphertext2), 32, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        err = siv->getTag(getPtr(tag2), 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+    }
+
+    // Different keys should produce different outputs
+    EXPECT_NE(ciphertext1, ciphertext2);
+    EXPECT_NE(tag1, tag2);
+
+    delete siv;
+}
+
+// Test separate cipher objects for same operation
+TEST(CMACSIV, SeparateCipherObjects)
+{
+    std::vector<Uint8> key(32, 0xDD);
+    std::vector<Uint8> aad(16, 0xEE);
+    std::vector<Uint8> plaintext(64, 0xFF);
+    std::vector<Uint8> ciphertext1(64), ciphertext2(64);
+    std::vector<Uint8> tag1(16), tag2(16);
+    alc_error_t err;
+
+    // Encrypt with first cipher object
+    auto siv1 = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(siv1, nullptr);
+
+    err = siv1->init(getPtr(key), 128, nullptr, 0);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = siv1->setAad(getPtr(aad), aad.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    Uint64 outlen = 0;
+    err = siv1->encrypt(getPtr(plaintext), getPtr(ciphertext1), 64, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = siv1->getTag(getPtr(tag1), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    delete siv1;
+
+    // Encrypt with second cipher object
+    auto siv2 = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(siv2, nullptr);
+
+    err = siv2->init(getPtr(key), 128, nullptr, 0);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = siv2->setAad(getPtr(aad), aad.size());
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    outlen = 0;
+    err = siv2->encrypt(getPtr(plaintext), getPtr(ciphertext2), 64, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    err = siv2->getTag(getPtr(tag2), 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Same inputs should produce same outputs
+    EXPECT_EQ(ciphertext1, ciphertext2);
+    EXPECT_EQ(tag1, tag2);
+
+    delete siv2;
+}
+
+//
