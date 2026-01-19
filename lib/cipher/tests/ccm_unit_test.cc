@@ -339,7 +339,7 @@ class CCM_KAT
     : public testing::TestWithParam<std::pair<const std::string, param_tuple>>
 {
   public:
-        iCipherAead*                pCcmObj    = nullptr;
+    iCipherCcm* pCcmObj = nullptr;
     std::vector<Uint8> m_key, m_nonce, m_aad, m_plaintext, m_ciphertext, m_tag;
     std::string        m_test_name;
     alc_error_t        m_err;
@@ -364,9 +364,15 @@ class CCM_KAT
 
         // Setup CCM Object
         // FIXME: Add feature selection
-        pCcmObj = createCipherAead(CipherMode::eAesCCM, keySizeToKeyLen(m_key.size()));
+        iCipherAead* aead = createCipherAead(CipherMode::eAesCCM,
+                                             keySizeToKeyLen(m_key.size()));
+        ASSERT_TRUE(aead != nullptr);
 
-        ASSERT_TRUE(pCcmObj != nullptr);
+        pCcmObj = dynamic_cast<iCipherCcm*>(aead);
+        if (pCcmObj == nullptr) {
+            delete aead;
+            FAIL() << "createCipherAead(eAesCCM) did not return iCipherCcm";
+        }
     }
     void TearDown() override { delete pCcmObj; }
 };
@@ -784,10 +790,14 @@ TEST(CCM, InvalidNonceLen)
 
     // Setup CCM Object
         // FIXME: Add feature selection
-    auto pCcmObj = createCipherAead(CipherMode::eAesCCM, keySizeToKeyLen(sizeof(key)));
+    iCipherAead* aead = createCipherAead(CipherMode::eAesCCM,
+                                         keySizeToKeyLen(sizeof(key)));
+    ASSERT_TRUE(aead != nullptr);
 
+    iCipherCcm* pCcmObj = dynamic_cast<iCipherCcm*>(aead);
     if (pCcmObj == nullptr) {
-        FAIL();
+        delete aead;
+        FAIL() << "createCipherAead(eAesCCM) did not return iCipherCcm";
     }
     alc_error_t err;
 
