@@ -36,15 +36,18 @@
 // class design
 namespace alcp::mac {
 using utils::CpuId;
+
 Cmac::Cmac()
 {
 }
 
 Cmac::Cmac(const Cmac& cmac)
+    : m_keyManager() // KeyManager is non-copyable, create new instance
 {
     utils::CopyBytes(m_k1, cmac.m_k1, cAESBlockSize);
     utils::CopyBytes(m_k2, cmac.m_k2, cAESBlockSize);
-    m_encrypt_keys = cmac.m_encrypt_keys;
+    // Note: m_encrypt_keys will be set when init() is called
+    m_encrypt_keys = nullptr;
     utils::CopyBytes(m_buff, cmac.m_buff, cAESBlockSize);
     m_buff_offset = cmac.m_buff_offset;
     utils::CopyBytes(m_buffEnc, cmac.m_buffEnc, cAESBlockSize);
@@ -60,7 +63,7 @@ Cmac::~Cmac()
 void
 Cmac::getSubkeys()
 {
-    avx2::get_subkeys(m_k1, m_k2, m_encrypt_keys, getRounds());
+    avx2::get_subkeys(m_k1, m_k2, m_encrypt_keys, m_keyManager.getRounds());
     return;
 }
 
@@ -138,7 +141,7 @@ Cmac::update(const Uint8* pMsgBuf, Uint64 size)
                      m_buff,
                      m_encrypt_keys,
                      m_pBuffEnc,
-                     getRounds(),
+                     m_keyManager.getRounds(),
                      static_cast<Uint32>(n_blocks));
     } else {
         // Using a separate pointer for pMsgBuf pointer operations so
@@ -146,11 +149,11 @@ Cmac::update(const Uint8* pMsgBuf, Uint64 size)
         const Uint8* p_plaintext = pMsgBuf;
         // Reference Algorithm for AES CMAC block processing
         alcp::cipher::xor_a_b(m_pBuffEnc, m_buff, m_pBuffEnc, cAESBlockSize);
-        encryptBlock(m_buffEnc, m_encrypt_keys, getRounds());
+        m_keyManager.encryptBlock(m_buffEnc, m_encrypt_keys, m_keyManager.getRounds());
         for (Uint64 i = 0; i < n_blocks; i++) {
             alcp::cipher::xor_a_b(
                 m_pBuffEnc, p_plaintext, m_pBuffEnc, cAESBlockSize);
-            encryptBlock(m_buffEnc, m_encrypt_keys, getRounds());
+            m_keyManager.encryptBlock(m_buffEnc, m_encrypt_keys, m_keyManager.getRounds());
             p_plaintext += cAESBlockSize;
         }
     }
@@ -193,7 +196,7 @@ Cmac::finalize(Uint8* pMsgBuf, Uint64 size)
                        cAESBlockSize,
                        m_k1,
                        m_k2,
-                       getRounds(),
+                       m_keyManager.getRounds(),
                        m_pBuffEnc,
                        m_encrypt_keys);
         utils::CopyBytes(pMsgBuf, m_pBuffEnc, size);
@@ -220,7 +223,7 @@ Cmac::finalize(Uint8* pMsgBuf, Uint64 size)
     cipher::xor_a_b(m_pBuffEnc, m_buff, m_pBuffEnc, cAESBlockSize);
     // Encrypt the data from temp_enc_result and store it back to
     // temp_enc_result
-    encryptBlock(m_buffEnc, m_encrypt_keys, getRounds());
+    m_keyManager.encryptBlock(m_buffEnc, m_encrypt_keys, m_keyManager.getRounds());
 
     utils::CopyBytes(pMsgBuf, m_pBuffEnc, size);
 
@@ -237,11 +240,14 @@ Cmac::init(const Uint8* pKey, Uint64 keyLen)
         return ALC_ERROR_INVALID_SIZE;
     }
 
-    // Use Rijndael::setKey to expand keys
+    // Use KeyManager to set key (handles same-key caching and expansion)
     // setKey takes key length in bits
-    setKey(pKey, static_cast<int>(keyLen * 8));
+    err = m_keyManager.setKey(pKey, keyLen * 8);
+    if (err != ALC_ERROR_NONE) {
+        return err;
+    }
 
-    m_encrypt_keys = getEncryptKeys();
+    m_encrypt_keys = m_keyManager.getEncryptKeys();
     getSubkeys();
     reset();
     return err;

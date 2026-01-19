@@ -68,22 +68,16 @@ SivT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv,
     alc_error_t err       = ALC_ERROR_NONE;
     Uint64      keyLength = keyLen;
 
-    // Set IV via IvManager
+    // Store synthetic IV (for decrypt, the IV is the tag from encrypt)
     if (pIv != nullptr && ivLen != 0) {
-        if (ivLen == 16) {
-            err = m_ivManager.setIv(pIv, ivLen);
-            if (err != ALC_ERROR_NONE) {
-                return err;
-            }
-            m_stateManager.onIvSet();
-        } else {
+        if (ivLen != 16) {
             return ALC_ERROR_INVALID_SIZE;
         }
+        utils::CopyBytes(m_syntheticIv, pIv, 16);
     }
 
-    // Set key via KeyManager
+    // Set keys - SIV uses double-key: first half for S2V, second half for CTR
     if (pKey != nullptr && keyLen != 0) {
-        // SIV uses double-key: first half for S2V, second half for CTR
         err = utils::SecureCopy<Uint8>(m_key1, 32, pKey, keyLength / 8);
         if (err != ALC_ERROR_NONE) {
             return err;
@@ -97,7 +91,6 @@ SivT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv,
         if (err != ALC_ERROR_NONE) {
             return err;
         }
-        m_stateManager.onKeySet();
     }
 
     return err;
@@ -323,9 +316,9 @@ SivT<keyLenBits, arch>::encrypt(const Uint8* pPlainText,
     for (Uint64 i = 0; i < SIZE_CMAC; i++) {
         q[i] = m_cmacTemp[i] & q[i];
     }
-    ctrobj->init(m_key2, (static_cast<Uint32>(keyLenBits)), q, 16);
+    m_ctrCipher.init(m_key2, (static_cast<Uint32>(keyLenBits)), q, 16);
     Uint64 ctr_outlen = 0;
-    err = ctrobj->encrypt(pPlainText, pCipherText, len + m_padLen, &ctr_outlen);
+    err = m_ctrCipher.encrypt(pPlainText, pCipherText, len + m_padLen, &ctr_outlen);
     if (alcp_is_error(err)) {
         err = ALC_ERROR_BAD_STATE;
         return err;
@@ -353,15 +346,14 @@ SivT<keyLenBits, arch>::decrypt(const Uint8* pCipherText,
     Uint8 q[16] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                     0x7f, 0xff, 0xff, 0xff, 0x7f, 0xff, 0xff, 0xff };
 
-    // Apply the mask and make q the IV (from IvManager)
-    const Uint8* pIv = m_ivManager.getIv();
+    // Apply the mask to synthetic IV
     for (Uint64 i = 0; i < SIZE_CMAC; i++) {
-        q[i] = pIv[i] & q[i];
+        q[i] = m_syntheticIv[i] & q[i];
     }
 
-    ctrobj->init(m_key2, (static_cast<Uint32>(keyLenBits)), q, 16);
+    m_ctrCipher.init(m_key2, (static_cast<Uint32>(keyLenBits)), q, 16);
     Uint64 ctr_outlen = 0;
-    err = ctrobj->decrypt(pCipherText, pPlainText, len, &ctr_outlen);
+    err = m_ctrCipher.decrypt(pCipherText, pPlainText, len, &ctr_outlen);
     if (alcp_is_error(err)) {
         err = ALC_ERROR_BAD_STATE;
         return err;
@@ -373,8 +365,8 @@ SivT<keyLenBits, arch>::decrypt(const Uint8* pCipherText,
         return err;
     }
 
-    // Verify tag, which just got generated (compare with IV from IvManager)
-    if (utils::CompareConstTime(&(m_cmacTemp[0]), pIv, SIZE_CMAC) == 0) {
+    // Verify tag, which just got generated (compare with stored synthetic IV)
+    if (utils::CompareConstTime(&(m_cmacTemp[0]), m_syntheticIv, SIZE_CMAC) == 0) {
         return ALC_ERROR_TAG_MISMATCH;
     }
 

@@ -29,22 +29,31 @@
 #pragma once
 #include "alcp/alcp.h"
 #include "alcp/base.hh"
-#include "alcp/cipher/rijndael.hh"
+#include "alcp/cipher/cipher_common.hh"
 #include "mac.hh"
 #include <immintrin.h>
 #include <memory>
 
 namespace alcp::mac {
-class Cmac final
-    : public IMac
-    , public cipher::Rijndael
+
+/**
+ * @brief AES-CMAC implementation using KeyManager for key handling
+ *
+ * Uses composition with KeyManager instead of inheriting from Rijndael.
+ * KeyManager provides:
+ * - Same-key caching (skips key expansion if key unchanged)
+ * - Key expansion via internal Rijndael
+ * - Secure key storage with memory locking
+ */
+class Cmac final : public IMac
 {
   public:
     ALCP_API_EXPORT Cmac();
     ALCP_API_EXPORT ~Cmac();
     ALCP_API_EXPORT Cmac(const Cmac& cmac);
+    
     /**
-     * @brief Reset CMAC. After resetting update can be called by the same key
+     * @brief Reset CMAC. After resetting update can be called with the same key
      */
     ALCP_API_EXPORT alc_error_t reset() override;
 
@@ -57,7 +66,14 @@ class Cmac final
     ALCP_API_EXPORT alc_error_t update(const Uint8* pMsgBuf,
                                        Uint64       size) override;
 
+    /**
+     * @brief Initialize CMAC with key
+     *
+     * @param pKey   Key bytes
+     * @param keyLen Key length in bytes (16, 24, or 32)
+     */
     ALCP_API_EXPORT alc_error_t init(const Uint8* pKey, Uint64 keyLen);
+    
     /**
      * @brief Call Finalize to copy the digest
      *
@@ -67,8 +83,13 @@ class Cmac final
     ALCP_API_EXPORT alc_error_t finalize(Uint8* pMsgBuf, Uint64 size) override;
 
   private:
-    void                 getSubkeys();
+    void getSubkeys();
+    
     static constexpr int cAESBlockSize = 16;
+    
+    // KeyManager for key expansion and same-key caching
+    cipher::KeyManager m_keyManager;
+    
     alignas(16) Uint8 m_k1[cAESBlockSize]{};
     alignas(16) Uint8 m_k2[cAESBlockSize]{};
     const Uint8* m_encrypt_keys = nullptr; // expanded keys ptr

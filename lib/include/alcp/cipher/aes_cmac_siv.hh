@@ -30,16 +30,13 @@
 
 #include "alcp/base.hh"
 #include "alcp/cipher/aes_generic.hh"
-#include "alcp/cipher/cipher_common.hh"
 #include "alcp/cipher/common.hh"
-#include "alcp/cipher/rijndael.hh"
 #include "alcp/utils/cpuid.hh"
 
 #include "alcp/cipher/aes_cmac_siv_arch.hh"
 
 #include "alcp/mac/cmac.hh"
 #include "alcp/utils/copy.hh"
-#include <memory>
 #include <new>
 #include <vector>
 
@@ -52,26 +49,27 @@ using utils::CpuId;
 /**
  * @brief Unified SIV cipher class
  *
- * Inherits from Rijndael for key expansion and uses composition
- * for state and IV management. Keys are managed internally via
- * m_key1/m_key2 arrays for the dual-key SIV construction.
+ * Uses composition - no Rijndael inheritance needed:
+ * - m_cmac handles S2V key expansion (uses KeyManager internally)
+ * - m_ctrCipher handles CTR key expansion (has its own KeyManager)
+ * 
+ * SIV uses a dual-key construction:
+ * - First half of key for S2V (authentication via CMAC)
+ * - Second half of key for CTR encryption
  * 
  * Template parameters:
  * - keyLenBits: Key length (128, 192, or 256 bits)
  * - arch: CPU architecture features
  */
 template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
-class SivT
-    : public Rijndael
-    , public iCipherAead
+class SivT : public iCipherAead
 {
   private:
-    // Composed components
-    StateManager m_stateManager;
-    IvManager    m_ivManager;
+    // Internal CTR cipher for encryption/decryption (inline, no heap allocation)
+    AesGenericCiphersT<CipherMode::eAesCTR, keyLenBits, arch> m_ctrCipher;
 
-    // Internal CTR cipher for encryption/decryption
-    std::unique_ptr<AesGenericCiphersT<CipherMode::eAesCTR, keyLenBits, arch>> ctrobj;
+    // Simple IV storage for synthetic IV during decryption (16 bytes for SIV)
+    alignas(16) Uint8 m_syntheticIv[16] = {};
 
   protected:
     // FIXME: simplify the vector code, unnecessary complication! Just allocate
@@ -101,17 +99,12 @@ class SivT
     alc_error_t s2v(const Uint8 plainText[], Uint64 size);
 
   public:
-    SivT()
-        : Rijndael()
-        , m_ivManager(16, 16) // SIV uses fixed 16-byte IV (synthetic IV)
-        , ctrobj(std::make_unique<AesGenericCiphersT<CipherMode::eAesCTR, keyLenBits, arch>>())
-    {
-    }
+    SivT() = default;
     ~SivT()
     {
         memset(m_key1, 0, 32);
         memset(m_key2, 0, 32);
-        // ctrobj automatically deleted by unique_ptr
+        memset(m_syntheticIv, 0, 16);
     }
 
   public:
@@ -137,29 +130,6 @@ class SivT
     alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
     {
         return ALC_ERROR_NOT_SUPPORTED;
-    }
-
-    // Multibuffer methods (direct class methods, no interface)
-    alc_error_t flush(const Uint8**  pPlainText,
-                      const Uint64*  pLengths,
-                      Uint64         numBuffers)
-    {
-        return ctrobj->flush(pPlainText, pLengths, numBuffers);
-    }
-
-    alc_error_t dequeue(Uint8**       pCipherText,
-                        Uint64        numBuffers,
-                        const Uint64* pLengths)
-    {
-        return ctrobj->dequeue(pCipherText, numBuffers, pLengths);
-    }
-    alc_error_t multibufferInit(const Uint8*  pKey,
-                                Uint64        keyLen,
-                                const Uint8** pIv,
-                                Uint64        ivLen,
-                                Uint64        numBuffers)
-    {
-        return ctrobj->multibufferInit(pKey, keyLen, pIv, ivLen, numBuffers);
     }
 };
 

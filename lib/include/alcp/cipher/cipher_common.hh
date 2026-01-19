@@ -318,6 +318,19 @@ class KeyManager : public Rijndael
         m_cipherKeyData = {};
     }
 
+    /**
+     * @brief Encrypt a single AES block in-place
+     * @param block Block to encrypt (4 x Uint32, modified in place)
+     * @param pKey Pointer to expanded encryption keys
+     * @param nRounds Number of AES rounds
+     * 
+     * Public wrapper for Rijndael::encryptBlock for use by CMAC and other MACs.
+     */
+    void encryptBlock(Uint32 (&block)[4], const Uint8* pKey, int nRounds)
+    {
+        Rijndael::encryptBlock(block, pKey, nRounds);
+    }
+
   private:
     alignas(16) Uint8 m_originalKey[cMaxKeyBytes] = {};
     Uint32            m_keyLenBytes               = 0;
