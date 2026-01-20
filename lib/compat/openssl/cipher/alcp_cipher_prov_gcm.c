@@ -35,66 +35,122 @@
 #include "alcp_cipher_prov_aead.h"
 #include "alcp_cipher_prov_aead_gcm.h"
 
-// done:MMM
+// Helper to get combined allocation size
+static inline size_t
+gcm_ctx_alloc_size(void)
+{
+    return sizeof(ALCP_PROV_AES_CTX) + alcp_cipher_aead_context_size();
+}
+
+// Helper to get ch_context pointer from combined allocation
+static inline void*
+gcm_ctx_get_ch_context(ALCP_PROV_AES_CTX* ctx)
+{
+    return (void*)((Uint8*)ctx + sizeof(ALCP_PROV_AES_CTX));
+}
+
 static void*
 ALCP_prov_alg_gcm_newctx(void* provctx, size_t keybits)
 {
     ALCP_PROV_AES_CTX* ctx;
     ENTER();
-    // printf("\n ALCP_prov_alg_gcm_newctx %ld \n", keybits);
 
-    // if (!ossl_prov_is_running())
-    // return NULL;
+    // Single combined allocation for ctx + ch_context
+    ctx = OPENSSL_zalloc(gcm_ctx_alloc_size());
+    if (ctx == NULL)
+        return NULL;
 
-    ctx = OPENSSL_zalloc(sizeof(*ctx));
-    // printf("  \n newctx cipherstate %p ",
-    //(void*)&ctx->base.prov_cipher_data.cipherState);
-    if (ctx != NULL) {
+    // ch_context points to memory immediately after the struct
+    ctx->base.handle.ch_context = gcm_ctx_get_ch_context(ctx);
 
-        // allocate context
-        ctx->base.handle.ch_context =
-            OPENSSL_malloc(alcp_cipher_aead_context_size());
+    // Request handle for the cipher
+    alc_error_t err = alcp_cipher_aead_request_with_extState(
+        ALC_AES_MODE_GCM,
+        keybits,
+        NULL,
+        &(ctx->base.handle));
 
-        if (ctx->base.handle.ch_context == NULL) {
-            printf("\n context allocation failed ");
-            OPENSSL_clear_free(ctx, sizeof(*ctx));
-            return NULL;
-        }
-        // Request handle for the cipher
-
-        // FIXME: Need to pass the state to the request, currently it fails
-        // while passing state from provider ctx
-        alc_error_t err = alcp_cipher_aead_request_with_extState(
-            ALC_AES_MODE_GCM,
-            keybits,
-            // FIXME:  failure observed when passing state from provider ctx
-            NULL, //&(ctx->base.prov_cipher_data.cipherState),
-            &(ctx->base.handle));
-
-        if (err == ALC_ERROR_NONE) {
-            ALCP_prov_gcm_initctx(provctx, &(ctx->base), keybits);
-        } else {
-            OPENSSL_clear_free(ctx, sizeof(*ctx));
-            return NULL;
-        }
+    if (err == ALC_ERROR_NONE) {
+        ALCP_prov_gcm_initctx(provctx, &(ctx->base), keybits);
+    } else {
+        OPENSSL_clear_free(ctx, gcm_ctx_alloc_size());
+        return NULL;
     }
+
     return ctx;
 }
 
-// WIP:MMM
 static void*
 ALCP_prov_alg_gcm_dupctx(void* provctx)
 {
     ENTER();
-    ALCP_PROV_AES_CTX* ctx  = provctx;
-    ALCP_PROV_AES_CTX* dctx = NULL;
+    ALCP_PROV_AES_CTX*      ctx  = provctx;
+    ALCP_PROV_AES_CTX*      dctx = NULL;
+    alc_prov_cipher_data_t* src_cipherctx;
+    alc_prov_cipher_data_t* dst_cipherctx;
 
     if (ctx == NULL)
         return NULL;
 
-    dctx = OPENSSL_memdup(ctx, sizeof(*ctx));
-    if (dctx != NULL && dctx->base.prov_cipher_data.pKey != NULL)
+    // Single combined allocation for new context
+    dctx = OPENSSL_zalloc(gcm_ctx_alloc_size());
+    if (dctx == NULL)
+        return NULL;
+
+    // Copy the struct data (not ch_context data)
+    memcpy(dctx, ctx, sizeof(*ctx));
+
+    // Fix pKey pointer to point to new context's ks
+    if (dctx->base.prov_cipher_data.pKey != NULL)
         dctx->base.prov_cipher_data.pKey = (const Uint8*)&dctx->ks;
+
+    // ch_context points to embedded memory after struct
+    dctx->base.handle.ch_context = gcm_ctx_get_ch_context(dctx);
+
+    src_cipherctx = &(ctx->base.prov_cipher_data);
+    dst_cipherctx = &(dctx->base.prov_cipher_data);
+
+    // Re-request cipher handle for the new context
+    alc_error_t err = alcp_cipher_aead_request_with_extState(
+        ALC_AES_MODE_GCM,
+        dst_cipherctx->keyLen_in_bytes * 8,
+        NULL,
+        &(dctx->base.handle));
+
+    if (err != ALC_ERROR_NONE) {
+        OPENSSL_clear_free(dctx, gcm_ctx_alloc_size());
+        return NULL;
+    }
+
+    // Re-initialize with key and/or IV if they were set in the source context
+    if (src_cipherctx->isKeySet) {
+        const Uint8* key_ptr = (const Uint8*)&dctx->ks;
+        const Uint8* iv_ptr  = NULL;
+        size_t       iv_len  = 0;
+
+        // Include IV if it was set (state is COPIED or BUFFERED)
+        if (src_cipherctx->ivState == IV_STATE_COPIED
+            || src_cipherctx->ivState == IV_STATE_BUFFERED) {
+            iv_ptr = dst_cipherctx->iv_buff;
+            iv_len = dst_cipherctx->ivLen;
+        }
+
+        err = alcp_cipher_aead_init(&(dctx->base.handle),
+                                    key_ptr,
+                                    dst_cipherctx->keyLen_in_bytes * 8,
+                                    iv_ptr,
+                                    iv_len);
+        if (alcp_is_error(err)) {
+            alcp_cipher_aead_finish(&(dctx->base.handle));
+            OPENSSL_clear_free(dctx, gcm_ctx_alloc_size());
+            return NULL;
+        }
+
+        // Update IV state if it was buffered (now it's initialized)
+        if (src_cipherctx->ivState == IV_STATE_BUFFERED && iv_ptr != NULL) {
+            dst_cipherctx->ivState = IV_STATE_COPIED;
+        }
+    }
 
     return dctx;
 }
@@ -107,14 +163,18 @@ ALCP_prov_alg_gcm_freectx(void* vctx)
     ENTER();
     ALCP_PROV_AES_CTX* ctx = (ALCP_PROV_AES_CTX*)vctx;
 
-    // free alcp
+    if (ctx == NULL)
+        return;
+
+    // Finish the cipher (ch_context is part of combined allocation, don't free
+    // separately)
     if (ctx->base.handle.ch_context != NULL) {
         alcp_cipher_aead_finish(&(ctx->base.handle));
-        OPENSSL_free(ctx->base.handle.ch_context);
         ctx->base.handle.ch_context = NULL;
     }
 
-    OPENSSL_clear_free(ctx, sizeof(*ctx));
+    // Single free for combined allocation
+    OPENSSL_clear_free(ctx, gcm_ctx_alloc_size());
 }
 
 #if 1 // to be removed. kept for understanding.

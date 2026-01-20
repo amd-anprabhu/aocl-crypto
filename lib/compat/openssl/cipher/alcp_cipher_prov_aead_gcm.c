@@ -100,48 +100,57 @@ gcm_init(void*            vctx,
 
     cipherctx->enc = enc;
 
-    // copy iv
+    // Validate IV if provided
     if (iv != NULL) {
         if (ivlen == 0 || ivlen > sizeof(cipherctx->iv_buff)) {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return 0;
         }
-        cipherctx->ivLen = ivlen;
-        memcpy(cipherctx->iv_buff, iv, ivlen);
-        cipherctx->ivState = IV_STATE_BUFFERED;
-#if DEBUG_PROV_GCM_INIT
-        printf("\n setIV");
-#endif
-        // setIv, this maynot be necessary since iv is buffered.
-        // this can be removed after verification.
-        alc_error_t err = alcp_cipher_aead_init(
-            &(ctx->handle), NULL, 0, cipherctx->iv_buff, ivlen);
-        if (alcp_is_error(err)) {
-            return 0;
-        }
     }
-#if DEBUG_PROV_GCM_INIT
-    alc_prov_cipher_data_t* cipherctxTemp = ctx->handle.alc_prov_cipher_data;
-    printf("\n gcm_init enc value %d", cipherctxTemp->enc);
-#endif
-    // set key
+
+    // Validate key if provided
     if (key != NULL) {
         if (keylen != cipherctx->keyLen_in_bytes) {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
             return 0;
         }
+    }
+
+    // Combined key+IV init path when both are provided (single call optimization)
+    if (key != NULL && iv != NULL) {
 #if DEBUG_PROV_GCM_INIT
-        // setKey only
-        printf("\n setKey");
+        printf("\n combined setKey+setIV");
 #endif
         alc_error_t err = alcp_cipher_aead_init(
-            &(ctx->handle), key, cipherctx->keyLen_in_bytes * 8, NULL, 0);
-
+            &(ctx->handle), key, cipherctx->keyLen_in_bytes * 8, iv, ivlen);
         if (alcp_is_error(err)) {
             return 0;
         }
         cipherctx->isKeySet        = 1;
         cipherctx->tls_enc_records = 0;
+        cipherctx->ivLen           = ivlen;
+        memcpy(cipherctx->iv_buff, iv, ivlen);
+        cipherctx->ivState = IV_STATE_COPIED;
+    } else if (key != NULL) {
+        // Key only - IV will be set later
+#if DEBUG_PROV_GCM_INIT
+        printf("\n setKey only");
+#endif
+        alc_error_t err = alcp_cipher_aead_init(
+            &(ctx->handle), key, cipherctx->keyLen_in_bytes * 8, NULL, 0);
+        if (alcp_is_error(err)) {
+            return 0;
+        }
+        cipherctx->isKeySet        = 1;
+        cipherctx->tls_enc_records = 0;
+    } else if (iv != NULL) {
+        // IV only - buffer it for later use in gcm_cipher_internal()
+#if DEBUG_PROV_GCM_INIT
+        printf("\n setIV buffered");
+#endif
+        cipherctx->ivLen = ivlen;
+        memcpy(cipherctx->iv_buff, iv, ivlen);
+        cipherctx->ivState = IV_STATE_BUFFERED;
     }
 #if DEBUG_PROV_GCM_INIT
     printf("\n call setctx\n");
