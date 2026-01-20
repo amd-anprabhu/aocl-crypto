@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -331,6 +331,98 @@ TEST(CTR, MultiUpdateDecryption)
             << "FAIL CPU_FEATURE:"
             << std::underlying_type<CpuCipherFeatures>::type(feature);
     }
+}
+
+/**
+ * @brief Test that verifies separate key/IV initialization works correctly.
+ *
+ * This tests the feature where iCipher::init() can be called as below with Key and IV serparately
+ *   1. init(nullptr, 0, iv, ivlen)  - IV only
+ *   2. init(key, keylen, nullptr, 0) - Key only
+ *
+ */
+TEST(CTR, SeparateKeyIvInit)
+{
+    // Use the test vectors from the namespace
+    auto ctr = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(ctr, nullptr) << "Failed to create CTR cipher";
+
+    std::vector<Uint8> output(cipherText.size());
+
+    // Test Pattern 1: IV first, then Key
+    // Step 1: Initialize with IV only (key=nullptr, keyLen=0)
+    alc_error_t err = ctr->init(nullptr, 0, &iv[0], iv.size());
+    EXPECT_FALSE(alcp_is_error(err))
+        << "init with IV-only should succeed, got error: " << err;
+
+    // Step 2: Initialize with Key only (iv=nullptr, ivLen=0)
+    err = ctr->init(&key[0], key.size() * 8, nullptr, 0);
+    EXPECT_FALSE(alcp_is_error(err))
+        << "init with Key-only should succeed, got error: " << err;
+
+    // Step 3: Encrypt
+    Uint64 outlen = 0;
+    err = ctr->encrypt(&plainText[0], &output[0], plainText.size(), &outlen);
+    EXPECT_FALSE(alcp_is_error(err))
+        << "encrypt failed after separate init";
+    EXPECT_EQ(outlen, plainText.size()) << "Encrypt output length mismatch";
+
+    // Verify encryption result matches expected ciphertext
+    EXPECT_EQ(cipherText, output)
+        << "Encryption with separate key/IV init produced wrong ciphertext";
+
+    delete ctr;
+
+    // Test Pattern 2: Key first, then IV
+    ctr = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(ctr, nullptr) << "Failed to create CTR cipher (2)";
+
+    std::vector<Uint8> decrypted(plainText.size());
+
+    // Step 1: Initialize with Key only
+    err = ctr->init(&key[0], key.size() * 8, nullptr, 0);
+    EXPECT_FALSE(alcp_is_error(err))
+        << "init with Key-only (pattern 2) should succeed";
+
+    // Step 2: Initialize with IV only
+    err = ctr->init(nullptr, 0, &iv[0], iv.size());
+    EXPECT_FALSE(alcp_is_error(err))
+        << "init with IV-only (pattern 2) should succeed";
+
+    // Step 3: Decrypt (CTR mode is symmetric)
+    outlen = 0;
+    err = ctr->decrypt(&cipherText[0], &decrypted[0], cipherText.size(), &outlen);
+    EXPECT_FALSE(alcp_is_error(err))
+        << "decrypt failed after separate init";
+    EXPECT_EQ(outlen, cipherText.size()) << "Decrypt output length mismatch";
+
+    // Verify decryption matches original plaintext
+    EXPECT_EQ(plainText, decrypted)
+        << "Decrypted data does not match original plaintext";
+
+    delete ctr;
+
+    // Test Pattern 3: Combined init still works (sanity check)
+    ctr = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(ctr, nullptr) << "Failed to create CTR cipher (3)";
+
+    std::vector<Uint8> output2(cipherText.size());
+
+    // Combined initialization
+    err = ctr->init(&key[0], key.size() * 8, &iv[0], iv.size());
+    EXPECT_FALSE(alcp_is_error(err))
+        << "init with combined key+IV should succeed";
+
+    outlen = 0;
+    err = ctr->encrypt(&plainText[0], &output2[0], plainText.size(), &outlen);
+    EXPECT_FALSE(alcp_is_error(err))
+        << "encrypt failed after combined init";
+
+    // Both encryption methods should produce the same result
+    EXPECT_EQ(output, output2)
+        << "Separate init and combined init produce different ciphertext";
+
+    delete ctr;
 }
 
 TEST(CTR, RandomEncryptDecryptTest)

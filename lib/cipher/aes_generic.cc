@@ -84,7 +84,9 @@ AesGenericCiphersT<mode, keyLenBits, arch>::multibufferInit(const Uint8* pKey,
 }
 
 /**
- * @brief Initialize cipher with key and IV
+ * @brief Initialize cipher with key and/or IV
+ *
+ * This function can be called to set the key alone, iv alone or both together
  */
 template<alcp::cipher::CipherMode       mode,
          alcp::cipher::CipherKeyLen     keyLenBits,
@@ -95,20 +97,20 @@ AesGenericCiphersT<mode, keyLenBits, arch>::init(const Uint8* pKey,
                                                   const Uint8* pIv,
                                                   Uint64       ivLen)
 {
-    // Validate input parameters
-    if (pKey == nullptr) {
-        return ALC_ERROR_INVALID_ARG;
-    }
+    alc_error_t err = ALC_ERROR_NONE;
 
-    // Set the key using KeyManager (inherits from Rijndael)
-    // This performs key expansion - keyLen is in bits
-    alc_error_t err = m_keyManager.setKey(pKey, keyLen);
-    if (err != ALC_ERROR_NONE) {
-        return err;
-    }
+    // Set key if provided
+    if (pKey != nullptr && keyLen != 0) {
+        // Set the key using KeyManager (inherits from Rijndael)
+        // This performs key expansion - keyLen is in bits
+        err = m_keyManager.setKey(pKey, keyLen);
+        if (err != ALC_ERROR_NONE) {
+            return err;
+        }
 
-    // Update state manager (key pointers auto-populated by KeyManager)
-    m_stateManager.onKeySet();
+        // Update state manager (key pointers auto-populated by KeyManager)
+        m_stateManager.onKeySet();
+    }
 
     // Set IV if provided
     if (pIv != nullptr && ivLen > 0) {
@@ -116,7 +118,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::init(const Uint8* pKey,
         m_stateManager.onIvSet();
     }
 
-    return ALC_ERROR_NONE;
+    return err;
 }
 
 // flush function to store the multibuffer data to the memory (variable-length version)
