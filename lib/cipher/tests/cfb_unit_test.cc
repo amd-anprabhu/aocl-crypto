@@ -734,6 +734,816 @@ TEST(CFB, ContextCopy)
     delete cfb_copy;
 }
 
+// ============================================================================
+// Negative Tests for CFB - Null Pointer and Edge Cases
+// ============================================================================
+
+// Test null pointer for key in init
+TEST(CFB_Negative, NullKeyPointer)
+{
+    std::vector<Uint8> test_iv(16, 0x00);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Passing null key pointer should return an error
+    alc_error_t err = cfb->init(nullptr, 128, &test_iv[0], 16);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with null key should fail";
+
+    delete cfb;
+}
+
+// Test null pointer for IV in init
+TEST(CFB_Negative, NullIVPointer)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Passing null IV pointer - behavior is implementation-defined
+    // Some implementations may accept null IV, others may fail
+    alc_error_t err = cfb->init(&test_key[0], 128, nullptr, 16);
+    // Document actual behavior without asserting specific outcome
+    (void)err;
+
+    delete cfb;
+}
+
+// Test null pointer for both key and IV in init
+TEST(CFB_Negative, NullKeyAndIVPointers)
+{
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Passing both null key and IV pointers should return an error
+    alc_error_t err = cfb->init(nullptr, 128, nullptr, 16);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with null key and IV should fail";
+
+    delete cfb;
+}
+
+// Test null pointer for input plaintext in encrypt
+TEST(CFB_Negative, NullInputPointerEncrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> output(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Encrypt with null input pointer should fail
+    Uint64 outlen = 0;
+    err = cfb->encrypt(nullptr, &output[0], 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input should fail";
+
+    delete cfb;
+}
+
+// Test null pointer for input ciphertext in decrypt
+TEST(CFB_Negative, NullInputPointerDecrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> output(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt with null input pointer should fail
+    Uint64 outlen = 0;
+    err = cfb->decrypt(nullptr, &output[0], 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null input should fail";
+
+    delete cfb;
+}
+
+// Test null pointer for output in encrypt
+TEST(CFB_Negative, NullOutputPointerEncrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Encrypt with null output pointer should fail
+    Uint64 outlen = 0;
+    err = cfb->encrypt(&input[0], nullptr, 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null output should fail";
+
+    delete cfb;
+}
+
+// Test null pointer for output in decrypt
+TEST(CFB_Negative, NullOutputPointerDecrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt with null output pointer should fail
+    Uint64 outlen = 0;
+    err = cfb->decrypt(&input[0], nullptr, 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null output should fail";
+
+    delete cfb;
+}
+
+// Test null pointer for output length in encrypt
+TEST(CFB_Negative, NullOutlenPointerEncrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Encrypt with null outlen pointer should fail
+    err = cfb->encrypt(&input[0], &output[0], 32, nullptr);
+    EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null outlen should fail";
+
+    delete cfb;
+}
+
+// Test null pointer for output length in decrypt
+TEST(CFB_Negative, NullOutlenPointerDecrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt with null outlen pointer should fail
+    err = cfb->decrypt(&input[0], &output[0], 32, nullptr);
+    EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null outlen should fail";
+
+    delete cfb;
+}
+
+// Test all null pointers in encrypt
+TEST(CFB_Negative, AllNullPointersEncrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Encrypt with all null pointers should fail
+    err = cfb->encrypt(nullptr, nullptr, 32, nullptr);
+    EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with all null pointers should fail";
+
+    delete cfb;
+}
+
+// Test all null pointers in decrypt
+TEST(CFB_Negative, AllNullPointersDecrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt with all null pointers should fail
+    err = cfb->decrypt(nullptr, nullptr, 32, nullptr);
+    EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with all null pointers should fail";
+
+    delete cfb;
+}
+
+// Test zero key length
+TEST(CFB_Negative, ZeroKeyLength)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Init with zero key length should fail
+    alc_error_t err = cfb->init(&test_key[0], 0, &test_iv[0], 16);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with zero key length should fail";
+
+    delete cfb;
+}
+
+// Test zero IV length
+TEST(CFB_Negative, ZeroIVLength)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Init with zero IV length should fail
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 0);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with zero IV length should fail";
+
+    delete cfb;
+}
+
+// Test invalid key length (not 128, 192, or 256 bits)
+TEST(CFB_Negative, InvalidKeyLength)
+{
+    std::vector<Uint8> test_key(20, 0x42); // 160-bit key (invalid)
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Init with invalid key length (160 bits = 20 bytes) should fail
+    alc_error_t err = cfb->init(&test_key[0], 160, &test_iv[0], 16);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with invalid key length (160 bits) should fail";
+
+    delete cfb;
+}
+
+// Test invalid IV length (CFB requires 16-byte IV)
+TEST(CFB_Negative, InvalidIVLength)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(8, 0x24); // 8-byte IV (invalid for CFB)
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Init with invalid IV length (8 bytes) should fail
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 8);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with invalid IV length (8 bytes) should fail";
+
+    delete cfb;
+}
+
+// Test encryption without initialization
+TEST(CFB_Negative, EncryptWithoutInit)
+{
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Encrypt without init should fail or produce error
+    Uint64 outlen = 0;
+    alc_error_t err = cfb->encrypt(&input[0], &output[0], 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Encrypt without init should fail";
+
+    delete cfb;
+}
+
+// Test decryption without initialization
+TEST(CFB_Negative, DecryptWithoutInit)
+{
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Decrypt without init should fail or produce error
+    Uint64 outlen = 0;
+    alc_error_t err = cfb->decrypt(&input[0], &output[0], 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Decrypt without init should fail";
+
+    delete cfb;
+}
+
+// Test zero input length encryption
+TEST(CFB_Negative, ZeroLengthInputEncrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Encrypt with zero length - should either succeed with zero output or return error
+    Uint64 outlen = 0;
+    err = cfb->encrypt(&input[0], &output[0], 0, &outlen);
+    // Zero length encryption might be valid (produces no output) or might fail
+    if (err == ALC_ERROR_NONE) {
+        EXPECT_EQ(outlen, 0) << "Zero length encrypt should produce zero output";
+    }
+
+    delete cfb;
+}
+
+// Test zero input length decryption
+TEST(CFB_Negative, ZeroLengthInputDecrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt with zero length - should either succeed with zero output or return error
+    Uint64 outlen = 0;
+    err = cfb->decrypt(&input[0], &output[0], 0, &outlen);
+    // Zero length decryption might be valid (produces no output) or might fail
+    if (err == ALC_ERROR_NONE) {
+        EXPECT_EQ(outlen, 0) << "Zero length decrypt should produce zero output";
+    }
+
+    delete cfb;
+}
+
+// Test non-block-aligned input size for encryption (CFB can handle arbitrary sizes)
+TEST(CFB_Negative, NonBlockAlignedInputEncrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(17, 0x55);  // 17 bytes (not multiple of 16)
+    std::vector<Uint8> output(17);
+    std::vector<Uint8> decrypted(17);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // CFB mode should handle non-block-aligned input
+    Uint64 outlen = 0;
+    err = cfb->encrypt(&input[0], &output[0], 17, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE) << "CFB should handle non-block-aligned input";
+    EXPECT_EQ(outlen, 17) << "Output length should match input length for CFB";
+
+    // Verify decryption works
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    err = cfb->decrypt(&output[0], &decrypted[0], 17, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cfb;
+}
+
+// Test non-block-aligned input size for decryption
+TEST(CFB_Negative, NonBlockAlignedInputDecrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(23, 0x55);  // 23 bytes (not multiple of 16)
+    std::vector<Uint8> output(23);
+    std::vector<Uint8> decrypted(23);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Encrypt first
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    Uint64 outlen = 0;
+    err = cfb->encrypt(&input[0], &output[0], 23, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 23);
+
+    // Decrypt
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    err = cfb->decrypt(&output[0], &decrypted[0], 23, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 23);
+    EXPECT_EQ(decrypted, input);
+
+    delete cfb;
+}
+
+// Test context copy with null source
+TEST(CFB_Negative, ContextCopyNullSource)
+{
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    auto cfb_dest = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb_dest, nullptr);
+
+    // Copy with null source should be handled gracefully
+    cfb->CopyCtx(nullptr, cfb_dest);
+    // The test passes if no crash occurs
+
+    delete cfb;
+    delete cfb_dest;
+}
+
+// Test context copy with null destination
+TEST(CFB_Negative, ContextCopyNullDestination)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+
+    // Copy with null destination should be handled gracefully
+    cfb->CopyCtx(cfb, nullptr);
+    // The test passes if no crash occurs
+
+    delete cfb;
+}
+
+// Test very large input size (boundary test)
+TEST(CFB_Negative, VeryLargeInputSize)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    
+    // Use a moderate size that won't cause memory issues but tests the limit
+    const size_t large_size = 16 * 1024 * 1024; // 16 MB
+    std::vector<Uint8> input(large_size, 0x55);
+    std::vector<Uint8> output(large_size);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    Uint64 outlen = 0;
+    err = cfb->encrypt(&input[0], &output[0], large_size, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, large_size);
+
+    delete cfb;
+}
+
+// Test mismatched key size and CipherKeyLen
+TEST(CFB_Negative, MismatchedKeySizeAndKeyLen)
+{
+    // Create cipher for 128-bit key but try to use 256-bit key
+    std::vector<Uint8> test_key(32, 0x42); // 256-bit key
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Pass 128-bit key length but cipher was created for 256-bit
+    alc_error_t err = cfb->init(&test_key[0], 256, &test_iv[0], 16);
+    // Behavior is implementation-defined - test that it doesn't crash
+    (void)err;
+
+    delete cfb;
+}
+
+// Test repeated initialization (reinit)
+TEST(CFB_Negative, RepeatedInitialization)
+{
+    std::vector<Uint8> test_key1(16, 0x42);
+    std::vector<Uint8> test_key2(16, 0x84);
+    std::vector<Uint8> test_iv1(16, 0x24);
+    std::vector<Uint8> test_iv2(16, 0x48);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output1(32), output2(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // First init and encrypt
+    alc_error_t err = cfb->init(&test_key1[0], 128, &test_iv1[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen = 0;
+    err = cfb->encrypt(&input[0], &output1[0], 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Reinit with different key/IV and encrypt again
+    err = cfb->init(&test_key2[0], 128, &test_iv2[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    outlen = 0;
+    err = cfb->encrypt(&input[0], &output2[0], 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Different keys should produce different outputs
+    EXPECT_NE(output1, output2) << "Different keys should produce different ciphertext";
+
+    delete cfb;
+}
+
+// Test maximum key length boundary
+TEST(CFB_Negative, MaxKeyLengthBoundary)
+{
+    // Test with key length just above valid (257 bits)
+    std::vector<Uint8> test_key(33, 0x42); // 264 bits
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey256Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Init with key length above maximum should fail
+    alc_error_t err = cfb->init(&test_key[0], 264, &test_iv[0], 16);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with key length > 256 bits should fail";
+
+    delete cfb;
+}
+
+// Test IV length boundary (17 bytes when 16 is required)
+TEST(CFB_Negative, IVLengthBoundary)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(17, 0x24); // 17-byte IV
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Init with IV length above required (17 bytes) - behavior is implementation-defined
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 17);
+    // The test passes if no crash occurs - behavior is implementation-defined
+    (void)err;
+
+    delete cfb;
+}
+
+// Test very small IV (less than required 16 bytes)
+TEST(CFB_Negative, SmallIVLength)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(4, 0x24); // 4-byte IV (invalid for CFB)
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Init with IV length below required (4 bytes) should fail
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 4);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with 4-byte IV should fail";
+
+    delete cfb;
+}
+
+// Test encrypt/decrypt with single byte data
+TEST(CFB_Negative, SingleByteData)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(1, 0x55);  // Single byte
+    std::vector<Uint8> output(1);
+    std::vector<Uint8> decrypted(1);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // CFB mode can handle single byte
+    Uint64 outlen = 0;
+    err = cfb->encrypt(&input[0], &output[0], 1, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 1);
+
+    // Verify decryption
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    err = cfb->decrypt(&output[0], &decrypted[0], 1, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cfb;
+}
+
+// Test with various input sizes around block boundary
+TEST(CFB_Negative, InputSizeVariations)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    
+    // Test sizes just above and below block boundaries
+    std::vector<size_t> test_sizes = { 1, 7, 15, 17, 31, 33, 47, 49 };
+
+    for (size_t size : test_sizes) {
+        std::vector<Uint8> input(size, 0x55);
+        std::vector<Uint8> output(size);
+        std::vector<Uint8> decrypted(size);
+
+        auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cfb, nullptr);
+
+        alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = cfb->encrypt(&input[0], &output[0], size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Failed for size " << size;
+        EXPECT_EQ(outlen, size) << "Output size mismatch for size " << size;
+
+        // Verify decryption
+        cfb->init(&test_key[0], 128, &test_iv[0], 16);
+        outlen = 0;
+        err = cfb->decrypt(&output[0], &decrypted[0], size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, input) << "Data mismatch for size " << size;
+
+        delete cfb;
+    }
+}
+
+// Test cipher reuse after error
+TEST(CFB_Negative, ReuseAfterError)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // First, cause an error by using null pointer
+    alc_error_t err = cfb->init(nullptr, 128, &test_iv[0], 16);
+    // This should have failed
+
+    // Now try to reinit properly and use the cipher
+    err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE) << "Reinit after error should succeed";
+
+    Uint64 outlen = 0;
+    err = cfb->encrypt(&input[0], &output[0], 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE) << "Encrypt after reinit should succeed";
+    EXPECT_EQ(outlen, 32);
+
+    delete cfb;
+}
+
+// Test decrypt with corrupted ciphertext (should still decrypt but produce wrong result)
+TEST(CFB_Negative, DecryptCorruptedCiphertext)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<Uint8> decrypted(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Encrypt
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    cfb->encrypt(&input[0], &ciphertext[0], 32, &outlen);
+
+    // Corrupt the ciphertext
+    ciphertext[0] ^= 0xFF;
+    ciphertext[16] ^= 0xFF;
+
+    // Decrypt corrupted ciphertext - should still succeed but produce wrong result
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    alc_error_t err = cfb->decrypt(&ciphertext[0], &decrypted[0], 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE) << "Decrypt of corrupted data should still succeed";
+    EXPECT_EQ(outlen, 32);
+    EXPECT_NE(decrypted, input) << "Corrupted ciphertext should produce different plaintext";
+
+    delete cfb;
+}
+
+// Test key length that doesn't match cipher creation
+TEST(CFB_Negative, KeyLengthMismatchWithCreation)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    // Create 256-bit cipher but use 128-bit key length in init
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey256Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Pass 128-bit key length but cipher was created for 256-bit
+    alc_error_t err = cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    // Behavior is implementation-defined - test that it doesn't crash
+    (void)err;
+
+    delete cfb;
+}
+
+// Test CFB stream property - changing one byte in ciphertext affects only that byte in plaintext
+TEST(CFB_Negative, StreamPropertyTest)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<Uint8> decrypted1(32), decrypted2(32);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // Encrypt
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    cfb->encrypt(&input[0], &ciphertext[0], 32, &outlen);
+
+    // Decrypt original
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cfb->decrypt(&ciphertext[0], &decrypted1[0], 32, &outlen);
+
+    // Corrupt one byte in ciphertext
+    std::vector<Uint8> corrupted_ciphertext = ciphertext;
+    corrupted_ciphertext[5] ^= 0x01;
+
+    // Decrypt corrupted ciphertext
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cfb->decrypt(&corrupted_ciphertext[0], &decrypted2[0], 32, &outlen);
+
+    // In CFB mode, a single byte error in ciphertext affects only one byte in plaintext
+    // (plus potentially causes error propagation in subsequent block)
+    EXPECT_NE(decrypted1, decrypted2) << "Corrupted ciphertext should produce different plaintext";
+
+    delete cfb;
+}
+
+// Test multi-update with arbitrary chunk sizes
+TEST(CFB_Negative, MultiUpdateArbitraryChunks)
+{
+#ifndef AES_MULTI_UPDATE
+    GTEST_SKIP() << "Multi Update functionality unavailable!";
+#endif
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(50, 0x55);
+    std::vector<Uint8> output(50);
+    std::vector<Uint8> single_output(50);
+
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cfb, nullptr);
+
+    // First, encrypt in one go
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    cfb->encrypt(&input[0], &single_output[0], 50, &outlen);
+
+    // Now encrypt in chunks
+    cfb->init(&test_key[0], 128, &test_iv[0], 16);
+    size_t offset = 0;
+    std::vector<size_t> chunks = { 7, 13, 5, 11, 14 }; // Total = 50
+    
+    for (size_t chunk : chunks) {
+        outlen = 0;
+        alc_error_t err = cfb->encrypt(&input[offset], &output[offset], chunk, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, chunk);
+        offset += chunk;
+    }
+
+    // Both should produce the same result
+    EXPECT_EQ(output, single_output) << "Multi-update should produce same result as single update";
+
+    delete cfb;
+}
+
 int
 main(int argc, char** argv)
 {
