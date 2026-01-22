@@ -327,6 +327,12 @@ CcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
 {
     alc_error_t err = ALC_ERROR_NONE;
 
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (outlen == nullptr) {
         return ALC_ERROR_INVALID_ARG;
     }
@@ -355,6 +361,12 @@ CcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
 {
     alc_error_t err = ALC_ERROR_NONE;
 
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (outlen == nullptr) {
         return ALC_ERROR_INVALID_ARG;
     }

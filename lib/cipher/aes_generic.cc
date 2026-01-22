@@ -514,12 +514,18 @@ template<alcp::cipher::CipherMode       mode,
          alcp::cipher::CipherKeyLen     keyLenBits,
          alcp::utils::CpuCipherFeatures arch>
 alc_error_t
-AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pinput,
+AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pInput,
                                                     Uint8*       pOutput,
                                                     Uint64       len,
                                                     Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (outlen == nullptr) {
         return ALC_ERROR_INVALID_ARG;
     }
@@ -543,8 +549,8 @@ AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pinput,
             Uint32 take = static_cast<Uint32>(len < static_cast<Uint64>(need)
                                                   ? len
                                                   : static_cast<Uint64>(need));
-            m_partialBuffer.append(pinput, take);
-            pinput += take;
+            m_partialBuffer.append(pInput, take);
+            pInput += take;
             len -= take;
             if (m_partialBuffer.isFull()) {
                 err = aesni::EncryptCbc(m_partialBuffer.data(),
@@ -565,7 +571,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pinput,
         // Process full blocks from remaining input
         Uint64 fullBytes = (len / 16ULL) * 16ULL;
         if (fullBytes > 0) {
-            err = aesni::EncryptCbc(pinput,
+            err = aesni::EncryptCbc(pInput,
                                     pOutput,
                                     fullBytes,
                                     m_keyManager.getCipherKeyData().m_enc_key,
@@ -574,7 +580,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pinput,
             if (err != ALC_ERROR_NONE) {
                 return err;
             }
-            pinput += fullBytes;
+            pInput += fullBytes;
             pOutput += fullBytes;
             len -= fullBytes;
             *outlen += fullBytes;
@@ -582,11 +588,11 @@ AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pinput,
 
         // Buffer trailing bytes (<16)
         if (len > 0) {
-            m_partialBuffer.append(pinput, len);
+            m_partialBuffer.append(pInput, len);
         }
 
 #else
-        err = aesni::EncryptCbc(pinput,
+        err = aesni::EncryptCbc(pInput,
                                 pOutput,
                                 len,
                                 m_keyManager.getCipherKeyData().m_enc_key,
@@ -598,7 +604,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pinput,
         *outlen = len;
 #endif // AES_MULTI_UPDATE
     } else if constexpr (mode == CipherMode::eAesOFB) {
-        err = aesni::EncryptOfb(pinput,
+        err = aesni::EncryptOfb(pInput,
                                 pOutput,
                                 len,
                                 m_keyManager.getCipherKeyData().m_enc_key,
@@ -606,21 +612,21 @@ AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pinput,
                                 pIv);
     } else if constexpr (mode == CipherMode::eAesCTR) {
         if constexpr (arch == CpuCipherFeatures::eVaes512) {
-            err = CryptCtr<keyLenBits, arch>(pinput,
+            err = CryptCtr<keyLenBits, arch>(pInput,
                                              pOutput,
                                              len,
                                              m_keyManager.getCipherKeyData().m_enc_key,
                                              m_keyManager.getRounds(),
                                              pIv);
         } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
-            err = vaes::CryptCtr(pinput,
+            err = vaes::CryptCtr(pInput,
                                  pOutput,
                                  len,
                                  m_keyManager.getCipherKeyData().m_enc_key,
                                  m_keyManager.getRounds(),
                                  pIv);
         } else if constexpr (arch == CpuCipherFeatures::eAesni) {
-            err = aesni::CryptCtr(pinput,
+            err = aesni::CryptCtr(pInput,
                                   pOutput,
                                   len,
                                   m_keyManager.getCipherKeyData().m_enc_key,
@@ -628,7 +634,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pinput,
                                   pIv);
         }
     } else if constexpr (mode == CipherMode::eAesCFB) {
-        err = aesni::EncryptCfb(pinput,
+        err = aesni::EncryptCfb(pInput,
                                 pOutput,
                                 len,
                                 m_keyManager.getCipherKeyData().m_enc_key,
@@ -648,12 +654,18 @@ template<alcp::cipher::CipherMode       mode,
          alcp::cipher::CipherKeyLen     keyLenBits,
          alcp::utils::CpuCipherFeatures arch>
 alc_error_t
-AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pinput,
+AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pInput,
                                                     Uint8*       pOutput,
                                                     Uint64       len,
                                                     Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (outlen == nullptr) {
         return ALC_ERROR_INVALID_ARG;
     }
@@ -677,8 +689,8 @@ AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pinput,
             Uint32 take = static_cast<Uint32>(len < static_cast<Uint64>(need)
                                                   ? len
                                                   : static_cast<Uint64>(need));
-            m_partialBuffer.append(pinput, take);
-            pinput += take;
+            m_partialBuffer.append(pInput, take);
+            pInput += take;
             len -= take;
             if (m_partialBuffer.isFull()) {
                 err = alcp::cipher::tDecryptCbc<keyLenBits, arch>(
@@ -700,7 +712,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pinput,
         Uint64 fullBytes = (len / 16ULL) * 16ULL;
         if (fullBytes > 0) {
             err = alcp::cipher::tDecryptCbc<keyLenBits, arch>(
-                pinput,
+                pInput,
                 pOutput,
                 fullBytes,
                 m_keyManager.getCipherKeyData().m_dec_key,
@@ -708,7 +720,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pinput,
             if (err != ALC_ERROR_NONE) {
                 return err;
             }
-            pinput += fullBytes;
+            pInput += fullBytes;
             pOutput += fullBytes;
             len -= fullBytes;
             *outlen += fullBytes;
@@ -716,19 +728,19 @@ AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pinput,
 
         // 3) Buffer trailing bytes (<16)
         if (len > 0) {
-            m_partialBuffer.append(pinput, len);
+            m_partialBuffer.append(pInput, len);
         }
 
 #else
         err = alcp::cipher::tDecryptCbc<keyLenBits, arch>(
-            pinput, pOutput, len, m_keyManager.getCipherKeyData().m_dec_key, pIv);
+            pInput, pOutput, len, m_keyManager.getCipherKeyData().m_dec_key, pIv);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
         *outlen = len;
 #endif // AES_MULTI_UPDATE
     } else if constexpr (mode == CipherMode::eAesOFB) {
-        err = aesni::DecryptOfb(pinput,
+        err = aesni::DecryptOfb(pInput,
                                 pOutput,
                                 len,
                                 m_keyManager.getCipherKeyData().m_enc_key,
@@ -736,21 +748,21 @@ AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pinput,
                                 pIv);
     } else if constexpr (mode == CipherMode::eAesCTR) {
         if constexpr (arch == CpuCipherFeatures::eVaes512) {
-            err = CryptCtr<keyLenBits, arch>(pinput,
+            err = CryptCtr<keyLenBits, arch>(pInput,
                                              pOutput,
                                              len,
                                              m_keyManager.getCipherKeyData().m_enc_key,
                                              m_keyManager.getRounds(),
                                              pIv);
         } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
-            err = vaes::CryptCtr(pinput,
+            err = vaes::CryptCtr(pInput,
                                  pOutput,
                                  len,
                                  m_keyManager.getCipherKeyData().m_enc_key,
                                  m_keyManager.getRounds(),
                                  pIv);
         } else if constexpr (arch == CpuCipherFeatures::eAesni) {
-            err = aesni::CryptCtr(pinput,
+            err = aesni::CryptCtr(pInput,
                                   pOutput,
                                   len,
                                   m_keyManager.getCipherKeyData().m_enc_key,
@@ -758,7 +770,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pinput,
                                   pIv);
         }
     } else if constexpr (mode == CipherMode::eAesCFB) {
-        err = DecryptCfb<keyLenBits, arch>(pinput,
+        err = DecryptCfb<keyLenBits, arch>(pInput,
                                            pOutput,
                                            len,
                                            m_keyManager.getCipherKeyData().m_enc_key,

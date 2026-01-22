@@ -199,6 +199,12 @@ GcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
     alc_error_t err = ALC_ERROR_NONE;
     m_gcm_ctx.m_isEncrypt = false;
 
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (outlen == nullptr) {
         return ALC_ERROR_INVALID_ARG;
     }
@@ -407,6 +413,12 @@ GcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
     alc_error_t err = ALC_ERROR_NONE;
     m_gcm_ctx.m_isEncrypt = true;
 
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (outlen == nullptr) {
         return ALC_ERROR_INVALID_ARG;
     }

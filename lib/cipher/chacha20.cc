@@ -109,6 +109,12 @@ ChaCha256T<CpuCipherFeatures::eVaes512>::encrypt(const Uint8* pInput,
 {
     alc_error_t err = ALC_ERROR_NONE;
 
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (outlen == nullptr) {
         return ALC_ERROR_INVALID_ARG;
     }
@@ -151,6 +157,12 @@ ChaCha256T<CpuCipherFeatures::eReference>::encrypt(const Uint8* pInput,
 {
     alc_error_t err = ALC_ERROR_NONE;
 
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (outlen == nullptr) {
         return ALC_ERROR_INVALID_ARG;
     }
