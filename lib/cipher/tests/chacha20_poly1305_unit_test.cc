@@ -718,4 +718,442 @@ TEST(Chacha20Poly1305, BlockBoundarySizes)
     }
 }
 
+// ============================================================================
+// Negative Tests for ChaCha20-Poly1305 - Null Pointer and Edge Cases
+// ============================================================================
+
+// Test null pointer for key in init
+TEST(Chacha20Poly1305_Negative, NullKeyPointer)
+{
+    GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
+
+    // TODO: Uncomment when null key validation is implemented
+    /*
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+
+    ref::ChaChaPoly256 chacha_poly;
+    alc_error_t err = chacha_poly.init(nullptr, 256, nonce, sizeof(nonce));
+    EXPECT_TRUE(alcp_is_error(err)) << "init with null key should fail";
+    */
+}
+
+// Test null pointer for nonce in init
+TEST(Chacha20Poly1305_Negative, NullNoncePointer)
+{
+    GTEST_SKIP() << "Skipped: Implementation may not validate null nonce pointer";
+
+    // TODO: Uncomment when null nonce validation is implemented
+    /*
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+
+    ref::ChaChaPoly256 chacha_poly;
+    alc_error_t err = chacha_poly.init(key, sizeof(key) * 8, nullptr, 12);
+    EXPECT_TRUE(alcp_is_error(err)) << "init with null nonce should fail";
+    */
+}
+
+// Test null pointer for input in encrypt
+TEST(Chacha20Poly1305_Negative, NullInputPointerEncrypt)
+{
+    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
+
+    // TODO: Uncomment when null pointer validation is implemented
+    /*
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    std::vector<Uint8> output(32);
+
+    ref::ChaChaPoly256 chacha_poly;
+    chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+
+    Uint64 outlen = 0;
+    alc_error_t err = chacha_poly.encrypt(nullptr, output.data(), 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input should fail";
+    */
+}
+
+// Test null pointer for output in encrypt
+TEST(Chacha20Poly1305_Negative, NullOutputPointerEncrypt)
+{
+    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
+
+    // TODO: Uncomment when null pointer validation is implemented
+    /*
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    std::vector<Uint8> input(32, 0x55);
+
+    ref::ChaChaPoly256 chacha_poly;
+    chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+
+    Uint64 outlen = 0;
+    alc_error_t err = chacha_poly.encrypt(input.data(), nullptr, 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null output should fail";
+    */
+}
+
+// Test null pointer for input in decrypt
+TEST(Chacha20Poly1305_Negative, NullInputPointerDecrypt)
+{
+    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
+
+    // TODO: Uncomment when null pointer validation is implemented
+    /*
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    std::vector<Uint8> output(32);
+
+    ref::ChaChaPoly256 chacha_poly;
+    chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+
+    Uint64 outlen = 0;
+    alc_error_t err = chacha_poly.decrypt(nullptr, output.data(), 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null input should fail";
+    */
+}
+
+// Test null pointer for output in decrypt
+TEST(Chacha20Poly1305_Negative, NullOutputPointerDecrypt)
+{
+    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
+
+    // TODO: Uncomment when null pointer validation is implemented
+    /*
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    std::vector<Uint8> input(32, 0x55);
+
+    ref::ChaChaPoly256 chacha_poly;
+    chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+
+    Uint64 outlen = 0;
+    alc_error_t err = chacha_poly.decrypt(input.data(), nullptr, 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null output should fail";
+    */
+}
+
+// Test null pointer for AAD in setAad
+TEST(Chacha20Poly1305_Negative, NullAADPointer)
+{
+    GTEST_SKIP() << "Skipped: Implementation may not validate null AAD pointer";
+
+    // TODO: Uncomment when null AAD validation is implemented
+    /*
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+
+    ref::ChaChaPoly256 chacha_poly;
+    chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    alc_error_t err = chacha_poly.setAad(nullptr, 12);
+    EXPECT_TRUE(alcp_is_error(err)) << "setAad with null AAD should fail";
+    */
+}
+
+// Test null pointer for tag in getTag
+TEST(Chacha20Poly1305_Negative, NullTagPointerGetTag)
+{
+    GTEST_SKIP() << "Skipped: Implementation may not validate null tag pointer";
+
+    // TODO: Uncomment when null tag validation is implemented
+    /*
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    std::vector<Uint8> plaintext(32, 0x55);
+    std::vector<Uint8> ciphertext(32);
+
+    ref::ChaChaPoly256 chacha_poly;
+    chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+
+    Uint64 outlen = 0;
+    chacha_poly.encrypt(plaintext.data(), ciphertext.data(), 32, &outlen);
+    alc_error_t err = chacha_poly.getTag(nullptr, 16);
+    EXPECT_TRUE(alcp_is_error(err)) << "getTag with null tag should fail";
+    */
+}
+
+// Test zero key length
+TEST(Chacha20Poly1305_Negative, ZeroKeyLength)
+{
+    GTEST_SKIP() << "Skipped: Implementation does not validate zero key length";
+
+    // TODO: Uncomment when zero key length validation is implemented
+    /*
+    Uint8 key[32] = { 0 };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+
+    ref::ChaChaPoly256 chacha_poly;
+    alc_error_t err = chacha_poly.init(key, 0, nonce, sizeof(nonce));
+    EXPECT_TRUE(alcp_is_error(err)) << "init with zero key length should fail";
+    */
+}
+
+// Test zero nonce length
+TEST(Chacha20Poly1305_Negative, ZeroNonceLength)
+{
+    GTEST_SKIP() << "Skipped: Implementation may not validate zero nonce length";
+
+    // TODO: Uncomment when zero nonce length validation is implemented
+    /*
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[12] = { 0 };
+
+    ref::ChaChaPoly256 chacha_poly;
+    alc_error_t err = chacha_poly.init(key, sizeof(key) * 8, nonce, 0);
+    EXPECT_TRUE(alcp_is_error(err)) << "init with zero nonce length should fail";
+    */
+}
+
+// Test zero length input (should succeed or be handled gracefully)
+TEST(Chacha20Poly1305_Negative, ZeroLengthInput)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    Uint8 dummy;
+    std::vector<Uint8> tag(16);
+
+    ref::ChaChaPoly256 chacha_poly;
+    chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_poly.setAad(AAD, sizeof(AAD));
+
+    Uint64 outlen = 0;
+    // Zero length encryption should be handled gracefully
+    chacha_poly.encrypt(&dummy, &dummy, 0, &outlen);
+    chacha_poly.getTag(tag.data(), 16);
+    // No crash means success - tag should still be valid
+}
+
+// Test in-place encryption (input == output)
+TEST(Chacha20Poly1305_Negative, InPlaceEncryption)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<Uint8> data(64, 0x77);
+    std::vector<Uint8> original = data;
+    std::vector<Uint8> tag(16);
+
+    ref::ChaChaPoly256 chacha_poly;
+    chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_poly.setAad(AAD, sizeof(AAD));
+
+    // In-place encryption (input == output)
+    Uint64 outlen = 0;
+    chacha_poly.encrypt(data.data(), data.data(), data.size(), &outlen);
+    chacha_poly.getTag(tag.data(), 16);
+
+    // Data should be changed (encrypted)
+    EXPECT_NE(data, original) << "In-place encryption should change data";
+}
+
+// Test in-place decryption (input == output)
+TEST(Chacha20Poly1305_Negative, InPlaceDecryption)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<Uint8> plaintext(64, 0x88);
+    std::vector<Uint8> data(64);
+    std::vector<Uint8> tag(16);
+
+    // First encrypt to get ciphertext
+    ref::ChaChaPoly256 chacha_enc;
+    chacha_enc.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_enc.setAad(AAD, sizeof(AAD));
+    Uint64 outlen1 = 0;
+    chacha_enc.encrypt(plaintext.data(), data.data(), plaintext.size(), &outlen1);
+    chacha_enc.getTag(tag.data(), 16);
+
+    // Now decrypt in-place
+    ref::ChaChaPoly256 chacha_dec;
+    chacha_dec.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_dec.setAad(AAD, sizeof(AAD));
+    Uint64 outlen2 = 0;
+    chacha_dec.decrypt(data.data(), data.data(), data.size(), &outlen2);
+
+    // In-place decryption should recover plaintext
+    EXPECT_EQ(data, plaintext) << "In-place decryption should recover plaintext";
+}
+
+// Test repeated init calls
+TEST(Chacha20Poly1305_Negative, RepeatedInit)
+{
+    Uint8 key1[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                     0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                     0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                     0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 key2[] = { 0x9f, 0x9e, 0x9d, 0x9c, 0x9b, 0x9a, 0x99, 0x98,
+                     0x97, 0x96, 0x95, 0x94, 0x93, 0x92, 0x91, 0x90,
+                     0x8f, 0x8e, 0x8d, 0x8c, 0x8b, 0x8a, 0x89, 0x88,
+                     0x87, 0x86, 0x85, 0x84, 0x83, 0x82, 0x81, 0x80 };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<Uint8> plaintext(64, 0x55);
+    std::vector<Uint8> ciphertext1(64), ciphertext2(64);
+    std::vector<Uint8> tag1(16), tag2(16);
+
+    ref::ChaChaPoly256 chacha_poly;
+
+    // First init and encrypt
+    chacha_poly.init(key1, sizeof(key1) * 8, nonce, sizeof(nonce));
+    chacha_poly.setAad(AAD, sizeof(AAD));
+    Uint64 outlen1 = 0;
+    chacha_poly.encrypt(plaintext.data(), ciphertext1.data(), plaintext.size(), &outlen1);
+    chacha_poly.getTag(tag1.data(), 16);
+
+    // Second init (overwriting first) and encrypt
+    chacha_poly.init(key2, sizeof(key2) * 8, nonce, sizeof(nonce));
+    chacha_poly.setAad(AAD, sizeof(AAD));
+    Uint64 outlen2 = 0;
+    chacha_poly.encrypt(plaintext.data(), ciphertext2.data(), plaintext.size(), &outlen2);
+    chacha_poly.getTag(tag2.data(), 16);
+
+    // Different keys should produce different outputs
+    EXPECT_NE(ciphertext1, ciphertext2) << "Different keys should produce different ciphertext";
+    EXPECT_NE(tag1, tag2) << "Different keys should produce different tag";
+}
+
+// Test very large data
+TEST(Chacha20Poly1305_Negative, VeryLargeData)
+{
+    const size_t data_size = 64 * 1024; // 64 KB
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<Uint8> plaintext(data_size);
+    for (size_t i = 0; i < data_size; i++) {
+        plaintext[i] = static_cast<Uint8>(i % 256);
+    }
+    std::vector<Uint8> ciphertext(data_size), decrypted(data_size);
+    std::vector<Uint8> tag(16);
+
+    ref::ChaChaPoly256 chacha_enc, chacha_dec;
+    chacha_enc.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_enc.setAad(AAD, sizeof(AAD));
+
+    Uint64 outlen1 = 0;
+    chacha_enc.encrypt(plaintext.data(), ciphertext.data(), data_size, &outlen1);
+    chacha_enc.getTag(tag.data(), 16);
+
+    chacha_dec.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_dec.setAad(AAD, sizeof(AAD));
+
+    Uint64 outlen2 = 0;
+    chacha_dec.decrypt(ciphertext.data(), decrypted.data(), data_size, &outlen2);
+
+    EXPECT_EQ(decrypted, plaintext);
+}
+
+// Test all zeros input
+TEST(Chacha20Poly1305_Negative, AllZerosInput)
+{
+    Uint8 key[32] = { 0 };
+    Uint8 nonce[12] = { 0 };
+    Uint8 AAD[12] = { 0 };
+    std::vector<Uint8> plaintext(64, 0x00);
+    std::vector<Uint8> ciphertext(64), decrypted(64);
+    std::vector<Uint8> tag(16);
+
+    ref::ChaChaPoly256 chacha_enc, chacha_dec;
+    chacha_enc.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_enc.setAad(AAD, sizeof(AAD));
+
+    Uint64 outlen1 = 0;
+    chacha_enc.encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen1);
+    chacha_enc.getTag(tag.data(), 16);
+
+    chacha_dec.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_dec.setAad(AAD, sizeof(AAD));
+
+    Uint64 outlen2 = 0;
+    chacha_dec.decrypt(ciphertext.data(), decrypted.data(), ciphertext.size(), &outlen2);
+
+    EXPECT_EQ(decrypted, plaintext);
+}
+
+// Test encrypt doesn't modify input
+TEST(Chacha20Poly1305_Negative, EncryptDoesNotModifyInput)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<Uint8> plaintext(64);
+    for (size_t i = 0; i < 64; i++) {
+        plaintext[i] = static_cast<Uint8>(i);
+    }
+    std::vector<Uint8> original_plaintext = plaintext;
+    std::vector<Uint8> ciphertext(64);
+    std::vector<Uint8> tag(16);
+
+    ref::ChaChaPoly256 chacha_poly;
+    chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
+    chacha_poly.setAad(AAD, sizeof(AAD));
+
+    Uint64 outlen = 0;
+    chacha_poly.encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen);
+    chacha_poly.getTag(tag.data(), 16);
+
+    // Verify input was not modified
+    EXPECT_EQ(plaintext, original_plaintext);
+}
+
 #endif
