@@ -560,6 +560,11 @@ Rsa_Cross(std::string             RsaAlgo,
             data_ext.m_msg  = &(input_data[0]);
         }
 
+        /* For RSA_NO_PADDING, ensure input integer < modulus (avoid m >= n) */
+        if (padding_mode == ALCP_TEST_RSA_NO_PADDING) {
+            input_data[force_misaligned ? 1 : 0] &= 0x7F;
+        }
+
         data_main.m_signature = &(signature_data_main[0]);
         data_ext.m_signature  = &(signature_data_ext[0]);
 
@@ -596,7 +601,7 @@ Rsa_Cross(std::string             RsaAlgo,
         }
 #endif
 
-        data_main.m_pseed = data_ext.m_pseed = &(seed[0]);
+        data_main.m_pseed = data_ext.m_pseed = getPtr(seed);
 
         /* label length should vary */
         std::vector<Uint8> label(i * KeySize);
@@ -613,7 +618,7 @@ Rsa_Cross(std::string             RsaAlgo,
             FAIL();
         }
 #endif
-        data_main.m_label = data_ext.m_label = &(label[0]);
+        data_main.m_label = data_ext.m_label = getPtr(label);
         data_main.m_label_size = data_ext.m_label_size = label.size();
 
         /* for PSS Digest sign Salt */

@@ -207,7 +207,7 @@ TEST_P(CMACFuncionalityTest, CMAC_SINGLE_UPDATE)
 {
 
     alc_error_t err = ALC_ERROR_NONE;
-    err             = m_cmac->update(&m_plain_text[0], m_plain_text.size());
+  err             = m_cmac->update(m_plain_text.data(), m_plain_text.size());
     ASSERT_TRUE(err == ALC_ERROR_NONE);
 
     err = m_cmac->finalize(&m_mac[0], m_mac.size());
@@ -219,7 +219,7 @@ TEST_P(CMACFuncionalityTest, CMAC_UPDATE_FINALIZE)
 {
 
     alc_error_t err = ALC_ERROR_NONE;
-    err             = m_cmac->update(&m_plain_text[0], m_plain_text.size());
+  err             = m_cmac->update(m_plain_text.data(), m_plain_text.size());
     ASSERT_TRUE(err == ALC_ERROR_NONE);
     err = m_cmac->finalize(&m_mac[0], m_mac.size());
     ASSERT_TRUE(err == ALC_ERROR_NONE);
@@ -238,9 +238,9 @@ TEST_P(CMACFuncionalityTest, CMAC_MULTIPLE_UPDATE)
     SetReserve(block1);
     SetReserve(block2);
     alc_error_t err = ALC_ERROR_NONE;
-    err             = m_cmac->update(&block1[0], block1.size());
+    err             = m_cmac->update(block1.data(), block1.size());
     ASSERT_TRUE(err == ALC_ERROR_NONE);
-    err = m_cmac->update(&block2[0], block2.size());
+    err = m_cmac->update(block2.data(), block2.size());
     ASSERT_TRUE(err == ALC_ERROR_NONE);
     err = m_cmac->finalize(&m_mac[0], m_mac.size());
     ASSERT_TRUE(err == ALC_ERROR_NONE);
@@ -249,9 +249,9 @@ TEST_P(CMACFuncionalityTest, CMAC_MULTIPLE_UPDATE)
 
 TEST_P(CMACFuncionalityTest, CMAC_RESET)
 {
-    m_cmac->update(&m_plain_text[0], m_plain_text.size());
+  m_cmac->update(m_plain_text.data(), m_plain_text.size());
     m_cmac->reset();
-    m_cmac->update(&m_plain_text[0], m_plain_text.size());
+  m_cmac->update(m_plain_text.data(), m_plain_text.size());
     m_cmac->finalize(&m_mac[0], m_mac.size());
 
     EXPECT_EQ(m_mac, m_expected_mac);

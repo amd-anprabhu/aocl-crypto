@@ -389,13 +389,13 @@ TEST(DRBG_Ctr, Generate)
     drbg->randomize(&generated_bytes[0],
                     generated_bytes.size(),
                     100,
-                    &additional_input[0],
+                    additional_input.data(),
                     additional_input.size());
 
     drbg->randomize(&generated_bytes[0],
                     generated_bytes.size(),
                     100,
-                    &additional_input[0],
+                    additional_input.data(),
                     additional_input.size());
 
     ASSERT_EQ(expected_generated_bytes, generated_bytes);

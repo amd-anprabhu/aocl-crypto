@@ -152,8 +152,7 @@ Digest_KAT(alc_digest_mode_t mode, bool ctx_copy, bool test_squeeze)
     if (mode == ALC_SHAKE_128 || mode == ALC_SHAKE_256) {
         while (csv.readNext()) {
             auto msg          = csv.getVect("MESSAGE");
-            data.m_msg        = &(msg[0]);
-            data.m_msg_len    = csv.getVect("MESSAGE").size();
+            data.m_msg_len    = msg.size();
             data.m_digest_len = csv.getVect("DIGEST").size();
             std::vector<Uint8> digest_(data.m_digest_len, 0);
             std::vector<Uint8> digest_dup_(data.m_digest_len, 0);
@@ -161,12 +160,11 @@ Digest_KAT(alc_digest_mode_t mode, bool ctx_copy, bool test_squeeze)
             data.m_digest_dup = &(digest_dup_[0]);
             /* FIXME: Hack when msg is NULL, this case is not currently handled
              * in some of the digest apis */
+            data.m_msg = msg.empty() ? &Temp : msg.data();
             bool isMsgEmpty = std::all_of(
                 msg.begin(), msg.end(), [](int i) { return i == 0; });
-            if (data.m_msg_len == 0) {
-                data.m_msg = &Temp;
-            }
             if (isMsgEmpty) {
+                data.m_msg     = &Temp;
                 data.m_msg_len = 0;
             }
 
@@ -291,19 +289,17 @@ Digest_KAT(alc_digest_mode_t mode, bool ctx_copy, bool test_squeeze)
     } else {
         while (csv.readNext()) {
             auto msg          = csv.getVect("MESSAGE");
-            data.m_msg        = &(msg[0]);
-            data.m_msg_len    = csv.getVect("MESSAGE").size();
+            data.m_msg_len    = msg.size();
             data.m_digest_len = csv.getVect("DIGEST").size();
             data.m_digest     = &(digest[0]);
             data.m_digest_dup = &(digest_dup[0]);
             /* FIXME: Hack when msg is NULL, this case is not currently handled
              * in some of the digest apis */
+            data.m_msg = msg.empty() ? &Temp : msg.data();
             bool isMsgEmpty = std::all_of(
                 msg.begin(), msg.end(), [](int i) { return i == 0; });
-            if (data.m_msg_len == 0) {
-                data.m_msg = &Temp;
-            }
             if (isMsgEmpty) {
+                data.m_msg     = &Temp;
                 data.m_msg_len = 0;
             }
 

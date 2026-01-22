@@ -133,7 +133,7 @@ Drbg::randomize(Uint8        p_Output[],
         }
         internalReseed(&entropy_input[0],
                        entropy_input.size(),
-                       &cAdditionalInput[0],
+                       cAdditionalInput,
                        cAdditionalInputLength);
     }
     generate(cAdditionalInput, cAdditionalInputLength, p_Output, cOutputLength);
@@ -148,7 +148,7 @@ Drbg::randomize(Uint8               p_Output[],
     return randomize(p_Output,
                      cOutputLength,
                      cSecurityStrength,
-                     &additional_input[0],
+                     additional_input.empty() ? nullptr : additional_input.data(),
                      additional_input.size());
 }
 

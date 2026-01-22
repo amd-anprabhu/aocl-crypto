@@ -459,11 +459,11 @@ HmacDrbg::Impl::instantiate(const std::vector<Uint8>& cEntropyInput,
                             const std::vector<Uint8>& cNonce,
                             const std::vector<Uint8>& cPersonalizationString)
 {
-    instantiate(&cEntropyInput[0],
+    instantiate(cEntropyInput.data(),
                 cEntropyInput.size(),
-                &cNonce[0],
+                cNonce.data(),
                 cNonce.size(),
-                &cPersonalizationString[0],
+                cPersonalizationString.data(),
                 cPersonalizationString.size());
 }
 
@@ -512,9 +512,9 @@ void
 HmacDrbg::Impl::generate(const std::vector<Uint8>& cAdditionalInput,
                          std::vector<Uint8>&       output)
 {
-    generate(&cAdditionalInput[0],
+    generate(cAdditionalInput.data(),
              cAdditionalInput.size(),
-             &output[0],
+             output.data(),
              output.size());
 }
 
@@ -546,9 +546,9 @@ void
 HmacDrbg::Impl::internalReseed(const std::vector<Uint8>& cEntropyInput,
                                const std::vector<Uint8>& cAdditionalInput)
 {
-    internalReseed(&cEntropyInput[0],
+    internalReseed(cEntropyInput.data(),
                    cEntropyInput.size(),
-                   &cAdditionalInput[0],
+                   cAdditionalInput.data(),
                    cAdditionalInput.size());
 }
 void

@@ -264,11 +264,11 @@ CtrDrbg::Impl::instantiate(const std::vector<Uint8>& cEntropyInput,
                            const std::vector<Uint8>& cNonce,
                            const std::vector<Uint8>& cPersonalizationString)
 {
-    instantiate(&cEntropyInput[0],
+    instantiate(cEntropyInput.data(),
                 cEntropyInput.size(),
-                &cNonce[0],
+                cNonce.data(),
                 cNonce.size(),
-                &cPersonalizationString[0],
+                cPersonalizationString.data(),
                 cPersonalizationString.size());
 }
 
@@ -296,9 +296,9 @@ void
 CtrDrbg::Impl::generate(const std::vector<Uint8>& cAdditionalInput,
                         std::vector<Uint8>&       output)
 {
-    generate(&cAdditionalInput[0],
+    generate(cAdditionalInput.data(),
              cAdditionalInput.size(),
-             &output[0],
+             output.data(),
              output.size());
 }
 

@@ -587,13 +587,14 @@ OpenSSLRsaBase::DecryptPvtKey(const alcp_rsa_data_t& data)
 {
     int    ret_val = 0;
     size_t outlen  = 0;
+    const size_t inlen = static_cast<size_t>(data.m_key_len);
 
     /* now call decrypt */
     if (EVP_PKEY_decrypt(m_rsa_handle_keyctx_pvt,
                          NULL,
                          &outlen,
                          data.m_encrypted_data,
-                         outlen)
+                         inlen)
         != 1) {
         std::cout << __func__ << ":"
                   << "EVP_PKEY_decrypt failed: Error:" << std::endl;
@@ -605,7 +606,7 @@ OpenSSLRsaBase::DecryptPvtKey(const alcp_rsa_data_t& data)
                          data.m_decrypted_data,
                          &outlen,
                          data.m_encrypted_data,
-                         outlen)
+                         inlen)
         != 1) {
         std::cout << __func__ << ":"
                   << "EVP_PKEY_decrypt failed: Error:" << std::endl;
