@@ -183,15 +183,19 @@ BenchXtsCipherExperimental(benchmark::State&            state,
         key[i] = i;
     }
 
+    for (Uint32 i = 0; i < 16; i++) {
+        iv[i] = i;
+    }
+
     alc_test_xts_init_data_t dataInit;
     dataInit.m_iv      = iv;
-    dataInit.m_iv_len  = 12;
+    dataInit.m_iv_len  = 16;
     dataInit.m_key     = key;
     dataInit.m_key_len = keylen / 8;
 
     alc_test_xts_update_data_t dataUpdate;
     dataUpdate.m_iv              = iv;
-    dataUpdate.m_iv_len          = 12;
+    dataUpdate.m_iv_len          = 16;
     dataUpdate.m_output          = output_text;
     dataUpdate.m_output_len      = cBlockSize;
     dataUpdate.m_input           = input_text;
