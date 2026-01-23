@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2025-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -210,12 +210,14 @@ TEST_P(AESMultibufferTest, MultibufferEncrypt)
     const int          num_buffers = params.num_buffers;
     const int          block_size  = params.block_size;
 
-    // Check if AVX512 is supported
+    // Check if either AVX512 or AESNI is supported for multi-buffer operations
     bool avx512_supported =
         CpuId::cpuHasAvx512(alcp::utils::Avx512Flags::AVX512_F);
+    bool aesni_supported = CpuId::cpuHasAesni();
 
-    if (!avx512_supported) {
-        GTEST_SKIP() << "AVX512 not supported on this machine";
+    // Skip only if neither AVX512 nor AESNI is available
+    if (!avx512_supported && !aesni_supported) {
+        GTEST_SKIP() << "Neither AVX512 nor AESNI supported on this machine";
     }
 
     // Generate the key once for this test

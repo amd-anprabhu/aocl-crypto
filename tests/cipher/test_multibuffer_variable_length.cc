@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2025-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -181,7 +181,7 @@ TEST_F(VariableLengthMultibufferTest, UniformLengths_40Buffers)
     if (err == ALC_ERROR_NO_FALLBACK) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
-        GTEST_SKIP() << "Multibuffer dequeue requires VAES512+ (zen4+) architecture";
+        GTEST_SKIP() << "Neither AVX512 nor AESNI available on this machine";
     }
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
@@ -278,7 +278,7 @@ TEST_F(VariableLengthMultibufferTest, VariableLengths_48Buffers)
     if (err == ALC_ERROR_NO_FALLBACK) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
-        GTEST_SKIP() << "Multibuffer dequeue requires VAES512+ (zen4+) architecture";
+        GTEST_SKIP() << "Neither AVX512 nor AESNI available on this machine";
     }
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
@@ -369,7 +369,7 @@ TEST_F(VariableLengthMultibufferTest, MaxBuffers_HighlyVariableLength)
     if (err == ALC_ERROR_NO_FALLBACK) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
-        GTEST_SKIP() << "Multibuffer dequeue requires VAES512+ (zen4+) architecture";
+        GTEST_SKIP() << "Neither AVX512 nor AESNI available on this machine";
     }
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
@@ -456,7 +456,7 @@ TEST_F(VariableLengthMultibufferTest, EdgeCase_33Buffers)
     if (err == ALC_ERROR_NO_FALLBACK) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
-        GTEST_SKIP() << "Multibuffer dequeue requires VAES512+ (zen4+) architecture";
+        GTEST_SKIP() << "Neither AVX512 nor AESNI available on this machine";
     }
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
@@ -538,7 +538,7 @@ TEST_F(VariableLengthMultibufferTest, MinimumLength_64Buffers)
     if (err == ALC_ERROR_NO_FALLBACK) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
-        GTEST_SKIP() << "Multibuffer dequeue requires VAES512+ (zen4+) architecture";
+        GTEST_SKIP() << "Neither AVX512 nor AESNI available on this machine";
     }
     EXPECT_EQ(err, ALC_ERROR_NONE);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -222,7 +222,38 @@ AesGenericCiphersT<mode, keyLenBits, arch>::dequeue(Uint8**       pCipherText,
 
         // Require AVX512 VAES for multi-buffer operations
         if constexpr (arch < CpuCipherFeatures::eVaes512) {
-            return ALC_ERROR_NO_FALLBACK;
+            // Check if AESNI is available for fallback
+            if (__builtin_expect(!CpuId::cpuHasAesni(), 0)) {
+                return ALC_ERROR_NO_FALLBACK;
+            }
+
+            const Uint64* actualLengths =
+                pLengths ? pLengths : m_multibuffer.m_bufferLengths;
+
+            for (Uint64 i = 0; i < numBuffers; i++) {
+                if constexpr (mode == CipherMode::eAesCBC) {
+                    err = aesni::EncryptCbc(
+                        m_multibuffer.m_pData[i],
+                        pCipherText[i],
+                        actualLengths[i],
+                        m_keyManager.getCipherKeyData().m_enc_key,
+                        m_keyManager.getRounds(),
+                        m_multibuffer.m_ivs[i]);
+                } else { // CipherMode::eAesCFB
+                    err = aesni::EncryptCfb(
+                        m_multibuffer.m_pData[i],
+                        pCipherText[i],
+                        actualLengths[i],
+                        m_keyManager.getCipherKeyData().m_enc_key,
+                        m_keyManager.getRounds(),
+                        m_multibuffer.m_ivs[i]);
+                }
+
+                if (err != ALC_ERROR_NONE) {
+                    return err;
+                }
+            }
+            return ALC_ERROR_NONE;
         }
 
         // Validate buffer count (must fit in stack-allocated arrays)
