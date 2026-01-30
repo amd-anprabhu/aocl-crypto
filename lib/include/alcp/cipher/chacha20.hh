@@ -31,13 +31,9 @@
 #include "alcp/base.hh"
 #include "alcp/cipher.h"
 #include "alcp/cipher/cipher_common.hh"
-#include "alcp/utils/cpuid.hh"
-
-#include "alcp/cipher/cipher_common.hh"
 
 namespace alcp::cipher {
-using utils::CpuCipherFeatures;
-using utils::CpuId;
+using utils::CpuArchLevel;
 
 static constexpr Uint32 Chacha20Constants[4] = {
     0x61707865, 0x3320646e, 0x79622d32, 0x6b206574
@@ -97,7 +93,7 @@ class ALCP_API_EXPORT ChaCha20
  * Template parameters:
  * - arch: CPU architecture features (eVaes512 or eReference)
  */
-template<CpuCipherFeatures arch>
+template<CpuArchLevel arch>
 class ALCP_API_EXPORT ChaCha256T
     : public ChaCha20
     , public iCipher
@@ -135,11 +131,11 @@ class ALCP_API_EXPORT ChaCha256T
 
 // Backward compatibility type aliases
 namespace vaes512 {
-    using ChaCha256 = ChaCha256T<CpuCipherFeatures::eVaes512>;
+    using ChaCha256 = ChaCha256T<CpuArchLevel::eZen4>;
 } // namespace vaes512
 
 namespace ref {
-    using ChaCha256 = ChaCha256T<CpuCipherFeatures::eReference>;
+    using ChaCha256 = ChaCha256T<CpuArchLevel::eReference>;
 } // namespace ref
 
 } // namespace alcp::cipher

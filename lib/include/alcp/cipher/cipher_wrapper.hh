@@ -45,12 +45,12 @@
 
 namespace alcp::cipher {
 
-template<alcp::cipher::CipherKeyLen keyLen, alcp::utils::CpuCipherFeatures arch>
+template<alcp::cipher::CipherKeyLen keyLen, alcp::utils::CpuArchLevel arch>
 alc_error_t
 tDecryptCbc(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv);
 
-template<alcp::cipher::CipherKeyLen keyLen, alcp::utils::CpuCipherFeatures arch>
+template<alcp::cipher::CipherKeyLen keyLen, alcp::utils::CpuArchLevel arch>
 alc_error_t
 DecryptCfb(const Uint8* pSrc,
            Uint8*       pDest,
@@ -59,7 +59,7 @@ DecryptCfb(const Uint8* pSrc,
            int          nRounds,
            Uint8*       pIv);
 
-template<alcp::cipher::CipherKeyLen keyLen, alcp::utils::CpuCipherFeatures arch>
+template<alcp::cipher::CipherKeyLen keyLen, alcp::utils::CpuArchLevel arch>
 alc_error_t
 CryptCtr(const Uint8* pSrc,
          Uint8*       pDest,

@@ -35,27 +35,15 @@
 namespace alcp::mac {
 
 using poly1305::Poly1305Builder;
-using utils::CpuArchFeature;
+using utils::AlgorithmType;
+using utils::CpuArchLevel;
 using utils::CpuId;
 
-// Adopted from lib/cipher/builder.cc
-CpuArchFeature
-getCpuArchFeature()
+// Map CpuArchLevel for poly1305 template dispatch
+CpuArchLevel
+getCpuArchLevel()
 {
-    CpuArchFeature cpu_feature =
-        CpuArchFeature::eReference; // If no arch features present,means
-                                    // no acceleration, Fall back to
-                                    // reference
-    if (CpuId::cpuHasAvx2()) {
-        cpu_feature = CpuArchFeature::eAvx2;
-
-        if (CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-            && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_DQ)
-            && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW)) {
-            cpu_feature = CpuArchFeature::eAvx512;
-        }
-    }
-    return cpu_feature;
+    return CpuId::getCachedArchLevel(AlgorithmType::ePoly1305);
 }
 
 alc_error_t

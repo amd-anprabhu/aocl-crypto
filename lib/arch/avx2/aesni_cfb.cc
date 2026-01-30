@@ -261,7 +261,7 @@ namespace aesni {
 } // namespace aesni
 
 // Decrypt
-template<alcp::cipher::CipherKeyLen T, alcp::utils::CpuCipherFeatures arch>
+template<alcp::cipher::CipherKeyLen T, alcp::utils::CpuArchLevel arch>
 alc_error_t
 DecryptCfb(const Uint8* pSrc,
            Uint8*       pDest,
@@ -279,7 +279,7 @@ DecryptCfb(const Uint8* pSrc,
 template<>
 alc_error_t
 DecryptCfb<alcp::cipher::CipherKeyLen::eKey128Bit,
-           alcp::utils::CpuCipherFeatures::eAesni>(const Uint8* pSrc,
+           alcp::utils::CpuArchLevel::eZen>(const Uint8* pSrc,
                                                    Uint8*       pDest,
                                                    Uint64       len,
                                                    const Uint8* pKey,
@@ -295,7 +295,7 @@ DecryptCfb<alcp::cipher::CipherKeyLen::eKey128Bit,
 template<>
 alc_error_t
 DecryptCfb<alcp::cipher::CipherKeyLen::eKey192Bit,
-           alcp::utils::CpuCipherFeatures::eAesni>(const Uint8* pSrc,
+           alcp::utils::CpuArchLevel::eZen>(const Uint8* pSrc,
                                                    Uint8*       pDest,
                                                    Uint64       len,
                                                    const Uint8* pKey,
@@ -311,7 +311,7 @@ DecryptCfb<alcp::cipher::CipherKeyLen::eKey192Bit,
 template<>
 alc_error_t
 DecryptCfb<alcp::cipher::CipherKeyLen::eKey256Bit,
-           alcp::utils::CpuCipherFeatures::eAesni>(const Uint8* pSrc,
+           alcp::utils::CpuArchLevel::eZen>(const Uint8* pSrc,
                                                    Uint8*       pDest,
                                                    Uint64       len,
                                                    const Uint8* pKey,

@@ -244,7 +244,7 @@ EncryptCbc(const Uint8* pSrc,    // ptr to ciphertext
 namespace alcp::cipher {
 // Decrypt Functions
 
-template<alcp::cipher::CipherKeyLen T, alcp::utils::CpuCipherFeatures arch>
+template<alcp::cipher::CipherKeyLen T, alcp::utils::CpuArchLevel arch>
 alc_error_t
 tDecryptCbc(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv)
@@ -259,7 +259,7 @@ tDecryptCbc(
 template<>
 alc_error_t
 tDecryptCbc<alcp::cipher::CipherKeyLen::eKey128Bit,
-            alcp::utils::CpuCipherFeatures::eAesni>(
+            alcp::utils::CpuArchLevel::eZen>(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv)
 {
     return alcp::cipher::aesni::DecryptCbc<alcp::cipher::aesni::AesDecrypt,
@@ -272,7 +272,7 @@ tDecryptCbc<alcp::cipher::CipherKeyLen::eKey128Bit,
 template<>
 alc_error_t
 tDecryptCbc<alcp::cipher::CipherKeyLen::eKey192Bit,
-            alcp::utils::CpuCipherFeatures::eAesni>(
+            alcp::utils::CpuArchLevel::eZen>(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv)
 {
     return alcp::cipher::aesni::DecryptCbc<alcp::cipher::aesni::AesDecrypt,
@@ -285,7 +285,7 @@ tDecryptCbc<alcp::cipher::CipherKeyLen::eKey192Bit,
 template<>
 alc_error_t
 tDecryptCbc<alcp::cipher::CipherKeyLen::eKey256Bit,
-            alcp::utils::CpuCipherFeatures::eAesni>(
+            alcp::utils::CpuArchLevel::eZen>(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv)
 {
     return alcp::cipher::aesni::DecryptCbc<alcp::cipher::aesni::AesDecrypt,

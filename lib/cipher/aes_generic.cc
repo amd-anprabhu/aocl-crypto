@@ -29,7 +29,15 @@
 #include "alcp/cipher/aes_generic.hh"
 #include "alcp/cipher/cipher_wrapper.hh"
 
-#include "alcp/utils/cpuid.hh"
+#include "alcp/utils/bits.hh"
+#include <stdexcept>
+
+// Branch prediction hints (no-op on MSVC)
+#if defined(__GNUC__) || defined(__clang__)
+#define ALCP_EXPECT(x, v) __builtin_expect(!!(x), (v))
+#else
+#define ALCP_EXPECT(x, v) (x)
+#endif
 
 using alcp::utils::CpuId;
 
@@ -37,7 +45,7 @@ namespace alcp::cipher {
 
 template<alcp::cipher::CipherMode       mode,
          alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
 AesGenericCiphersT<mode, keyLenBits, arch>::multibufferInit(const Uint8* pKey,
                                                             Uint64       keyLen,
@@ -90,7 +98,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::multibufferInit(const Uint8* pKey,
  */
 template<alcp::cipher::CipherMode       mode,
          alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
 AesGenericCiphersT<mode, keyLenBits, arch>::init(const Uint8* pKey,
                                                   Uint64       keyLen,
@@ -124,7 +132,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::init(const Uint8* pKey,
 // flush function to store the multibuffer data to the memory (variable-length version)
 template<alcp::cipher::CipherMode       mode,
          alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
 AesGenericCiphersT<mode, keyLenBits, arch>::flush(const Uint8**  pPlainText,
                                                   const Uint64*  pLengths,
@@ -202,7 +210,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::flush(const Uint8**  pPlainText,
  */
 template<alcp::cipher::CipherMode       mode,
          alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
 AesGenericCiphersT<mode, keyLenBits, arch>::dequeue(Uint8**       pCipherText,
                                                     Uint64        numBuffers,
@@ -221,11 +229,10 @@ AesGenericCiphersT<mode, keyLenBits, arch>::dequeue(Uint8**       pCipherText,
         }
 
         // Require AVX512 VAES for multi-buffer operations
-        if constexpr (arch < CpuCipherFeatures::eVaes512) {
-            // Check if AESNI is available for fallback
-            if (__builtin_expect(!CpuId::cpuHasAesni(), 0)) {
-                return ALC_ERROR_NO_FALLBACK;
-            }
+        // AESNI single buffer path is the fallback for all architectures.
+        // Don't have to check for aesni support here. since it is already checked in CpuId::getArchLevel(AlgorithmType::eCipher)
+        // reference implemetation will never reach here.
+        if constexpr (arch < CpuArchLevel::eZen4) {
 
             const Uint64* actualLengths =
                 pLengths ? pLengths : m_multibuffer.m_bufferLengths;
@@ -543,7 +550,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::dequeue(Uint8**       pCipherText,
 
 template<alcp::cipher::CipherMode       mode,
          alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
 AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pInput,
                                                     Uint8*       pOutput,
@@ -568,7 +575,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pInput,
 
     Uint8* pIv = m_ivManager.getIv();
 
-    if constexpr (arch < CpuCipherFeatures::eAesni) {
+    if constexpr (arch < CpuArchLevel::eZen) {
         return ALC_ERROR_NOT_SUPPORTED;
     }
 
@@ -642,21 +649,21 @@ AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pInput,
                                 m_keyManager.getRounds(),
                                 pIv);
     } else if constexpr (mode == CipherMode::eAesCTR) {
-        if constexpr (arch == CpuCipherFeatures::eVaes512) {
+        if constexpr (arch == CpuArchLevel::eZen4) {
             err = CryptCtr<keyLenBits, arch>(pInput,
                                              pOutput,
                                              len,
                                              m_keyManager.getCipherKeyData().m_enc_key,
                                              m_keyManager.getRounds(),
                                              pIv);
-        } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
+        } else if constexpr (arch == CpuArchLevel::eZen3) {
             err = vaes::CryptCtr(pInput,
                                  pOutput,
                                  len,
                                  m_keyManager.getCipherKeyData().m_enc_key,
                                  m_keyManager.getRounds(),
                                  pIv);
-        } else if constexpr (arch == CpuCipherFeatures::eAesni) {
+        } else if constexpr (arch == CpuArchLevel::eZen) {
             err = aesni::CryptCtr(pInput,
                                   pOutput,
                                   len,
@@ -683,7 +690,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::encrypt(const Uint8* pInput,
 
 template<alcp::cipher::CipherMode       mode,
          alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
 AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pInput,
                                                     Uint8*       pOutput,
@@ -708,7 +715,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pInput,
 
     Uint8* pIv = m_ivManager.getIv();
 
-    if constexpr (arch < CpuCipherFeatures::eAesni) {
+    if constexpr (arch < CpuArchLevel::eZen) {
         return ALC_ERROR_NOT_SUPPORTED;
     }
 
@@ -778,21 +785,21 @@ AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pInput,
                                 m_keyManager.getRounds(),
                                 pIv);
     } else if constexpr (mode == CipherMode::eAesCTR) {
-        if constexpr (arch == CpuCipherFeatures::eVaes512) {
+        if constexpr (arch == CpuArchLevel::eZen4) {
             err = CryptCtr<keyLenBits, arch>(pInput,
                                              pOutput,
                                              len,
                                              m_keyManager.getCipherKeyData().m_enc_key,
                                              m_keyManager.getRounds(),
                                              pIv);
-        } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
+        } else if constexpr (arch == CpuArchLevel::eZen3) {
             err = vaes::CryptCtr(pInput,
                                  pOutput,
                                  len,
                                  m_keyManager.getCipherKeyData().m_enc_key,
                                  m_keyManager.getRounds(),
                                  pIv);
-        } else if constexpr (arch == CpuCipherFeatures::eAesni) {
+        } else if constexpr (arch == CpuArchLevel::eZen) {
             err = aesni::CryptCtr(pInput,
                                   pOutput,
                                   len,
@@ -819,7 +826,7 @@ AesGenericCiphersT<mode, keyLenBits, arch>::decrypt(const Uint8* pInput,
 
 template<alcp::cipher::CipherMode       mode,
          alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
 AesGenericCiphersT<mode, keyLenBits, arch>::CopyCtx(const iCipher* pSrc,
                                                     iCipher*       pDst)
@@ -855,126 +862,126 @@ AesGenericCiphersT<mode, keyLenBits, arch>::CopyCtx(const iCipher* pSrc,
 /* eAesCBC */
 template class AesGenericCiphersT<CipherMode::eAesCBC,
                                   alcp::cipher::CipherKeyLen::eKey128Bit,
-                                  CpuCipherFeatures::eVaes512>;
+                                  CpuArchLevel::eZen4>;
 template class AesGenericCiphersT<CipherMode::eAesCBC,
                                   alcp::cipher::CipherKeyLen::eKey192Bit,
-                                  CpuCipherFeatures::eVaes512>;
+                                  CpuArchLevel::eZen4>;
 template class AesGenericCiphersT<CipherMode::eAesCBC,
                                   alcp::cipher::CipherKeyLen::eKey256Bit,
-                                  CpuCipherFeatures::eVaes512>;
+                                  CpuArchLevel::eZen4>;
 
 template class AesGenericCiphersT<CipherMode::eAesCBC,
                                   alcp::cipher::CipherKeyLen::eKey128Bit,
-                                  CpuCipherFeatures::eVaes256>;
+                                  CpuArchLevel::eZen3>;
 template class AesGenericCiphersT<CipherMode::eAesCBC,
                                   alcp::cipher::CipherKeyLen::eKey192Bit,
-                                  CpuCipherFeatures::eVaes256>;
+                                  CpuArchLevel::eZen3>;
 template class AesGenericCiphersT<CipherMode::eAesCBC,
                                   alcp::cipher::CipherKeyLen::eKey256Bit,
-                                  CpuCipherFeatures::eVaes256>;
+                                  CpuArchLevel::eZen3>;
 
 template class AesGenericCiphersT<CipherMode::eAesCBC,
                                   alcp::cipher::CipherKeyLen::eKey128Bit,
-                                  CpuCipherFeatures::eAesni>;
+                                  CpuArchLevel::eZen>;
 template class AesGenericCiphersT<CipherMode::eAesCBC,
                                   alcp::cipher::CipherKeyLen::eKey192Bit,
-                                  CpuCipherFeatures::eAesni>;
+                                  CpuArchLevel::eZen>;
 template class AesGenericCiphersT<CipherMode::eAesCBC,
                                   alcp::cipher::CipherKeyLen::eKey256Bit,
-                                  CpuCipherFeatures::eAesni>;
+                                  CpuArchLevel::eZen>;
 
 /* eAesOFB */
 template class AesGenericCiphersT<CipherMode::eAesOFB,
                                   alcp::cipher::CipherKeyLen::eKey128Bit,
-                                  CpuCipherFeatures::eVaes512>;
+                                  CpuArchLevel::eZen4>;
 template class AesGenericCiphersT<CipherMode::eAesOFB,
                                   alcp::cipher::CipherKeyLen::eKey192Bit,
-                                  CpuCipherFeatures::eVaes512>;
+                                  CpuArchLevel::eZen4>;
 template class AesGenericCiphersT<CipherMode::eAesOFB,
                                   alcp::cipher::CipherKeyLen::eKey256Bit,
-                                  CpuCipherFeatures::eVaes512>;
+                                  CpuArchLevel::eZen4>;
 
 template class AesGenericCiphersT<CipherMode::eAesOFB,
                                   alcp::cipher::CipherKeyLen::eKey128Bit,
-                                  CpuCipherFeatures::eVaes256>;
+                                  CpuArchLevel::eZen3>;
 template class AesGenericCiphersT<CipherMode::eAesOFB,
                                   alcp::cipher::CipherKeyLen::eKey192Bit,
-                                  CpuCipherFeatures::eVaes256>;
+                                  CpuArchLevel::eZen3>;
 template class AesGenericCiphersT<CipherMode::eAesOFB,
                                   alcp::cipher::CipherKeyLen::eKey256Bit,
-                                  CpuCipherFeatures::eVaes256>;
+                                  CpuArchLevel::eZen3>;
 
 template class AesGenericCiphersT<CipherMode::eAesOFB,
                                   alcp::cipher::CipherKeyLen::eKey128Bit,
-                                  CpuCipherFeatures::eAesni>;
+                                  CpuArchLevel::eZen>;
 template class AesGenericCiphersT<CipherMode::eAesOFB,
                                   alcp::cipher::CipherKeyLen::eKey192Bit,
-                                  CpuCipherFeatures::eAesni>;
+                                  CpuArchLevel::eZen>;
 template class AesGenericCiphersT<CipherMode::eAesOFB,
                                   alcp::cipher::CipherKeyLen::eKey256Bit,
-                                  CpuCipherFeatures::eAesni>;
+                                  CpuArchLevel::eZen>;
 
 /* eAesCTR */
 template class AesGenericCiphersT<CipherMode::eAesCTR,
                                   alcp::cipher::CipherKeyLen::eKey128Bit,
-                                  CpuCipherFeatures::eVaes512>;
+                                  CpuArchLevel::eZen4>;
 template class AesGenericCiphersT<CipherMode::eAesCTR,
                                   alcp::cipher::CipherKeyLen::eKey192Bit,
-                                  CpuCipherFeatures::eVaes512>;
+                                  CpuArchLevel::eZen4>;
 template class AesGenericCiphersT<CipherMode::eAesCTR,
                                   alcp::cipher::CipherKeyLen::eKey256Bit,
-                                  CpuCipherFeatures::eVaes512>;
+                                  CpuArchLevel::eZen4>;
 
 template class AesGenericCiphersT<CipherMode::eAesCTR,
                                   alcp::cipher::CipherKeyLen::eKey128Bit,
-                                  CpuCipherFeatures::eVaes256>;
+                                  CpuArchLevel::eZen3>;
 template class AesGenericCiphersT<CipherMode::eAesCTR,
                                   alcp::cipher::CipherKeyLen::eKey192Bit,
-                                  CpuCipherFeatures::eVaes256>;
+                                  CpuArchLevel::eZen3>;
 template class AesGenericCiphersT<CipherMode::eAesCTR,
                                   alcp::cipher::CipherKeyLen::eKey256Bit,
-                                  CpuCipherFeatures::eVaes256>;
+                                  CpuArchLevel::eZen3>;
 
 template class AesGenericCiphersT<CipherMode::eAesCTR,
                                   alcp::cipher::CipherKeyLen::eKey128Bit,
-                                  CpuCipherFeatures::eAesni>;
+                                  CpuArchLevel::eZen>;
 template class AesGenericCiphersT<CipherMode::eAesCTR,
                                   alcp::cipher::CipherKeyLen::eKey192Bit,
-                                  CpuCipherFeatures::eAesni>;
+                                  CpuArchLevel::eZen>;
 template class AesGenericCiphersT<CipherMode::eAesCTR,
                                   alcp::cipher::CipherKeyLen::eKey256Bit,
-                                  CpuCipherFeatures::eAesni>;
+                                  CpuArchLevel::eZen>;
 
 /* eAesCFB */
 template class AesGenericCiphersT<CipherMode::eAesCFB,
                                   alcp::cipher::CipherKeyLen::eKey128Bit,
-                                  CpuCipherFeatures::eVaes512>;
+                                  CpuArchLevel::eZen4>;
 template class AesGenericCiphersT<CipherMode::eAesCFB,
                                   alcp::cipher::CipherKeyLen::eKey192Bit,
-                                  CpuCipherFeatures::eVaes512>;
+                                  CpuArchLevel::eZen4>;
 template class AesGenericCiphersT<CipherMode::eAesCFB,
                                   alcp::cipher::CipherKeyLen::eKey256Bit,
-                                  CpuCipherFeatures::eVaes512>;
+                                  CpuArchLevel::eZen4>;
 
 template class AesGenericCiphersT<CipherMode::eAesCFB,
                                   alcp::cipher::CipherKeyLen::eKey128Bit,
-                                  CpuCipherFeatures::eVaes256>;
+                                  CpuArchLevel::eZen3>;
 template class AesGenericCiphersT<CipherMode::eAesCFB,
                                   alcp::cipher::CipherKeyLen::eKey192Bit,
-                                  CpuCipherFeatures::eVaes256>;
+                                  CpuArchLevel::eZen3>;
 template class AesGenericCiphersT<CipherMode::eAesCFB,
                                   alcp::cipher::CipherKeyLen::eKey256Bit,
-                                  CpuCipherFeatures::eVaes256>;
+                                  CpuArchLevel::eZen3>;
 
 template class AesGenericCiphersT<CipherMode::eAesCFB,
                                   alcp::cipher::CipherKeyLen::eKey128Bit,
-                                  CpuCipherFeatures::eAesni>;
+                                  CpuArchLevel::eZen>;
 template class AesGenericCiphersT<CipherMode::eAesCFB,
                                   alcp::cipher::CipherKeyLen::eKey192Bit,
-                                  CpuCipherFeatures::eAesni>;
+                                  CpuArchLevel::eZen>;
 template class AesGenericCiphersT<CipherMode::eAesCFB,
                                   alcp::cipher::CipherKeyLen::eKey256Bit,
-                                  CpuCipherFeatures::eAesni>;
+                                  CpuArchLevel::eZen>;
 
 // other generic modes to be added.
 

@@ -29,9 +29,9 @@
 #pragma once
 
 #include "alcp/base.hh"
+#include "alcp/cipher.hh"
 #include "alcp/cipher/aes_generic.hh"
 #include "alcp/cipher/common.hh"
-#include "alcp/utils/cpuid.hh"
 
 #include "alcp/cipher/aes_cmac_siv_arch.hh"
 
@@ -43,8 +43,6 @@
 using Cmac = alcp::mac::Cmac;
 #define SIZE_CMAC 128 / 8
 namespace alcp::cipher {
-// cpuid namespace
-using utils::CpuId;
 
 /**
  * @brief Unified SIV cipher class
@@ -61,8 +59,9 @@ using utils::CpuId;
  * - keyLenBits: Key length (128, 192, or 256 bits)
  * - arch: CPU architecture features
  */
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
-class SivT : public iCipherAead
+template<CipherKeyLen keyLenBits, utils::CpuArchLevel arch>
+class SivT
+    : public virtual iCipherAead
 {
   private:
     // Internal CTR cipher for encryption/decryption (inline, no heap allocation)
@@ -133,7 +132,7 @@ class SivT : public iCipherAead
     }
 };
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, utils::CpuArchLevel arch>
 using Siv = SivT<keyLenBits, arch>;
 
 } // namespace alcp::cipher

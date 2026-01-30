@@ -35,8 +35,8 @@
 
 #include "alcp/cipher.hh"
 #include "alcp/cipher/cipher_wrapper.hh"
+#include "alcp/utils/cpuid.hh"
 #include "debug_defs.hh"
-#include "dispatcher.hh"
 #include "randomize.hh"
 
 #undef DEBUG
@@ -142,13 +142,13 @@ using namespace alcp::cipher::unittest;
 using namespace alcp::cipher::unittest::cbc;
 TEST(CBC, creation)
 {
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
             << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+                   typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
@@ -379,15 +379,15 @@ TEST(CBC, MultiUpdateDecryption)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
             << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+                   typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
@@ -418,7 +418,7 @@ TEST(CBC, MultiUpdateDecryption)
         }
         EXPECT_EQ(plainText, output)
             << "FAIL CPU_FEATURE:"
-            << std::underlying_type<CpuCipherFeatures>::type(feature);
+            << std::underlying_type<CpuArchLevel>::type(feature);
 
         delete cbc;
     }
@@ -489,15 +489,15 @@ TEST(CBC, InplaceEncryption)
 #ifndef CBC_INPLACE_BUFFER
     GTEST_SKIP() << "In-place encryption functionality disabled!";
 #endif
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
             << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+                   typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
@@ -526,7 +526,7 @@ TEST(CBC, InplaceEncryption)
 
         EXPECT_EQ(cipherText, plainText_copy)
             << "FAIL CPU_FEATURE:"
-            << std::underlying_type<CpuCipherFeatures>::type(feature);
+            << std::underlying_type<CpuArchLevel>::type(feature);
 
         delete cbc;
     }
@@ -537,15 +537,15 @@ TEST(CBC, InplaceDecryption)
 #ifndef CBC_INPLACE_BUFFER
     GTEST_SKIP() << "In-place decryption functionality disabled!";
 #endif
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
             << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+                   typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
@@ -574,7 +574,7 @@ TEST(CBC, InplaceDecryption)
 
         EXPECT_EQ(plainText, cipherText_copy)
             << "FAIL CPU_FEATURE:"
-            << std::underlying_type<CpuCipherFeatures>::type(feature);
+            << std::underlying_type<CpuArchLevel>::type(feature);
 
         delete cbc;
     }
@@ -589,15 +589,15 @@ TEST(CBC, PaddingEncryption)
     std::vector<Uint8>             ct = { 0xe2, 0x27, 0x81, 0xbb, 0x3f, 0xf3,
                                           0x3c, 0x74, 0x11, 0x84, 0xe1, 0x1d,
                                           0x84, 0xd4, 0x49, 0xfc, 0xaf };
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
             << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+                   typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
@@ -624,7 +624,7 @@ TEST(CBC, PaddingEncryption)
 
         EXPECT_EQ(ct, output)
             << "FAIL CPU_FEATURE:"
-            << std::underlying_type<CpuCipherFeatures>::type(feature);
+            << std::underlying_type<CpuArchLevel>::type(feature);
 
         delete cbc;
     }
@@ -649,14 +649,14 @@ TEST(CBC, RandomEncryptDecryptTest)
     random->getRandomBytes(key_256, 32);
     random->getRandomBytes(iv, 16);
 
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
 
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
             << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+                   typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
@@ -742,11 +742,11 @@ TEST(CBC, MultiBufferRandomTest)
         cipher_text_vect[i] = new Uint8[cTextSize];
     }
 
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
 
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
         /* FIXME: run this test only for zen4 for now? */
-        if (feature != CpuCipherFeatures::eVaes512) {
+        if (feature != CpuArchLevel::eZen4) {
             std::cout << "Skipping test for feature avx512 " << std::endl;
             continue;
         }
@@ -812,8 +812,8 @@ TEST(CBC, MultiUpdateArbitrarySizesVariousUpdateCounts)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
         // Factory removed
         auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
 

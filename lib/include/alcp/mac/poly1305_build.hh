@@ -36,6 +36,7 @@
 
 namespace alcp::mac::poly1305 {
 using namespace alcp::base::status;
+using utils::CpuArchLevel;
 
 // FIXME: Below code looks way similar to CMAC builder, we can combine it
 class Poly1305Builder
@@ -44,39 +45,39 @@ class Poly1305Builder
     static alc_error_t build(Context* ctx);
 };
 
-template<CpuArchFeature feature>
+template<CpuArchLevel archLevel>
 static alc_error_t
 __poly1305_wrapperInit(Context*        ctx,
                        const Uint8*    key,
                        Uint64          size,
                        alc_mac_info_t* info)
 {
-    auto p_poly1305 = static_cast<Poly1305<feature>*>(ctx->m_mac);
+    auto p_poly1305 = static_cast<Poly1305<archLevel>*>(ctx->m_mac);
     return p_poly1305->init(key, size);
 }
 
-template<CpuArchFeature feature>
+template<CpuArchLevel archLevel>
 static alc_error_t
 __poly1305_wrapperUpdate(void* poly1305, const Uint8* buff, Uint64 size)
 {
 
-    auto p_poly1305 = static_cast<Poly1305<feature>*>(poly1305);
+    auto p_poly1305 = static_cast<Poly1305<archLevel>*>(poly1305);
     return p_poly1305->update(buff, size);
 }
 
-template<CpuArchFeature feature>
+template<CpuArchLevel archLevel>
 static alc_error_t
 __poly1305_wrapperFinalize(void* poly1305, Uint8* buff, Uint64 size)
 {
-    auto p_poly1305 = static_cast<Poly1305<feature>*>(poly1305);
+    auto p_poly1305 = static_cast<Poly1305<archLevel>*>(poly1305);
     return p_poly1305->finalize(buff, size);
 }
 
-template<CpuArchFeature feature>
+template<CpuArchLevel archLevel>
 static void
 __poly1305_wrapperFinish(void* poly1305, void* digest)
 {
-    auto p_poly1305 = static_cast<Poly1305<feature>*>(poly1305);
+    auto p_poly1305 = static_cast<Poly1305<archLevel>*>(poly1305);
 #if 0
     p_poly1305->~Poly1305();
 #else
@@ -86,20 +87,20 @@ __poly1305_wrapperFinish(void* poly1305, void* digest)
     // Not deleting the memory because it is allocated by application
 }
 
-template<CpuArchFeature feature>
+template<CpuArchLevel archLevel>
 static alc_error_t
 __poly1305_wrapperReset(void* poly1305)
 {
-    auto p_poly1305 = static_cast<Poly1305<feature>*>(poly1305);
+    auto p_poly1305 = static_cast<Poly1305<archLevel>*>(poly1305);
     return p_poly1305->reset();
 }
 
-template<CpuArchFeature feature>
+template<CpuArchLevel archLevel>
 static alc_error_t
 __poly1305_build_with_copy(Context* srcCtx, Context* destCtx)
 {
-    auto poly1305_algo = new Poly1305<feature>(
-        *reinterpret_cast<Poly1305<feature>*>(srcCtx->m_mac));
+    auto poly1305_algo = new Poly1305<archLevel>(
+        *reinterpret_cast<Poly1305<archLevel>*>(srcCtx->m_mac));
 
     destCtx->m_mac = static_cast<void*>(poly1305_algo);
 
@@ -113,13 +114,13 @@ __poly1305_build_with_copy(Context* srcCtx, Context* destCtx)
     return ALC_ERROR_NONE;
 }
 
-template<CpuArchFeature feature>
+template<CpuArchLevel archLevel>
 static alc_error_t
 __build_poly1305_arch(Context* ctx)
 {
     alc_error_t err{ ALC_ERROR_NONE };
 
-    auto p_algo = new Poly1305<feature>();
+    auto p_algo = new Poly1305<archLevel>();
 
     if (p_algo == nullptr) {
         // Unable to Allocate Memory for Poly1305 Object
@@ -127,12 +128,12 @@ __build_poly1305_arch(Context* ctx)
     }
     ctx->m_mac = static_cast<void*>(p_algo);
 
-    ctx->init      = __poly1305_wrapperInit<feature>;
-    ctx->update    = __poly1305_wrapperUpdate<feature>;
-    ctx->finalize  = __poly1305_wrapperFinalize<feature>;
-    ctx->finish    = __poly1305_wrapperFinish<feature>;
-    ctx->reset     = __poly1305_wrapperReset<feature>;
-    ctx->duplicate = __poly1305_build_with_copy<feature>;
+    ctx->init      = __poly1305_wrapperInit<archLevel>;
+    ctx->update    = __poly1305_wrapperUpdate<archLevel>;
+    ctx->finalize  = __poly1305_wrapperFinalize<archLevel>;
+    ctx->finish    = __poly1305_wrapperFinish<archLevel>;
+    ctx->reset     = __poly1305_wrapperReset<archLevel>;
+    ctx->duplicate = __poly1305_build_with_copy<archLevel>;
 
     return err;
 }
@@ -140,17 +141,19 @@ __build_poly1305_arch(Context* ctx)
 alc_error_t
 Poly1305Builder::build(Context* ctx)
 {
-    CpuArchFeature feature = getCpuArchFeature();
+    CpuArchLevel archLevel = getCpuArchLevel();
     /* In the interst of Preventing VTable overheads, Interface is not used. */
-    switch (feature) {
-        case CpuArchFeature::eAvx512:
-            return __build_poly1305_arch<CpuArchFeature::eAvx512>(ctx);
-        case CpuArchFeature::eAvx2:
-            return __build_poly1305_arch<CpuArchFeature::eAvx2>(ctx);
-        case CpuArchFeature::eReference:
-            return __build_poly1305_arch<CpuArchFeature::eReference>(ctx);
-        case CpuArchFeature::eDynamic:
-            return __build_poly1305_arch<CpuArchFeature::eDynamic>(ctx);
+    switch (archLevel) {
+        case CpuArchLevel::eZen4:
+            return __build_poly1305_arch<CpuArchLevel::eZen4>(ctx);
+        case CpuArchLevel::eZen3:
+            return __build_poly1305_arch<CpuArchLevel::eZen3>(ctx);
+        case CpuArchLevel::eZen:
+            return __build_poly1305_arch<CpuArchLevel::eZen>(ctx);
+        case CpuArchLevel::eReference:
+            return __build_poly1305_arch<CpuArchLevel::eReference>(ctx);
+        case CpuArchLevel::eDynamic:
+            return __build_poly1305_arch<CpuArchLevel::eDynamic>(ctx);
     }
     // Should be in theory unreachable code
     // Dispatch Failure

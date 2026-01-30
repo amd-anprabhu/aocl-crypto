@@ -1,0 +1,480 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1150">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="zenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2d3561"/>
+      <stop offset="100%" style="stop-color:#1e2749"/>
+    </linearGradient>
+    <linearGradient id="zen3Grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3d5a80"/>
+      <stop offset="100%" style="stop-color:#2c4057"/>
+    </linearGradient>
+    <linearGradient id="zen4Grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4a7c59"/>
+      <stop offset="100%" style="stop-color:#325a3d"/>
+    </linearGradient>
+    <linearGradient id="featureGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ee6c4d"/>
+      <stop offset="100%" style="stop-color:#e63946"/>
+    </linearGradient>
+    <linearGradient id="algoGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#457b9d"/>
+      <stop offset="100%" style="stop-color:#2c5f7c"/>
+    </linearGradient>
+    
+    <!-- Filters -->
+    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="3" dy="3" stdDeviation="4" flood-opacity="0.3"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1400" height="1150" fill="#0d1117"/>
+  
+  <!-- Grid pattern -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#21262d" stroke-width="0.5"/>
+  </pattern>
+  <rect width="1400" height="1150" fill="url(#grid)"/>
+  
+  <!-- Title -->
+  <text x="700" y="50" font-family="Segoe UI, Arial, sans-serif" font-size="32" font-weight="bold" fill="#58a6ff" text-anchor="middle">
+    ALCP CPU Feature Requirements &amp; Kernel Dispatch Map
+  </text>
+  <text x="700" y="80" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#8b949e" text-anchor="middle">
+    Runtime detection determines optimal kernel path for each algorithm
+  </text>
+  
+  <!-- Legend -->
+  <g transform="translate(50, 100)">
+    <rect x="0" y="0" width="200" height="130" rx="8" fill="#161b22" stroke="#30363d"/>
+    <text x="100" y="25" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="bold" fill="#c9d1d9" text-anchor="middle">Architecture Levels</text>
+    
+    <rect x="15" y="40" width="20" height="15" rx="3" fill="url(#zenGrad)"/>
+    <text x="45" y="52" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#c9d1d9">Zen/Zen2 (eZen)</text>
+    
+    <rect x="15" y="65" width="20" height="15" rx="3" fill="url(#zen3Grad)"/>
+    <text x="45" y="77" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#c9d1d9">Zen3 (eZen3)</text>
+    
+    <rect x="15" y="90" width="20" height="15" rx="3" fill="url(#zen4Grad)"/>
+    <text x="45" y="102" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#c9d1d9">Zen4/Zen5 (eZen4)</text>
+  </g>
+  
+  <!-- Feature Legend -->
+  <g transform="translate(270, 100)">
+    <rect x="0" y="0" width="250" height="130" rx="8" fill="#161b22" stroke="#30363d"/>
+    <text x="125" y="25" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="bold" fill="#c9d1d9" text-anchor="middle">CPU Features (CPUID)</text>
+    
+    <rect x="15" y="38" width="16" height="16" rx="4" fill="#ee6c4d"/>
+    <text x="40" y="51" font-family="Consolas, monospace" font-size="10" fill="#c9d1d9">AESNI</text>
+    <rect x="85" y="38" width="16" height="16" rx="4" fill="#f4a261"/>
+    <text x="110" y="51" font-family="Consolas, monospace" font-size="10" fill="#c9d1d9">VAES</text>
+    <rect x="145" y="38" width="16" height="16" rx="4" fill="#2a9d8f"/>
+    <text x="170" y="51" font-family="Consolas, monospace" font-size="10" fill="#c9d1d9">AVX512</text>
+    
+    <rect x="15" y="60" width="16" height="16" rx="4" fill="#e9c46a"/>
+    <text x="40" y="73" font-family="Consolas, monospace" font-size="10" fill="#c9d1d9">AVX2</text>
+    <rect x="85" y="60" width="16" height="16" rx="4" fill="#a855f7"/>
+    <text x="110" y="73" font-family="Consolas, monospace" font-size="10" fill="#c9d1d9">SHA-NI</text>
+    <rect x="145" y="60" width="16" height="16" rx="4" fill="#ec4899"/>
+    <text x="170" y="73" font-family="Consolas, monospace" font-size="10" fill="#c9d1d9">IFMA</text>
+    
+    <rect x="15" y="82" width="16" height="16" rx="4" fill="#06b6d4"/>
+    <text x="40" y="95" font-family="Consolas, monospace" font-size="10" fill="#c9d1d9">ADX</text>
+    <rect x="85" y="82" width="16" height="16" rx="4" fill="#84cc16"/>
+    <text x="110" y="95" font-family="Consolas, monospace" font-size="10" fill="#c9d1d9">BMI2</text>
+    <rect x="145" y="82" width="16" height="16" rx="4" fill="#64748b"/>
+    <text x="170" y="95" font-family="Consolas, monospace" font-size="10" fill="#c9d1d9">SSE3</text>
+  </g>
+  
+  <!-- Dispatch Flow Info -->
+  <g transform="translate(540, 100)">
+    <rect x="0" y="0" width="280" height="130" rx="8" fill="#161b22" stroke="#30363d"/>
+    <text x="140" y="25" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="bold" fill="#c9d1d9" text-anchor="middle">Dispatch Logic</text>
+    <text x="15" y="50" font-family="Consolas, monospace" font-size="11" fill="#7ee787">CpuId::getCachedArchLevel()</text>
+    <text x="15" y="70" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#8b949e">→ Detects highest supported arch</text>
+    <text x="15" y="90" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#8b949e">→ Selects optimal kernel at runtime</text>
+    <text x="15" y="110" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#8b949e">→ Falls back to lower arch if needed</text>
+  </g>
+  
+  <!-- =================================== -->
+  <!-- ALGORITHM CARDS -->
+  <!-- =================================== -->
+  
+  <!-- CIPHER CARD -->
+  <g transform="translate(50, 260)" filter="url(#dropShadow)">
+    <rect x="0" y="0" width="400" height="230" rx="12" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+    <rect x="0" y="0" width="400" height="45" rx="12" fill="url(#algoGrad)"/>
+    <rect x="0" y="33" width="400" height="12" fill="url(#algoGrad)"/>
+    <text x="200" y="30" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle">
+      🔐 AES CIPHER
+    </text>
+    <text x="200" y="65" font-family="Segoe UI, Arial, sans-serif" font-size="11" fill="#8b949e" text-anchor="middle">
+      CBC, CTR, GCM, XTS, CFB, OFB, CCM, SIV, ChaCha20
+    </text>
+    
+    <!-- Zen -->
+    <g transform="translate(20, 85)">
+      <rect x="0" y="0" width="360" height="35" rx="6" fill="url(#zenGrad)" stroke="#4b5563"/>
+      <text x="10" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen/Zen2</text>
+      <rect x="100" y="8" width="55" height="20" rx="4" fill="#ee6c4d"/>
+      <text x="127" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">AESNI</text>
+      <rect x="160" y="8" width="45" height="20" rx="4" fill="#e9c46a"/>
+      <text x="182" y="22" font-family="Consolas, monospace" font-size="10" fill="#1a1a2e" text-anchor="middle">AVX2</text>
+      <text x="220" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">→ 128-bit</text>
+    </g>
+    
+    <!-- Zen3 -->
+    <g transform="translate(20, 125)">
+      <rect x="0" y="0" width="360" height="35" rx="6" fill="url(#zen3Grad)" stroke="#4b5563"/>
+      <text x="10" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen3</text>
+      <rect x="100" y="8" width="60" height="20" rx="4" fill="#f4a261"/>
+      <text x="130" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">VAES</text>
+      <rect x="165" y="8" width="45" height="20" rx="4" fill="#e9c46a"/>
+      <text x="187" y="22" font-family="Consolas, monospace" font-size="10" fill="#1a1a2e" text-anchor="middle">AVX2</text>
+      <text x="225" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">→ 256-bit</text>
+    </g>
+    
+    <!-- Zen4 -->
+    <g transform="translate(20, 165)">
+      <rect x="0" y="0" width="360" height="35" rx="6" fill="url(#zen4Grad)" stroke="#4b5563"/>
+      <text x="10" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen4</text>
+      <rect x="100" y="8" width="60" height="20" rx="4" fill="#f4a261"/>
+      <text x="130" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">VAES</text>
+      <rect x="165" y="8" width="60" height="20" rx="4" fill="#2a9d8f"/>
+      <text x="195" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">AVX512</text>
+      <text x="240" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">→ 512-bit</text>
+    </g>
+  </g>
+  
+  <!-- SHA256 CARD -->
+  <g transform="translate(480, 260)" filter="url(#dropShadow)">
+    <rect x="0" y="0" width="400" height="230" rx="12" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+    <rect x="0" y="0" width="400" height="45" rx="12" fill="#7c3aed"/>
+    <rect x="0" y="33" width="400" height="12" fill="#7c3aed"/>
+    <text x="200" y="30" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle">
+      #️⃣ SHA256 / SHA224
+    </text>
+    <text x="200" y="65" font-family="Segoe UI, Arial, sans-serif" font-size="11" fill="#8b949e" text-anchor="middle">
+      Hardware SHA extension prioritized
+    </text>
+    
+    <!-- Primary Path -->
+    <g transform="translate(20, 85)">
+      <rect x="0" y="0" width="360" height="50" rx="6" fill="#22c55e" fill-opacity="0.15" stroke="#22c55e"/>
+      <text x="10" y="18" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="bold" fill="#22c55e">✓ PRIMARY PATH</text>
+      <rect x="130" y="7" width="70" height="20" rx="4" fill="#a855f7"/>
+      <text x="165" y="21" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">SHA-NI</text>
+      <text x="10" y="40" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">shani::ShaUpdate256() - Hardware accelerated</text>
+    </g>
+    
+    <!-- Fallback -->
+    <g transform="translate(20, 145)">
+      <rect x="0" y="0" width="360" height="50" rx="6" fill="#6b7280" fill-opacity="0.15" stroke="#6b7280"/>
+      <text x="10" y="18" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="bold" fill="#6b7280">FALLBACK (disabled)</text>
+      <rect x="160" y="7" width="50" height="20" rx="4" fill="#e9c46a" fill-opacity="0.5"/>
+      <text x="185" y="21" font-family="Consolas, monospace" font-size="10" fill="#9ca3af" text-anchor="middle">AVX2</text>
+      <text x="10" y="40" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6b7280">avx2::ShaUpdate256() - Poor performance</text>
+    </g>
+  </g>
+  
+  <!-- SHA512 CARD -->
+  <g transform="translate(910, 260)" filter="url(#dropShadow)">
+    <rect x="0" y="0" width="440" height="230" rx="12" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+    <rect x="0" y="0" width="440" height="45" rx="12" fill="#8b5cf6"/>
+    <rect x="0" y="33" width="440" height="12" fill="#8b5cf6"/>
+    <text x="220" y="30" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle">
+      #️⃣ SHA512 / SHA384
+    </text>
+    <text x="220" y="65" font-family="Segoe UI, Arial, sans-serif" font-size="11" fill="#8b949e" text-anchor="middle">
+      Architecture-based dispatch
+    </text>
+    
+    <!-- Zen -->
+    <g transform="translate(20, 85)">
+      <rect x="0" y="0" width="400" height="35" rx="6" fill="url(#zenGrad)" stroke="#4b5563"/>
+      <text x="10" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen/Zen2</text>
+      <rect x="110" y="8" width="50" height="20" rx="4" fill="#e9c46a"/>
+      <text x="135" y="22" font-family="Consolas, monospace" font-size="10" fill="#1a1a2e" text-anchor="middle">AVX2</text>
+      <rect x="170" y="8" width="50" height="20" rx="4" fill="#64748b"/>
+      <text x="195" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">SSE3</text>
+      <text x="235" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">→ avx2::ShaUpdate512</text>
+    </g>
+    
+    <!-- Zen3 -->
+    <g transform="translate(20, 125)">
+      <rect x="0" y="0" width="400" height="35" rx="6" fill="url(#zen3Grad)" stroke="#4b5563"/>
+      <text x="10" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen3</text>
+      <rect x="110" y="8" width="50" height="20" rx="4" fill="#e9c46a"/>
+      <text x="135" y="22" font-family="Consolas, monospace" font-size="10" fill="#1a1a2e" text-anchor="middle">AVX2</text>
+      <rect x="170" y="8" width="50" height="20" rx="4" fill="#f4a261"/>
+      <text x="195" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">VAES</text>
+      <text x="260" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">→ zen3::ShaUpdate512</text>
+    </g>
+    
+    <!-- Zen4 -->
+    <g transform="translate(20, 165)">
+      <rect x="0" y="0" width="400" height="35" rx="6" fill="url(#zen4Grad)" stroke="#4b5563"/>
+      <text x="10" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen4</text>
+      <rect x="110" y="8" width="70" height="20" rx="4" fill="#2a9d8f"/>
+      <text x="145" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">AVX512</text>
+      <text x="200" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">→ zen4::ShaUpdate512</text>
+    </g>
+  </g>
+  
+  <!-- RSA CARD -->
+  <g transform="translate(50, 520)" filter="url(#dropShadow)">
+    <rect x="0" y="0" width="400" height="230" rx="12" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+    <rect x="0" y="0" width="400" height="45" rx="12" fill="#ef4444"/>
+    <rect x="0" y="33" width="400" height="12" fill="#ef4444"/>
+    <text x="200" y="30" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle">
+      🔑 RSA
+    </text>
+    <text x="200" y="65" font-family="Segoe UI, Arial, sans-serif" font-size="11" fill="#8b949e" text-anchor="middle">
+      1024/2048-bit keys, OAEP, PSS, PKCS#1 v1.5
+    </text>
+    
+    <!-- Zen -->
+    <g transform="translate(20, 85)">
+      <rect x="0" y="0" width="360" height="35" rx="6" fill="url(#zenGrad)" stroke="#4b5563"/>
+      <text x="10" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen/Zen2</text>
+      <rect x="100" y="8" width="45" height="20" rx="4" fill="#06b6d4"/>
+      <text x="122" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">ADX</text>
+      <rect x="150" y="8" width="50" height="20" rx="4" fill="#84cc16"/>
+      <text x="175" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">BMI2</text>
+      <text x="215" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">→ zen::arch*</text>
+    </g>
+    
+    <!-- Zen3 -->
+    <g transform="translate(20, 125)">
+      <rect x="0" y="0" width="360" height="35" rx="6" fill="url(#zen3Grad)" stroke="#4b5563"/>
+      <text x="10" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen3</text>
+      <rect x="100" y="8" width="45" height="20" rx="4" fill="#06b6d4"/>
+      <text x="122" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">ADX</text>
+      <rect x="150" y="8" width="50" height="20" rx="4" fill="#84cc16"/>
+      <text x="175" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">BMI2</text>
+      <text x="215" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">→ zen3::arch*</text>
+    </g>
+    
+    <!-- Zen4 -->
+    <g transform="translate(20, 165)">
+      <rect x="0" y="0" width="360" height="35" rx="6" fill="url(#zen4Grad)" stroke="#4b5563"/>
+      <text x="10" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen4</text>
+      <rect x="100" y="8" width="45" height="20" rx="4" fill="#06b6d4"/>
+      <text x="122" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">ADX</text>
+      <rect x="150" y="8" width="50" height="20" rx="4" fill="#84cc16"/>
+      <text x="175" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">BMI2</text>
+      <rect x="205" y="8" width="50" height="20" rx="4" fill="#ec4899"/>
+      <text x="230" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">IFMA</text>
+      <text x="270" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">→ zen4::arch*</text>
+    </g>
+  </g>
+  
+  <!-- SHA3 CARD -->
+  <g transform="translate(480, 520)" filter="url(#dropShadow)">
+    <rect x="0" y="0" width="400" height="230" rx="12" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+    <rect x="0" y="0" width="400" height="45" rx="12" fill="#0ea5e9"/>
+    <rect x="0" y="33" width="400" height="12" fill="#0ea5e9"/>
+    <text x="200" y="30" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle">
+      🌀 SHA3 / SHAKE
+    </text>
+    <text x="200" y="65" font-family="Segoe UI, Arial, sans-serif" font-size="11" fill="#8b949e" text-anchor="middle">
+      SHA3-224/256/384/512, SHAKE128/256
+    </text>
+    
+    <!-- Zen -->
+    <g transform="translate(20, 85)">
+      <rect x="0" y="0" width="360" height="35" rx="6" fill="url(#zenGrad)" stroke="#4b5563"/>
+      <text x="10" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen/Zen2</text>
+      <rect x="110" y="8" width="50" height="20" rx="4" fill="#e9c46a"/>
+      <text x="135" y="22" font-family="Consolas, monospace" font-size="10" fill="#1a1a2e" text-anchor="middle">AVX2</text>
+      <text x="180" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">→ zen::Sha3Update</text>
+    </g>
+    
+    <!-- Zen3 -->
+    <g transform="translate(20, 125)">
+      <rect x="0" y="0" width="360" height="35" rx="6" fill="url(#zen3Grad)" stroke="#4b5563"/>
+      <text x="10" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen3</text>
+      <rect x="110" y="8" width="50" height="20" rx="4" fill="#e9c46a"/>
+      <text x="135" y="22" font-family="Consolas, monospace" font-size="10" fill="#1a1a2e" text-anchor="middle">AVX2</text>
+      <rect x="165" y="8" width="50" height="20" rx="4" fill="#f4a261"/>
+      <text x="190" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">VAES</text>
+      <text x="230" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">→ zen3::Sha3Update</text>
+    </g>
+    
+    <!-- Zen4 -->
+    <g transform="translate(20, 165)">
+      <rect x="0" y="0" width="360" height="35" rx="6" fill="url(#zen4Grad)" stroke="#4b5563"/>
+      <text x="10" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen4</text>
+      <rect x="110" y="8" width="70" height="20" rx="4" fill="#2a9d8f"/>
+      <text x="145" y="22" font-family="Consolas, monospace" font-size="10" fill="white" text-anchor="middle">AVX512</text>
+      <text x="195" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">→ zen4::Sha3Update</text>
+    </g>
+  </g>
+  
+  <!-- POLY1305 CARD -->
+  <g transform="translate(910, 520)" filter="url(#dropShadow)">
+    <rect x="0" y="0" width="440" height="230" rx="12" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+    <rect x="0" y="0" width="440" height="45" rx="12" fill="#f59e0b"/>
+    <rect x="0" y="33" width="440" height="12" fill="#f59e0b"/>
+    <text x="220" y="30" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle">
+      🔏 Poly1305
+    </text>
+    <text x="220" y="65" font-family="Segoe UI, Arial, sans-serif" font-size="11" fill="#8b949e" text-anchor="middle">
+      MAC for ChaCha20-Poly1305 AEAD
+    </text>
+    
+    <!-- Zen/Zen3 -->
+    <g transform="translate(20, 85)">
+      <rect x="0" y="0" width="400" height="50" rx="6" fill="url(#zenGrad)" stroke="#4b5563"/>
+      <text x="10" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen/Zen2/Zen3</text>
+      <rect x="140" y="7" width="50" height="20" rx="4" fill="#e9c46a"/>
+      <text x="165" y="21" font-family="Consolas, monospace" font-size="10" fill="#1a1a2e" text-anchor="middle">AVX2</text>
+      <text x="205" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">→ Reference impl</text>
+      <text x="10" y="40" font-family="Consolas, monospace" font-size="10" fill="#6b7280">reference::Poly1305Ref()</text>
+    </g>
+    
+    <!-- Zen4 -->
+    <g transform="translate(20, 145)">
+      <rect x="0" y="0" width="400" height="60" rx="6" fill="url(#zen4Grad)" stroke="#4b5563"/>
+      <text x="10" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen4</text>
+      <rect x="85" y="8" width="60" height="20" rx="4" fill="#2a9d8f"/>
+      <text x="115" y="22" font-family="Consolas, monospace" font-size="9" fill="white" text-anchor="middle">AVX512F</text>
+      <rect x="150" y="8" width="60" height="20" rx="4" fill="#2a9d8f"/>
+      <text x="180" y="22" font-family="Consolas, monospace" font-size="9" fill="white" text-anchor="middle">AVX512DQ</text>
+      <rect x="215" y="8" width="60" height="20" rx="4" fill="#2a9d8f"/>
+      <text x="245" y="22" font-family="Consolas, monospace" font-size="9" fill="white" text-anchor="middle">AVX512BW</text>
+      <rect x="280" y="8" width="50" height="20" rx="4" fill="#ec4899"/>
+      <text x="305" y="22" font-family="Consolas, monospace" font-size="9" fill="white" text-anchor="middle">IFMA</text>
+      <text x="10" y="40" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#9ca3af">→ Requires AVX512(F,DQ,BW,IFMA)</text>
+      <text x="10" y="52" font-family="Consolas, monospace" font-size="10" fill="#7ee787">zen4::poly1305_*_radix44()</text>
+    </g>
+  </g>
+  
+  <!-- X25519 CARD -->
+  <g transform="translate(50, 780)" filter="url(#dropShadow)">
+    <rect x="0" y="0" width="400" height="250" rx="12" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+    <rect x="0" y="0" width="400" height="45" rx="12" fill="#10b981"/>
+    <rect x="0" y="33" width="400" height="12" fill="#10b981"/>
+    <text x="200" y="30" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle">
+      🔐 X25519 (ECDH)
+    </text>
+    <text x="200" y="65" font-family="Segoe UI, Arial, sans-serif" font-size="11" fill="#8b949e" text-anchor="middle">
+      Elliptic Curve Diffie-Hellman
+    </text>
+    
+    <!-- Zen -->
+    <g transform="translate(20, 85)">
+      <rect x="0" y="0" width="360" height="45" rx="6" fill="url(#zenGrad)" stroke="#4b5563"/>
+      <text x="10" y="18" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen/Zen2</text>
+      <rect x="100" y="6" width="40" height="18" rx="4" fill="#06b6d4"/>
+      <text x="120" y="19" font-family="Consolas, monospace" font-size="9" fill="white" text-anchor="middle">ADX</text>
+      <rect x="145" y="6" width="45" height="18" rx="4" fill="#84cc16"/>
+      <text x="167" y="19" font-family="Consolas, monospace" font-size="9" fill="white" text-anchor="middle">BMI2</text>
+      <rect x="195" y="6" width="45" height="18" rx="4" fill="#e9c46a"/>
+      <text x="217" y="19" font-family="Consolas, monospace" font-size="9" fill="#1a1a2e" text-anchor="middle">AVX2</text>
+      <text x="10" y="38" font-family="Consolas, monospace" font-size="9" fill="#9ca3af">radix64bit → avx2::alcpScalarMul*</text>
+    </g>
+    
+    <!-- Zen3 -->
+    <g transform="translate(20, 135)">
+      <rect x="0" y="0" width="360" height="45" rx="6" fill="url(#zen3Grad)" stroke="#4b5563"/>
+      <text x="10" y="18" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen3</text>
+      <rect x="100" y="6" width="40" height="18" rx="4" fill="#06b6d4"/>
+      <text x="120" y="19" font-family="Consolas, monospace" font-size="9" fill="white" text-anchor="middle">ADX</text>
+      <rect x="145" y="6" width="45" height="18" rx="4" fill="#84cc16"/>
+      <text x="167" y="19" font-family="Consolas, monospace" font-size="9" fill="white" text-anchor="middle">BMI2</text>
+      <rect x="195" y="6" width="45" height="18" rx="4" fill="#f4a261"/>
+      <text x="217" y="19" font-family="Consolas, monospace" font-size="9" fill="white" text-anchor="middle">VAES</text>
+      <text x="10" y="38" font-family="Consolas, monospace" font-size="9" fill="#9ca3af">radix64bit → zen3::alcpScalarMul*</text>
+    </g>
+    
+    <!-- Zen4 -->
+    <g transform="translate(20, 185)">
+      <rect x="0" y="0" width="360" height="45" rx="6" fill="url(#zen4Grad)" stroke="#4b5563"/>
+      <text x="10" y="18" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="white">Zen4</text>
+      <rect x="100" y="6" width="60" height="18" rx="4" fill="#2a9d8f"/>
+      <text x="130" y="19" font-family="Consolas, monospace" font-size="9" fill="white" text-anchor="middle">AVX512</text>
+      <text x="10" y="38" font-family="Consolas, monospace" font-size="9" fill="#7ee787">radix51bit → zen4::alcpScalarMul*</text>
+    </g>
+  </g>
+  
+  <!-- ARCHITECTURE DETECTION FLOW -->
+  <g transform="translate(480, 780)" filter="url(#dropShadow)">
+    <rect x="0" y="0" width="870" height="250" rx="12" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+    <rect x="0" y="0" width="870" height="45" rx="12" fill="#6366f1"/>
+    <rect x="0" y="33" width="870" height="12" fill="#6366f1"/>
+    <text x="435" y="30" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle">
+      ⚙️ Default Architecture Detection (eDefault - backward compat)
+    </text>
+    
+    <!-- Flow diagram -->
+    <g transform="translate(20, 60)">
+      <!-- Detection box -->
+      <rect x="0" y="0" width="180" height="80" rx="8" fill="#1f2937" stroke="#4b5563"/>
+      <text x="90" y="25" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="bold" fill="#c9d1d9" text-anchor="middle">cpuHasAvx512(F,DQ,BW,</text>
+      <text x="90" y="40" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="bold" fill="#c9d1d9" text-anchor="middle">IFMA,VL) &amp;&amp; cpuHasVaes()</text>
+      <text x="90" y="55" font-family="Consolas, monospace" font-size="9" fill="#8b949e" text-anchor="middle">AVX512 Full + VAES</text>
+      <text x="90" y="72" font-family="Segoe UI, Arial, sans-serif" font-size="10" font-weight="bold" fill="#22c55e" text-anchor="middle">→ eZen4</text>
+      
+      <!-- Arrow -->
+      <line x1="190" y1="40" x2="220" y2="40" stroke="#4b5563" stroke-width="2" marker-end="url(#arrow)"/>
+      <text x="205" y="55" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#ef4444">✗</text>
+      
+      <!-- Zen3 box -->
+      <rect x="230" y="0" width="180" height="80" rx="8" fill="#1f2937" stroke="#4b5563"/>
+      <text x="320" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="bold" fill="#c9d1d9" text-anchor="middle">cpuHasVaes() &amp;&amp;</text>
+      <text x="320" y="37" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="bold" fill="#c9d1d9" text-anchor="middle">cpuHasAdx() &amp;&amp; cpuHasAvx2()</text>
+      <text x="320" y="52" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="bold" fill="#c9d1d9" text-anchor="middle">&amp;&amp; cpuHasBmi2()</text>
+      <text x="320" y="72" font-family="Segoe UI, Arial, sans-serif" font-size="10" font-weight="bold" fill="#22c55e" text-anchor="middle">→ eZen3</text>
+      
+      <!-- Arrow -->
+      <line x1="420" y1="40" x2="450" y2="40" stroke="#4b5563" stroke-width="2"/>
+      <text x="435" y="55" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#ef4444">✗</text>
+      
+      <!-- Zen box -->
+      <rect x="460" y="0" width="180" height="80" rx="8" fill="#1f2937" stroke="#4b5563"/>
+      <text x="550" y="22" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="bold" fill="#c9d1d9" text-anchor="middle">cpuHasAdx() &amp;&amp; cpuHasAvx2()</text>
+      <text x="550" y="37" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="bold" fill="#c9d1d9" text-anchor="middle">&amp;&amp; cpuHasBmi2()</text>
+      <text x="550" y="52" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="bold" fill="#c9d1d9" text-anchor="middle">&amp;&amp; cpuHasAesni()</text>
+      <text x="550" y="72" font-family="Segoe UI, Arial, sans-serif" font-size="10" font-weight="bold" fill="#22c55e" text-anchor="middle">→ eZen</text>
+      
+      <!-- Arrow to fallback -->
+      <line x1="650" y1="40" x2="680" y2="40" stroke="#4b5563" stroke-width="2"/>
+      <text x="665" y="55" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#ef4444">✗</text>
+      
+      <!-- Reference box -->
+      <rect x="690" y="0" width="150" height="80" rx="8" fill="#7f1d1d" stroke="#dc2626"/>
+      <text x="765" y="35" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="bold" fill="#fca5a5" text-anchor="middle">FALLBACK</text>
+      <text x="765" y="55" font-family="Segoe UI, Arial, sans-serif" font-size="11" fill="#f87171" text-anchor="middle">eReference</text>
+      <text x="765" y="70" font-family="Segoe UI, Arial, sans-serif" font-size="9" fill="#fca5a5" text-anchor="middle">(Not recommended)</text>
+    </g>
+    
+    <!-- Environment override -->
+    <g transform="translate(20, 155)">
+      <rect x="0" y="0" width="820" height="50" rx="6" fill="#1c1917" stroke="#78716c"/>
+      <text x="15" y="20" font-family="Segoe UI, Arial, sans-serif" font-size="11" font-weight="bold" fill="#fbbf24">💡 Environment Override</text>
+      <text x="15" y="38" font-family="Consolas, monospace" font-size="11" fill="#a3e635">export AOCL_ENABLE_INSTRUCTION=ZEN4</text>
+      <text x="400" y="38" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#8b949e"># Force specific arch: ZEN, ZEN2, ZEN3, ZEN4, ZEN5</text>
+    </g>
+  </g>
+  
+  <!-- Footer -->
+  <text x="700" y="1100" font-family="Segoe UI, Arial, sans-serif" font-size="11" fill="#6b7280" text-anchor="middle">
+    ALCP - AMD Cryptographic Library | Runtime CPU dispatch ensures optimal performance across AMD Zen architectures
+  </text>
+</svg>
+
+

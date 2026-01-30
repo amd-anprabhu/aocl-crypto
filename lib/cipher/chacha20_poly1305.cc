@@ -33,7 +33,7 @@ namespace alcp::cipher {
 
 using mac::poly1305::Poly1305;
 
-template<CpuCipherFeatures arch>
+template<CpuArchLevel arch>
 alc_error_t
 ChaChPolyT<arch>::setIvInternal(const Uint8* iv, Uint64 ivLen)
 {
@@ -54,7 +54,7 @@ ChaChPolyT<arch>::setIvInternal(const Uint8* iv, Uint64 ivLen)
     return err;
 }
 
-template<CpuCipherFeatures arch>
+template<CpuArchLevel arch>
 alc_error_t
 ChaChPolyT<arch>::setKeyInternal(const Uint8* key, Uint64 keylen)
 {
@@ -71,7 +71,7 @@ ChaChPolyT<arch>::setKeyInternal(const Uint8* key, Uint64 keylen)
 
     m_len_input_processed.u64 = 0;
     m_len_aad_processed.u64   = 0;
-    err = Poly1305<utils::CpuArchFeature::eDynamic>::init(m_poly1305_key, 32);
+    err = Poly1305<utils::CpuArchLevel::eDynamic>::init(m_poly1305_key, 32);
     if (err != ALC_ERROR_NONE) {
         return err;
     }
@@ -79,7 +79,7 @@ ChaChPolyT<arch>::setKeyInternal(const Uint8* key, Uint64 keylen)
     return ALC_ERROR_NONE;
 }
 
-template<CpuCipherFeatures arch>
+template<CpuArchLevel arch>
 alc_error_t
 ChaChPolyT<arch>::init(const Uint8* pKey,
                        Uint64       keyLen,
@@ -95,7 +95,7 @@ ChaChPolyT<arch>::init(const Uint8* pKey,
     return err;
 }
 
-template<CpuCipherFeatures arch>
+template<CpuArchLevel arch>
 alc_error_t
 ChaChPolyT<arch>::encrypt(const Uint8* inputBuffer,
                           Uint8*       outputBuffer,
@@ -128,13 +128,13 @@ ChaChPolyT<arch>::encrypt(const Uint8* inputBuffer,
                                 ? 0
                                 : (16 - (m_len_aad_processed.u64 % 16));
     if (padding_length != 0) {
-        err = Poly1305<utils::CpuArchFeature::eDynamic>::update(m_zero_padding, padding_length);
+        err = Poly1305<utils::CpuArchLevel::eDynamic>::update(m_zero_padding, padding_length);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
     }
 
-    err = Poly1305<utils::CpuArchFeature::eDynamic>::update(outputBuffer, bufferLength);
+    err = Poly1305<utils::CpuArchLevel::eDynamic>::update(outputBuffer, bufferLength);
     if (err != ALC_ERROR_NONE) {
         return err;
     }
@@ -143,25 +143,25 @@ ChaChPolyT<arch>::encrypt(const Uint8* inputBuffer,
                          ? 0
                          : (16 - (m_len_input_processed.u64 % 16));
     if (padding_length != 0) {
-        err = Poly1305<utils::CpuArchFeature::eDynamic>::update(m_zero_padding, padding_length);
+        err = Poly1305<utils::CpuArchLevel::eDynamic>::update(m_zero_padding, padding_length);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
     }
 
     constexpr Uint64 cSizeLength = sizeof(Uint64);
-    err = Poly1305<utils::CpuArchFeature::eDynamic>::update(m_len_aad_processed.u8, cSizeLength);
+    err = Poly1305<utils::CpuArchLevel::eDynamic>::update(m_len_aad_processed.u8, cSizeLength);
     if (err != ALC_ERROR_NONE) {
         return err;
     }
-    err = Poly1305<utils::CpuArchFeature::eDynamic>::update(m_len_input_processed.u8, cSizeLength);
+    err = Poly1305<utils::CpuArchLevel::eDynamic>::update(m_len_input_processed.u8, cSizeLength);
     if (err != ALC_ERROR_NONE) {
         return err;
     }
     return ALC_ERROR_NONE;
 }
 
-template<CpuCipherFeatures arch>
+template<CpuArchLevel arch>
 alc_error_t
 ChaChPolyT<arch>::decrypt(const Uint8* inputBuffer,
                           Uint8*       outputBuffer,
@@ -194,7 +194,7 @@ ChaChPolyT<arch>::decrypt(const Uint8* inputBuffer,
                                 ? 0
                                 : (16 - (m_len_aad_processed.u64 % 16));
     if (padding_length != 0) {
-        err = Poly1305<utils::CpuArchFeature::eDynamic>::update(m_zero_padding, padding_length);
+        err = Poly1305<utils::CpuArchLevel::eDynamic>::update(m_zero_padding, padding_length);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
@@ -202,7 +202,7 @@ ChaChPolyT<arch>::decrypt(const Uint8* inputBuffer,
 
     // In case of decryption one should change the order of updation i.e
     // input (which is the ciphertext) should be updated
-    err = Poly1305<utils::CpuArchFeature::eDynamic>::update(inputBuffer, bufferLength);
+    err = Poly1305<utils::CpuArchLevel::eDynamic>::update(inputBuffer, bufferLength);
     if (err != ALC_ERROR_NONE) {
         return err;
     }
@@ -211,29 +211,29 @@ ChaChPolyT<arch>::decrypt(const Uint8* inputBuffer,
                          ? 0
                          : (16 - (m_len_input_processed.u64 % 16));
     if (padding_length != 0) {
-        err = Poly1305<utils::CpuArchFeature::eDynamic>::update(m_zero_padding, padding_length);
+        err = Poly1305<utils::CpuArchLevel::eDynamic>::update(m_zero_padding, padding_length);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
     }
 
     constexpr Uint64 cSizeLength = sizeof(Uint64);
-    err = Poly1305<utils::CpuArchFeature::eDynamic>::update(m_len_aad_processed.u8, cSizeLength);
+    err = Poly1305<utils::CpuArchLevel::eDynamic>::update(m_len_aad_processed.u8, cSizeLength);
     if (err != ALC_ERROR_NONE) {
         return err;
     }
-    err = Poly1305<utils::CpuArchFeature::eDynamic>::update(m_len_input_processed.u8, cSizeLength);
+    err = Poly1305<utils::CpuArchLevel::eDynamic>::update(m_len_input_processed.u8, cSizeLength);
     if (err != ALC_ERROR_NONE) {
         return err;
     }
     return ALC_ERROR_NONE;
 }
 
-template<CpuCipherFeatures arch>
+template<CpuArchLevel arch>
 alc_error_t
 ChaChPolyT<arch>::setAad(const Uint8* pInput, Uint64 len)
 {
-    alc_error_t err = Poly1305<utils::CpuArchFeature::eDynamic>::update(pInput, len);
+    alc_error_t err = Poly1305<utils::CpuArchLevel::eDynamic>::update(pInput, len);
     if (err != ALC_ERROR_NONE) {
         return err;
     }
@@ -241,15 +241,15 @@ ChaChPolyT<arch>::setAad(const Uint8* pInput, Uint64 len)
     return err;
 }
 
-template<CpuCipherFeatures arch>
+template<CpuArchLevel arch>
 alc_error_t
 ChaChPolyT<arch>::getTag(Uint8* pOutput, Uint64 len)
 {
-    alc_error_t err = Poly1305<utils::CpuArchFeature::eDynamic>::finalize(pOutput, len);
+    alc_error_t err = Poly1305<utils::CpuArchLevel::eDynamic>::finalize(pOutput, len);
     return err;
 }
 
-template<CpuCipherFeatures arch>
+template<CpuArchLevel arch>
 alc_error_t
 ChaChPolyT<arch>::setTagLength(Uint64 tagLength)
 {
@@ -260,7 +260,7 @@ ChaChPolyT<arch>::setTagLength(Uint64 tagLength)
 }
 
 // Explicit template instantiations
-template class ChaChPolyT<CpuCipherFeatures::eVaes512>;
-template class ChaChPolyT<CpuCipherFeatures::eReference>;
+template class ChaChPolyT<CpuArchLevel::eZen4>;
+template class ChaChPolyT<CpuArchLevel::eReference>;
 
 } // namespace alcp::cipher

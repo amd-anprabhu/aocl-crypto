@@ -32,10 +32,8 @@
 
 #include <gtest/gtest.h>
 
-
 #include "alcp/cipher/cipher_wrapper.hh"
 #include "debug_defs.hh"
-#include "dispatcher.hh"
 #include "randomize.hh"
 
 #undef DEBUG

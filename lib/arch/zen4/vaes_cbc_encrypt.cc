@@ -39,6 +39,13 @@
 #include "alcp/types.hh"
 #include "avx512.hh"
 
+// Branch prediction hints (no-op on MSVC)
+#if defined(__GNUC__) || defined(__clang__)
+#define ALCP_EXPECT_UNLIKELY(x) __builtin_expect(!!(x), 0)
+#else
+#define ALCP_EXPECT_UNLIKELY(x) (x)
+#endif
+
 #include "vaes_avx512.hh"
 #include "vaes_avx512_core.hh"
 
@@ -146,11 +153,11 @@ EncryptCbc(const Uint8** pPlainText,
     Uint64      blocks = len / Rijndael::cBlockSize;
     alc_error_t err    = ALC_ERROR_NONE;
 
-    if (__builtin_expect(num_buffers == 0 || blocks == 0, 0)) {
+    if (ALCP_EXPECT_UNLIKELY(num_buffers == 0 || blocks == 0)) {
         return ALC_ERROR_NONE;
     }
 
-    if (__builtin_expect(nRounds != 10 && nRounds != 12 && nRounds != 14, 0)) {
+    if (ALCP_EXPECT_UNLIKELY(nRounds != 10 && nRounds != 12 && nRounds != 14)) {
         return ALC_ERROR_INVALID_ARG; // Invalid number of rounds
     }
 

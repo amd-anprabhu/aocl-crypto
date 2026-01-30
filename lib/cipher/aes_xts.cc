@@ -29,9 +29,9 @@
 #include "alcp/cipher/aes_xts.hh"
 #include "alcp/cipher/cipher_wrapper.hh"
 
-#include "alcp/utils/cpuid.hh"
-
 using alcp::utils::CpuId;
+using alcp::utils::CpuArchLevel;
+using alcp::utils::AlgorithmType;
 
 namespace alcp::cipher {
 
@@ -115,7 +115,10 @@ Xts::expandTweakKeys(const Uint8* pKey, int len)
     Uint8 dummy_key[32] = { 0 };
 
     const Uint8* key = pKey ? pKey : &dummy_key[0];
-    if (CpuId::cpuHasAesni()) {
+    // Use cached cipher feature for AESNI check
+    static CpuArchLevel cipherFeature =
+        CpuId::getCachedArchLevel(AlgorithmType::eCipher);
+    if (cipherFeature >= CpuArchLevel::eZen) {
         aesni::ExpandTweakKeys(key, m_xts.m_tweak_round_key, m_keyManager.getRounds());
         return;
     }
@@ -160,7 +163,7 @@ Xts::expandTweakKeys(const Uint8* pKey, int len)
 /*******************************************/
 
 template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
 XtsT<keyLenBits, arch>::encrypt(const Uint8* pInput,
                                 Uint8*       pOutput,
@@ -196,7 +199,7 @@ XtsT<keyLenBits, arch>::encrypt(const Uint8* pInput,
 
     Uint64 blocks_in = len / 16;
 
-    if constexpr (arch == CpuCipherFeatures::eVaes512) {
+    if constexpr (arch == CpuArchLevel::eZen4) {
         err = vaes512::EncryptXts(pInput,
                                   pOutput,
                                   len,
@@ -204,14 +207,14 @@ XtsT<keyLenBits, arch>::encrypt(const Uint8* pInput,
                                   m_keyManager.getRounds(),
                                   m_xts.m_tweak_block);
 
-    } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
+    } else if constexpr (arch == CpuArchLevel::eZen3) {
         err = vaes::EncryptXts(pInput,
                                pOutput,
                                len,
                                m_keyManager.getCipherKeyData().m_enc_key,
                                m_keyManager.getRounds(),
                                m_xts.m_tweak_block);
-    } else if constexpr (arch == CpuCipherFeatures::eAesni) {
+    } else if constexpr (arch == CpuArchLevel::eZen) {
         err = aesni::EncryptXts(pInput,
                                 pOutput,
                                 len,
@@ -230,7 +233,7 @@ XtsT<keyLenBits, arch>::encrypt(const Uint8* pInput,
 };
 
 template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
 XtsT<keyLenBits, arch>::decrypt(const Uint8* pInput,
                                 Uint8*       pOutput,
@@ -265,7 +268,7 @@ XtsT<keyLenBits, arch>::decrypt(const Uint8* pInput,
     }
 
     Uint64 blocks_in = len / 16;
-    if constexpr (arch == CpuCipherFeatures::eVaes512) {
+    if constexpr (arch == CpuArchLevel::eZen4) {
         err = vaes512::DecryptXts(pInput,
                                   pOutput,
                                   len,
@@ -273,14 +276,14 @@ XtsT<keyLenBits, arch>::decrypt(const Uint8* pInput,
                                   m_keyManager.getRounds(),
                                   m_xts.m_tweak_block);
 
-    } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
+    } else if constexpr (arch == CpuArchLevel::eZen3) {
         err = vaes::DecryptXts(pInput,
                                pOutput,
                                len,
                                m_keyManager.getCipherKeyData().m_dec_key,
                                m_keyManager.getRounds(),
                                m_xts.m_tweak_block);
-    } else if constexpr (arch == CpuCipherFeatures::eAesni) {
+    } else if constexpr (arch == CpuArchLevel::eZen) {
         err = aesni::DecryptXts(pInput,
                                 pOutput,
                                 len,
@@ -298,7 +301,7 @@ XtsT<keyLenBits, arch>::decrypt(const Uint8* pInput,
 /*******************************************/
 
 template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
 XtsBlockT<keyLenBits, arch>::decrypt(const Uint8* pInput,
                                      Uint8*       pOutput,
@@ -332,21 +335,21 @@ XtsBlockT<keyLenBits, arch>::decrypt(const Uint8* pInput,
         return ALC_ERROR_NOT_SUPPORTED;
     }
 
-    if constexpr (arch == CpuCipherFeatures::eVaes512) {
+    if constexpr (arch == CpuArchLevel::eZen4) {
         err = vaes512::DecryptXts(pInput,
                                   pOutput,
                                   len,
                                   m_keyManager.getCipherKeyData().m_dec_key,
                                   m_keyManager.getRounds(),
                                   m_xts.m_tweak_block);
-    } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
+    } else if constexpr (arch == CpuArchLevel::eZen3) {
         err = vaes::DecryptXts(pInput,
                                pOutput,
                                len,
                                m_keyManager.getCipherKeyData().m_dec_key,
                                m_keyManager.getRounds(),
                                m_xts.m_tweak_block);
-    } else if constexpr (arch == CpuCipherFeatures::eAesni) {
+    } else if constexpr (arch == CpuArchLevel::eZen) {
         err = aesni::DecryptXts(pInput,
                                 pOutput,
                                 len,
@@ -363,7 +366,7 @@ XtsBlockT<keyLenBits, arch>::decrypt(const Uint8* pInput,
 };
 
 template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
 XtsBlockT<keyLenBits, arch>::encrypt(const Uint8* pInput,
                                      Uint8*       pOutput,
@@ -397,7 +400,7 @@ XtsBlockT<keyLenBits, arch>::encrypt(const Uint8* pInput,
         return ALC_ERROR_NOT_SUPPORTED;
     }
 
-    if constexpr (arch == CpuCipherFeatures::eVaes512) {
+    if constexpr (arch == CpuArchLevel::eZen4) {
         err = vaes512::EncryptXts(pInput,
                                   pOutput,
                                   len,
@@ -405,14 +408,14 @@ XtsBlockT<keyLenBits, arch>::encrypt(const Uint8* pInput,
                                   m_keyManager.getRounds(),
                                   m_xts.m_tweak_block);
 
-    } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
+    } else if constexpr (arch == CpuArchLevel::eZen3) {
         err = vaes::EncryptXts(pInput,
                                pOutput,
                                len,
                                m_keyManager.getCipherKeyData().m_enc_key,
                                m_keyManager.getRounds(),
                                m_xts.m_tweak_block);
-    } else if constexpr (arch == CpuCipherFeatures::eAesni) {
+    } else if constexpr (arch == CpuArchLevel::eZen) {
         err = aesni::EncryptXts(pInput,
                                 pOutput,
                                 len,
@@ -428,7 +431,7 @@ XtsBlockT<keyLenBits, arch>::encrypt(const Uint8* pInput,
 }
 
 template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
 XtsBlockT<keyLenBits, arch>::encryptSegment(const Uint8* pInput,
                                             Uint8*       pOutput,
@@ -443,7 +446,7 @@ XtsBlockT<keyLenBits, arch>::encryptSegment(const Uint8* pInput,
 }
 
 template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
 XtsBlockT<keyLenBits, arch>::decryptSegment(const Uint8* pInput,
                                             Uint8*       pOutput,
@@ -458,33 +461,33 @@ XtsBlockT<keyLenBits, arch>::decryptSegment(const Uint8* pInput,
 }
 
 template class XtsT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                    CpuCipherFeatures::eVaes512>;
+                    CpuArchLevel::eZen4>;
 template class XtsT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                    CpuCipherFeatures::eVaes512>;
+                    CpuArchLevel::eZen4>;
 
 template class XtsT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                    CpuCipherFeatures::eVaes256>;
+                    CpuArchLevel::eZen3>;
 template class XtsT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                    CpuCipherFeatures::eVaes256>;
+                    CpuArchLevel::eZen3>;
 
 template class XtsT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                    CpuCipherFeatures::eAesni>;
+                    CpuArchLevel::eZen>;
 template class XtsT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                    CpuCipherFeatures::eAesni>;
+                    CpuArchLevel::eZen>;
 
 template class XtsBlockT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                         CpuCipherFeatures::eVaes512>;
+                         CpuArchLevel::eZen4>;
 template class XtsBlockT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                         CpuCipherFeatures::eVaes512>;
+                         CpuArchLevel::eZen4>;
 
 template class XtsBlockT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                         CpuCipherFeatures::eVaes256>;
+                         CpuArchLevel::eZen3>;
 template class XtsBlockT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                         CpuCipherFeatures::eVaes256>;
+                         CpuArchLevel::eZen3>;
 
 template class XtsBlockT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                         CpuCipherFeatures::eAesni>;
+                         CpuArchLevel::eZen>;
 template class XtsBlockT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                         CpuCipherFeatures::eAesni>;
+                         CpuArchLevel::eZen>;
 
 } // namespace alcp::cipher

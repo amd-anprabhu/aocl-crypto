@@ -33,7 +33,7 @@
 #include "alcp/utils/cpuid.hh"
 
 namespace alcp::mac {
-using utils::CpuArchFeature;
+using utils::CpuArchLevel;
 
 class MacBuilder
 {
@@ -43,7 +43,7 @@ class MacBuilder
                                      mac::Context* destCtx);
 };
 
-CpuArchFeature
-getCpuArchFeature();
+CpuArchLevel
+getCpuArchLevel();
 
 } // namespace alcp::mac

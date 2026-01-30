@@ -28,6 +28,7 @@ INCLUDE(${CMAKE_SOURCE_DIR}/cmake/AlcpTests.cmake)
 # Enforcing File Name
 SET(TEST_FILES 
   status_test.cc
+  dispatch_test.cc
   )
 
 ALCP_MODULE("base")

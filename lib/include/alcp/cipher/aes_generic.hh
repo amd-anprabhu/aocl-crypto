@@ -31,11 +31,7 @@
 #include "alcp/cipher/cipher_common.hh"
 #include "alcp/cipher/cipher_wrapper.hh"
 
-#include "alcp/utils/cpuid.hh"
-
 #include <type_traits>
-
-using alcp::utils::CpuId;
 
 namespace alcp::cipher {
 
@@ -84,7 +80,7 @@ struct MultibufferStorage
  * - keyLenBits: Key length in bits (128, 192, or 256)
  * - arch: CPU architecture features for optimized implementations
  */
-template<CipherMode mode, CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherMode mode, CipherKeyLen keyLenBits, utils::CpuArchLevel arch>
 class AesGenericCiphersT
     : public iCipher
     , public std::conditional_t<SupportsMultibuffer<mode>, iMultibuffer, EmptyComponent>

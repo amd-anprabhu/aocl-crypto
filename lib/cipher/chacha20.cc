@@ -102,7 +102,7 @@ ChaCha20::setIv(const Uint8 iv[], Uint64 ivlen)
 
 template<>
 alc_error_t
-ChaCha256T<CpuCipherFeatures::eVaes512>::encrypt(const Uint8* pInput,
+ChaCha256T<CpuArchLevel::eZen4>::encrypt(const Uint8* pInput,
                                                   Uint8*       pOutput,
                                                   Uint64       len,
                                                   Uint64*      outlen)
@@ -139,7 +139,7 @@ ChaCha256T<CpuCipherFeatures::eVaes512>::encrypt(const Uint8* pInput,
 
 template<>
 alc_error_t
-ChaCha256T<CpuCipherFeatures::eVaes512>::decrypt(const Uint8* pInput,
+ChaCha256T<CpuArchLevel::eZen4>::decrypt(const Uint8* pInput,
                                                   Uint8*       pOutput,
                                                   Uint64       len,
                                                   Uint64*      outlen)
@@ -150,7 +150,7 @@ ChaCha256T<CpuCipherFeatures::eVaes512>::decrypt(const Uint8* pInput,
 
 template<>
 alc_error_t
-ChaCha256T<CpuCipherFeatures::eReference>::encrypt(const Uint8* pInput,
+ChaCha256T<CpuArchLevel::eReference>::encrypt(const Uint8* pInput,
                                                     Uint8*       pOutput,
                                                     Uint64       len,
                                                     Uint64*      outlen)
@@ -187,7 +187,7 @@ ChaCha256T<CpuCipherFeatures::eReference>::encrypt(const Uint8* pInput,
 
 template<>
 alc_error_t
-ChaCha256T<CpuCipherFeatures::eReference>::decrypt(const Uint8* pInput,
+ChaCha256T<CpuArchLevel::eReference>::decrypt(const Uint8* pInput,
                                                     Uint8*       pOutput,
                                                     Uint64       len,
                                                     Uint64*      outlen)

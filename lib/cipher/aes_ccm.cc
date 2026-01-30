@@ -50,7 +50,7 @@ ctrInc(Uint8 ctr[])
     }
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 CcmT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv, Uint64 ivLen)
 {
@@ -132,7 +132,7 @@ copyTag(ccm_data_t* ctx, Uint8 ptag[], Uint64 tagLen)
     return ALC_ERROR_NONE;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 CcmT<keyLenBits, arch>::cryptUpdate(const Uint8 pInput[],
                                    Uint8       pOutput[],
@@ -203,7 +203,7 @@ CcmT<keyLenBits, arch>::cryptUpdate(const Uint8 pInput[],
     return err;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 CcmT<keyLenBits, arch>::setIvInternal(ccm_data_t* ccm_data,
                                      const Uint8 pIv[],
@@ -247,7 +247,7 @@ CcmT<keyLenBits, arch>::setIvInternal(ccm_data_t* ccm_data,
 }
 
 // Auth methods
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 CcmT<keyLenBits, arch>::setTagLength(Uint64 tagLen)
 {
@@ -259,7 +259,7 @@ CcmT<keyLenBits, arch>::setTagLength(Uint64 tagLen)
     return ALC_ERROR_NONE;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 CcmT<keyLenBits, arch>::setPlainTextLength(Uint64 len)
 {
@@ -269,7 +269,7 @@ CcmT<keyLenBits, arch>::setPlainTextLength(Uint64 len)
     return ALC_ERROR_NONE;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 CcmT<keyLenBits, arch>::setAad(const Uint8* pInput, Uint64 aadLen)
 {
@@ -280,7 +280,7 @@ CcmT<keyLenBits, arch>::setAad(const Uint8* pInput, Uint64 aadLen)
     return ALC_ERROR_NONE;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 CcmT<keyLenBits, arch>::getTag(Uint8* pOutput, Uint64 tagLen)
 {
@@ -318,7 +318,7 @@ CcmT<keyLenBits, arch>::getTag(Uint8* pOutput, Uint64 tagLen)
 }
 
 // Encrypt/Decrypt methods
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 CcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
                                Uint8*       pOutput,
@@ -352,7 +352,7 @@ CcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
     return err;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 CcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
                                Uint8*       pOutput,
@@ -387,8 +387,8 @@ CcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
 }
 
 // Explicit template instantiations
-template class CcmT<CipherKeyLen::eKey128Bit, CpuCipherFeatures::eAesni>;
-template class CcmT<CipherKeyLen::eKey192Bit, CpuCipherFeatures::eAesni>;
-template class CcmT<CipherKeyLen::eKey256Bit, CpuCipherFeatures::eAesni>;
+template class CcmT<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen>;
+template class CcmT<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen>;
+template class CcmT<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen>;
 
 } // namespace alcp::cipher

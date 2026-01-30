@@ -241,7 +241,7 @@ DecryptCfbKernel(const Uint8* pSrc,
 namespace alcp::cipher {
 
 // primary template
-template<alcp::cipher::CipherKeyLen T, alcp::utils::CpuCipherFeatures arch>
+template<alcp::cipher::CipherKeyLen T, alcp::utils::CpuArchLevel arch>
 alc_error_t
 DecryptCfb(const Uint8* pSrc,
            Uint8*       pDest,
@@ -263,7 +263,7 @@ DecryptCfb(const Uint8* pSrc,
 template<>
 alc_error_t
 DecryptCfb<alcp::cipher::CipherKeyLen::eKey128Bit,
-           alcp::utils::CpuCipherFeatures::eVaes512>(const Uint8* pSrc,
+           alcp::utils::CpuArchLevel::eZen4>(const Uint8* pSrc,
                                                      Uint8*       pDest,
                                                      Uint64       len,
                                                      const Uint8* pKey,
@@ -282,7 +282,7 @@ DecryptCfb<alcp::cipher::CipherKeyLen::eKey128Bit,
 template<>
 alc_error_t
 DecryptCfb<alcp::cipher::CipherKeyLen::eKey192Bit,
-           alcp::utils::CpuCipherFeatures::eVaes512>(const Uint8* pSrc,
+           alcp::utils::CpuArchLevel::eZen4>(const Uint8* pSrc,
                                                      Uint8*       pDest,
                                                      Uint64       len,
                                                      const Uint8* pKey,
@@ -301,7 +301,7 @@ DecryptCfb<alcp::cipher::CipherKeyLen::eKey192Bit,
 template<>
 alc_error_t
 DecryptCfb<alcp::cipher::CipherKeyLen::eKey256Bit,
-           alcp::utils::CpuCipherFeatures::eVaes512>(const Uint8* pSrc,
+           alcp::utils::CpuArchLevel::eZen4>(const Uint8* pSrc,
                                                      Uint8*       pDest,
                                                      Uint64       len,
                                                      const Uint8* pKey,

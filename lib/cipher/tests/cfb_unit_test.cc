@@ -33,8 +33,8 @@
 #include <gtest/gtest.h>
 
 #include "alcp/cipher/cipher_wrapper.hh"
+#include "alcp/utils/cpuid.hh"
 #include "debug_defs.hh"
-#include "dispatcher.hh"
 #include "randomize.hh"
 
 #undef DEBUG
@@ -114,13 +114,13 @@ using namespace alcp::cipher::unittest;
 using namespace alcp::cipher::unittest::cfb;
 TEST(CFB, creation)
 {
-    std::vector<CpuCipherFeatures> cpuFeatures = getSupportedFeatures();
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpuFeatures) {
+    std::vector<CpuArchLevel> cpuFeatures = alcp::utils::CpuId::getSupportedArchLevels();
+    for ([[maybe_unused]] CpuArchLevel feature : cpuFeatures) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
             << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+                   typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
@@ -213,10 +213,10 @@ TEST(CFB, MultiUpdateDecryption)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
         // Factory removed
         auto cfb        = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
 
@@ -244,7 +244,7 @@ TEST(CFB, MultiUpdateDecryption)
         delete cfb;
         EXPECT_EQ(plainText, output)
             << "FAIL CPU_FEATURE:"
-            << std::underlying_type<CpuCipherFeatures>::type(feature);
+            << std::underlying_type<CpuArchLevel>::type(feature);
     }
 }
 
@@ -266,15 +266,15 @@ TEST(CFB, RandomEncryptDecryptTest)
     random->getRandomBytes(key_256, 32);
     random->getRandomBytes(iv, 16);
 
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
 
     for (int i = (cTextSize - 16); i > 16; i -= 16)
-        for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+        for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
             std::cout
                 << "Cpu Feature:"
                 << static_cast<
-                       typename std::underlying_type<CpuCipherFeatures>::type>(
+                       typename std::underlying_type<CpuArchLevel>::type>(
                        feature)
                 << std::endl;
 #endif

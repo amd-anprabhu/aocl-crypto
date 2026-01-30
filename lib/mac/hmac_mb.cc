@@ -137,10 +137,7 @@ HmacMB::init(const Uint8* pKey, Uint64 keyLen, alc_digest_mode_t digest_mode)
 {
     alc_error_t err = ALC_ERROR_NONE;
 
-    static bool avx512_available =
-        CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_VL)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW);
+    static bool avx512_available = CpuId::cpuHasAvx512VL();
 
     m_key         = pKey;
     m_key_len     = keyLen;
@@ -241,10 +238,7 @@ HmacMB::dequeue(Uint8** ppDstBuf, const Uint64 numBuffers)
         }
     }
 
-    static bool avx512_available =
-        CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_VL)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW);
+    static bool avx512_available = CpuId::cpuHasAvx512VL();
 
     // Optimized AVX512 path with pre-computed hash states and reusable objects
     if (avx512_available && numBuffers >= 6) {

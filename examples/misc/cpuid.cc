@@ -29,6 +29,7 @@
 #include "alcp/utils/cpuid.hh"
 #include <iostream>
 
+using alcp::utils::Avx512Flags;
 using alcp::utils::CpuId;
 
 #define GREEN "\033[0;32m"
@@ -109,16 +110,88 @@ void
 checkAMDSupport()
 {
     std::cout << "======AMD FLAGS=======" << std::endl;
-    printBoolMsg("ZEN1", CpuId::cpuIsZen1());
-    printBoolMsg("ZEN2", CpuId::cpuIsZen2());
-    printBoolMsg("ZEN3", CpuId::cpuIsZen3());
-    printBoolMsg("ZEN4", CpuId::cpuIsZen4());
-    printBoolMsg("ZEN5", CpuId::cpuIsZen5());
+    printBoolMsg("ZEN_BASELINE (ADX+AVX2+BMI2)",
+                 CpuId::cpuHasAdx() && CpuId::cpuHasAvx2()
+                     && CpuId::cpuHasBmi2());
+    printBoolMsg("AVX512_BASE (F+DQ+BW)", CpuId::cpuHasAvx512Base());
+    printBoolMsg("AVX512_FULL (F+DQ+BW+IFMA+VL)",
+                 CpuId::cpuHasAvx512(Avx512Flags::AVX512_F)
+                     && CpuId::cpuHasAvx512(Avx512Flags::AVX512_DQ)
+                     && CpuId::cpuHasAvx512(Avx512Flags::AVX512_BW)
+                     && CpuId::cpuHasAvx512(Avx512Flags::AVX512_IFMA)
+                     && CpuId::cpuHasAvx512(Avx512Flags::AVX512_VL));
+}
+
+std::string
+archLevelToString(alcp::utils::CpuArchLevel archLevel)
+{
+    using alcp::utils::CpuArchLevel;
+    switch (archLevel) {
+        case CpuArchLevel::eReference:
+            return "Reference";
+        case CpuArchLevel::eZen:
+            return "Zen/Zen2";
+        case CpuArchLevel::eZen3:
+            return "Zen3";
+        case CpuArchLevel::eZen4:
+            return "Zen4/Zen5";
+        default:
+            return "Unknown";
+    }
+}
+
+void
+checkArchLevel()
+{
+    using alcp::utils::AlgorithmType;
+    using alcp::utils::CpuArchLevel;
+    using alcp::utils::CpuCapability;
+
+    std::cout << "======DEFAULT ARCH LEVEL (Backward Compatible)======="
+              << std::endl;
+    CpuArchLevel defaultArch = CpuId::getCachedArchLevel();
+    std::cout << "\tDefault: " << archLevelToString(defaultArch) << std::endl;
+
+    std::cout << "======PER-ALGORITHM ARCH LEVELS=======" << std::endl;
+    std::cout << "\tCipher:   "
+              << archLevelToString(
+                     CpuId::getCachedArchLevel(AlgorithmType::eCipher))
+              << std::endl;
+    std::cout << "\tRSA:      "
+              << archLevelToString(
+                     CpuId::getCachedArchLevel(AlgorithmType::eRsa))
+              << std::endl;
+    std::cout << "\tPoly1305: "
+              << archLevelToString(
+                     CpuId::getCachedArchLevel(AlgorithmType::ePoly1305))
+              << std::endl;
+    std::cout << "\tX25519:   "
+              << archLevelToString(
+                     CpuId::getCachedArchLevel(AlgorithmType::eX25519))
+              << std::endl;
+    std::cout << "\tSHA2-256: "
+              << archLevelToString(
+                     CpuId::getCachedArchLevel(AlgorithmType::eSha2_256))
+              << std::endl;
+    std::cout << "\tSHA2-512: "
+              << archLevelToString(
+                     CpuId::getCachedArchLevel(AlgorithmType::eSha2_512))
+              << std::endl;
+    std::cout << "\tSHA3:     "
+              << archLevelToString(
+                     CpuId::getCachedArchLevel(AlgorithmType::eSha3))
+              << std::endl;
+
+    std::cout << "======SPECIAL CAPABILITIES=======" << std::endl;
+    printBoolMsg("SHA-NI", CpuId::hasCapability(CpuCapability::eShaNi));
+    printBoolMsg("RDRAND", CpuId::hasCapability(CpuCapability::eRdRand));
+    printBoolMsg("RDSEED", CpuId::hasCapability(CpuCapability::eRdSeed));
 }
 
 int
 main()
 {
+    checkArchLevel();
     checkAMDSupport();
     checkAESSupport();
     checkSHASupport();

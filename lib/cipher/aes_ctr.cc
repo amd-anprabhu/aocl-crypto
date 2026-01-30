@@ -31,10 +31,6 @@
 //#include "alcp/cipher/aes_ctr.hh"
 #include "alcp/cipher/cipher_wrapper.hh"
 
-#include "alcp/utils/cpuid.hh"
-
-using alcp::utils::CpuId;
-
 namespace alcp::cipher {
 
 namespace vaes {

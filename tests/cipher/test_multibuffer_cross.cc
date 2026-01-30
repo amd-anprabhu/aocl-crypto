@@ -43,6 +43,7 @@
 
 // Factory removed
 using alcp::cipher::iCipher;
+using alcp::utils::CpuId;
 using alcp::cipher::createCipher;
 using alcp::cipher::CipherMode;
 using alcp::cipher::CipherKeyLen;

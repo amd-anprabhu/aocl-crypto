@@ -34,7 +34,6 @@
 #include "alcp/utils/bits.hh"
 #include "alcp/utils/constants.hh"
 #include "alcp/utils/copy.hh"
-#include "alcp/utils/cpuid.hh"
 
 #include <map>
 
@@ -591,7 +590,10 @@ Rijndael::expandKeys(const Uint8* pUserKey) noexcept
     pEncKey = m_enc_key;
     pDecKey = m_dec_key;
 
-    if (CpuId::cpuHasAesni()) {
+    // Use cached cipher feature for AESNI check
+    static CpuArchLevel cipherFeature =
+        CpuId::getCachedArchLevel(AlgorithmType::eCipher);
+    if (cipherFeature >= CpuArchLevel::eZen) {
         aesni::ExpandKeys(key, pEncKey, pDecKey, m_nrounds);
         return;
     }

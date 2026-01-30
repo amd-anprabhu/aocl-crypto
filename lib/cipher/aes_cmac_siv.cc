@@ -31,9 +31,10 @@
 #include <string.h>
 
 namespace alcp::cipher {
+using utils::CpuId;
 
 // Helper methods
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 SivT<keyLenBits, arch>::setKeys(const Uint8 key1[], Uint64 length)
 {
@@ -61,7 +62,7 @@ SivT<keyLenBits, arch>::setKeys(const Uint8 key1[], Uint64 length)
     return err;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 SivT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv, Uint64 ivLen)
 {
@@ -96,7 +97,7 @@ SivT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv,
     return err;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 SivT<keyLenBits, arch>::cmacWrapper(const Uint8 data[], Uint64 size, Uint8 mac[], Uint64 macSize)
 {
@@ -120,7 +121,7 @@ SivT<keyLenBits, arch>::cmacWrapper(const Uint8 data[], Uint64 size, Uint8 mac[]
     return err;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 SivT<keyLenBits, arch>::cmacWrapperMultiData(const Uint8 data1[],
                                             Uint64      size1,
@@ -153,7 +154,7 @@ SivT<keyLenBits, arch>::cmacWrapperMultiData(const Uint8 data1[],
     return err;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 SivT<keyLenBits, arch>::addAdditionalInput(const Uint8* pAad, Uint64 aadLen)
 {
@@ -190,7 +191,7 @@ SivT<keyLenBits, arch>::addAdditionalInput(const Uint8* pAad, Uint64 aadLen)
     return err;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 SivT<keyLenBits, arch>::s2v(const Uint8 plainText[], Uint64 size)
 {
@@ -217,7 +218,9 @@ SivT<keyLenBits, arch>::s2v(const Uint8 plainText[], Uint64 size)
     if (size >= SIZE_CMAC) {
 
         // Take out last block
-        if (CpuId::cpuIsZen3()) {
+        static utils::CpuArchLevel cipherFeature =
+            CpuId::getCachedArchLevel(utils::AlgorithmType::eCipher);
+        if (cipherFeature >= utils::CpuArchLevel::eZen3) {
             zen3::xor_a_b((plainText + size - SIZE_CMAC),
                           m_cmacTemp,
                           m_cmacTemp,
@@ -254,7 +257,7 @@ SivT<keyLenBits, arch>::s2v(const Uint8 plainText[], Uint64 size)
 }
 
 // Auth methods
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 SivT<keyLenBits, arch>::getTag(Uint8 out[], Uint64 len)
 {
@@ -270,7 +273,7 @@ SivT<keyLenBits, arch>::getTag(Uint8 out[], Uint64 len)
     return ALC_ERROR_NONE;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 SivT<keyLenBits, arch>::setAad(const Uint8* pAad, Uint64 aadLen)
 {
@@ -282,7 +285,7 @@ SivT<keyLenBits, arch>::setAad(const Uint8* pAad, Uint64 aadLen)
     return err;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 SivT<keyLenBits, arch>::setTagLength(Uint64 tagLength)
 {
@@ -295,7 +298,7 @@ SivT<keyLenBits, arch>::setTagLength(Uint64 tagLength)
 }
 
 // Encrypt/Decrypt methods
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 SivT<keyLenBits, arch>::encrypt(const Uint8* pPlainText,
                                Uint8*       pCipherText,
@@ -332,7 +335,7 @@ SivT<keyLenBits, arch>::encrypt(const Uint8* pPlainText,
     return err;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 SivT<keyLenBits, arch>::decrypt(const Uint8* pCipherText,
                                Uint8*       pPlainText,
@@ -379,16 +382,16 @@ SivT<keyLenBits, arch>::decrypt(const Uint8* pCipherText,
 }
 
 // Explicit template instantiations
-template class SivT<CipherKeyLen::eKey128Bit, CpuCipherFeatures::eVaes512>;
-template class SivT<CipherKeyLen::eKey192Bit, CpuCipherFeatures::eVaes512>;
-template class SivT<CipherKeyLen::eKey256Bit, CpuCipherFeatures::eVaes512>;
+template class SivT<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen4>;
+template class SivT<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen4>;
+template class SivT<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen4>;
 
-template class SivT<CipherKeyLen::eKey128Bit, CpuCipherFeatures::eVaes256>;
-template class SivT<CipherKeyLen::eKey192Bit, CpuCipherFeatures::eVaes256>;
-template class SivT<CipherKeyLen::eKey256Bit, CpuCipherFeatures::eVaes256>;
+template class SivT<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen3>;
+template class SivT<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen3>;
+template class SivT<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen3>;
 
-template class SivT<CipherKeyLen::eKey128Bit, CpuCipherFeatures::eAesni>;
-template class SivT<CipherKeyLen::eKey192Bit, CpuCipherFeatures::eAesni>;
-template class SivT<CipherKeyLen::eKey256Bit, CpuCipherFeatures::eAesni>;
+template class SivT<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen>;
+template class SivT<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen>;
+template class SivT<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen>;
 
 } // namespace alcp::cipher

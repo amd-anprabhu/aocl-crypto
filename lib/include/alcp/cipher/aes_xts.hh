@@ -37,9 +37,7 @@
 #include "alcp/cipher/cipher_wrapper.hh"
 #include "alcp/utils/constants.hh"
 #include "alcp/utils/copy.hh"
-#include "alcp/utils/cpuid.hh"
 
-using alcp::utils::CpuId;
 namespace alcp::cipher {
 
 // XTS-specific data (IV is stored in IvManager)
@@ -103,7 +101,7 @@ GetSbox(Uint8 offset, bool use_invsbox = false)
     return utils::GetSbox(offset, use_invsbox);
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, utils::CpuArchLevel arch>
 class XtsT
     : public Xts
     , public iCipher
@@ -140,7 +138,7 @@ class XtsT
 };
 
 /* XTS Block cipher with segmented capability */
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, utils::CpuArchLevel arch>
 class XtsBlockT
     : public Xts
     , public iCipherSegment

@@ -47,7 +47,7 @@ union len_aad_processed
     Uint8  u8[8];
 };
 
-using utils::CpuArchFeature;
+using utils::CpuArchLevel;
 
 /**
  * @brief Unified ChaCha20-Poly1305 template class
@@ -56,12 +56,12 @@ using utils::CpuArchFeature;
  * components via the ChaCha20 base class.
  *
  * Template parameters:
- * - arch: CPU architecture features (eVaes512 or eReference)
+ * - arch: CPU architecture level (eZen4 or eReference)
  */
-template<CpuCipherFeatures arch>
+template<CpuArchLevel arch>
 class ALCP_API_EXPORT ChaChPolyT
     : public ChaCha256T<arch>
-    , public alcp::mac::poly1305::Poly1305<CpuArchFeature::eDynamic>
+    , public alcp::mac::poly1305::Poly1305<CpuArchLevel::eDynamic>
     , public iCipherAead
 {
   protected:
@@ -104,16 +104,16 @@ class ALCP_API_EXPORT ChaChPolyT
     }
 };
 
-template<CpuCipherFeatures arch>
+template<CpuArchLevel arch>
 using ChaChaPoly = ChaChPolyT<arch>;
 
 namespace vaes512 {
-    using ChaChaPoly256 = ChaChPolyT<CpuCipherFeatures::eVaes512>;
+    using ChaChaPoly256 = ChaChPolyT<CpuArchLevel::eZen4>;
     using ChaChaPoly = ChaChaPoly256;
 } // namespace vaes512
 
 namespace ref {
-    using ChaChaPoly256 = ChaChPolyT<CpuCipherFeatures::eReference>;
+    using ChaChaPoly256 = ChaChPolyT<CpuArchLevel::eReference>;
     using ChaChaPoly = ChaChaPoly256;
 } // namespace ref
 

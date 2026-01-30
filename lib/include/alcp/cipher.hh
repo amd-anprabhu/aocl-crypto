@@ -39,8 +39,7 @@
 
 #include "alcp/utils/cpuid.hh"
 
-using alcp::utils::CpuCipherFeatures;
-using alcp::utils::CpuId;
+using alcp::utils::CpuArchLevel;
 
 namespace alcp { namespace cipher {
     enum class CipherKeyLen

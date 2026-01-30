@@ -30,11 +30,8 @@
 #include "gtest/gtest.h"
 #include <tuple>
 
-#include "alcp/utils/cpuid.hh"
-
 using namespace alcp::base;
 using alcp::mac::Cmac;
-using alcp::utils::CpuId;
 
 typedef std::tuple<std::vector<Uint8>, // key
                    std::vector<Uint8>, // plaintext

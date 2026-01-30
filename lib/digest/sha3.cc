@@ -43,6 +43,8 @@
 namespace utils = alcp::utils;
 using namespace alcp::digest;
 
+using alcp::utils::AlgorithmType;
+using alcp::utils::CpuArchLevel;
 using alcp::utils::CpuId;
 
 #include "sha3_inplace.hh"
@@ -128,21 +130,20 @@ template<alc_digest_len_t digest_len>
 inline void
 Sha3<digest_len>::squeezeChunk(Uint8* pBuf, Uint64 size)
 {
-    static bool zen1_available = CpuId::cpuIsZen1() || CpuId::cpuIsZen2();
-    static bool zen3_available = CpuId::cpuIsZen3();
-    static bool zen4_available = CpuId::cpuIsZen4();
-    static bool zen5_available = CpuId::cpuIsZen5();
+    static CpuArchLevel archLevel =
+        CpuId::getCachedArchLevel(AlgorithmType::eSha3);
 
-    static bool avx512f_available =
-        CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_VL);
-
-    if (zen5_available) {
+    switch (archLevel) {
+        case CpuArchLevel::eZen4:
 #ifdef COMPILER_IS_CLANG
-        return zen3::Sha3Finalize(
-            (Uint8*)m_state_flat, pBuf, size, m_block_len, m_shake_index);
-#else
-        if (avx512f_available) {
+            // Only Zen5 + Clang uses zen3 kernel for better performance
+            // This is an unusual exception. Using CpuId based zen detection. 
+            // Must update this if any other usecase arise that cant' be handled like this.
+            if (CpuId::cpuIsZen5()) {
+                return zen3::Sha3Finalize(
+                    (Uint8*)m_state_flat, pBuf, size, m_block_len, m_shake_index);
+            }
+#endif
             return zen4::Sha3Finalize((Uint8*)m_state_flat,
                                       pBuf,
                                       size,
@@ -151,34 +152,17 @@ Sha3<digest_len>::squeezeChunk(Uint8* pBuf, Uint64 size)
                                       cRoundConstantsIota,
                                       cRotationConstants,
                                       cRotationConstantsHarmonize);
-        } else {
+        case CpuArchLevel::eZen3:
             return zen3::Sha3Finalize(
                 (Uint8*)m_state_flat, pBuf, size, m_block_len, m_shake_index);
-        }
-#endif
+        case CpuArchLevel::eZen:
+            return zen::Sha3Finalize(
+                (Uint8*)m_state_flat, pBuf, size, m_block_len, m_shake_index);
+        default:
+            break;
     }
 
-    if (zen4_available && avx512f_available) {
-        return zen4::Sha3Finalize((Uint8*)m_state_flat,
-                                  pBuf,
-                                  size,
-                                  m_block_len,
-                                  m_shake_index,
-                                  cRoundConstantsIota,
-                                  cRotationConstants,
-                                  cRotationConstantsHarmonize);
-    }
-
-    if (zen3_available) {
-        return zen3::Sha3Finalize(
-            (Uint8*)m_state_flat, pBuf, size, m_block_len, m_shake_index);
-    }
-
-    if (zen1_available) {
-        return zen::Sha3Finalize(
-            (Uint8*)m_state_flat, pBuf, size, m_block_len, m_shake_index);
-    }
-
+    // Reference implementation fallback
     Uint64 rem = m_block_len - m_shake_index;
 
     if (size <= rem) {
@@ -212,21 +196,20 @@ Sha3<digest_len>::processChunk(const Uint8* pSrc, Uint64 len)
     Uint64* p_msg_buffer64 = (Uint64*)pSrc;
     Uint64  chunk_size_u64 = m_block_len / 8;
 
-    static bool zen1_available = CpuId::cpuIsZen1() || CpuId::cpuIsZen2();
-    static bool zen3_available = CpuId::cpuIsZen3();
-    static bool zen4_available = CpuId::cpuIsZen4();
-    static bool zen5_available = CpuId::cpuIsZen5();
+    static CpuArchLevel archLevel =
+        CpuId::getCachedArchLevel(AlgorithmType::eSha3);
 
-    static bool avx512f_available =
-        CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_VL);
-
-    if (zen5_available) {
+    switch (archLevel) {
+        case CpuArchLevel::eZen4:
 #ifdef COMPILER_IS_CLANG
-        return zen3::Sha3Update(
-            m_state_flat, p_msg_buffer64, msg_size, m_block_len);
-#else
-        if (avx512f_available) {
+            // Only Zen5 + Clang uses zen3 kernel for better performance
+            // This is an unusual exception. Using CpuId based zen detection. 
+            // Must update this if any other usecase arise that cant' be handled like this.
+            if (CpuId::cpuIsZen5()) {
+                return zen3::Sha3Update(
+                    m_state_flat, p_msg_buffer64, msg_size, m_block_len);
+            }
+#endif
             return zen4::Sha3Update(m_state_flat,
                                     p_msg_buffer64,
                                     msg_size,
@@ -234,33 +217,17 @@ Sha3<digest_len>::processChunk(const Uint8* pSrc, Uint64 len)
                                     cRoundConstantsIota,
                                     cRotationConstants,
                                     cRotationConstantsHarmonize);
-        } else {
+        case CpuArchLevel::eZen3:
             return zen3::Sha3Update(
                 m_state_flat, p_msg_buffer64, msg_size, m_block_len);
-        }
-#endif
+        case CpuArchLevel::eZen:
+            return zen::Sha3Update(
+                m_state_flat, p_msg_buffer64, msg_size, m_block_len);
+        default:
+            break;
     }
 
-    if (zen4_available && avx512f_available) {
-        return zen4::Sha3Update(m_state_flat,
-                                p_msg_buffer64,
-                                msg_size,
-                                m_block_len,
-                                cRoundConstantsIota,
-                                cRotationConstants,
-                                cRotationConstantsHarmonize);
-    }
-
-    if (zen3_available) {
-        return zen3::Sha3Update(
-            m_state_flat, p_msg_buffer64, msg_size, m_block_len);
-    }
-
-    if (zen1_available) {
-        return zen::Sha3Update(
-            m_state_flat, p_msg_buffer64, msg_size, m_block_len);
-    }
-
+    // Reference implementation fallback
     while (msg_size) {
         // xor message chunk into m_state.
         absorbChunk(p_msg_buffer64, m_state_flat, chunk_size_u64);

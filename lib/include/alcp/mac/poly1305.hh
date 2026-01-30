@@ -36,8 +36,8 @@
 #define POLY1305_RADIX_26 false
 
 namespace alcp::mac::poly1305 {
-using utils::CpuArchFeature;
-template<utils::CpuArchFeature feature = CpuArchFeature::eDynamic>
+using utils::CpuArchLevel;
+template<utils::CpuArchLevel archLevel = CpuArchLevel::eDynamic>
 class ALCP_API_EXPORT Poly1305 : public IMac
 {
   private:

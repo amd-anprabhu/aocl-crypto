@@ -42,11 +42,6 @@
 #include "alcp/alcp.h"
 
 // CPU feature detection for AVX512
-#ifdef __linux__
-#include <cpuid.h>
-#elif WIN32
-#include <intrin.h>
-#endif
 
 static alc_cipher_handle_t handle;
 

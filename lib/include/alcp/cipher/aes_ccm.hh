@@ -29,7 +29,6 @@
 
 #include "alcp/cipher/cipher_common.hh"
 #include "alcp/utils/copy.hh"
-#include "alcp/utils/cpuid.hh"
 
 #include <cstdint>
 #include <immintrin.h>
@@ -87,7 +86,7 @@ namespace aesni::ccm {
  * - keyLenBits: Key length (128, 192, or 256 bits)
  * - arch: CPU architecture features (currently only eAesni supported)
  */
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, utils::CpuArchLevel arch>
 class CcmT
     : public iCipherCcm
 {
@@ -154,7 +153,7 @@ class CcmT
     alc_error_t finish() override { return ALC_ERROR_NONE; }
 };
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, utils::CpuArchLevel arch>
 using Ccm = CcmT<keyLenBits, arch>;
 
 } // namespace alcp::cipher

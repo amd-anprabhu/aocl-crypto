@@ -105,7 +105,7 @@ typedef struct _alc_gcm_ctx
  * @tparam keyLenBits Key length (128, 192, or 256 bits)
  * @tparam arch CPU architecture features (eAesni, eVaes256, eVaes512)
  */
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, utils::CpuArchLevel arch>
 class GcmT
     : public virtual iCipherAead
 {

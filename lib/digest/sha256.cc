@@ -40,6 +40,8 @@
 #include "alcp/utils/endian.hh"
 
 namespace utils = alcp::utils;
+using utils::AlgorithmType;
+using utils::CpuArchLevel;
 using utils::CpuId;
 
 namespace alcp::digest {
@@ -69,13 +71,11 @@ template<alc_digest_len_t digest_len>
 alc_error_t
 Sha2<digest_len>::processChunk(const Uint8* pSrc, Uint64 len)
 {
-    static bool shani_available = CpuId::cpuHasShani();
-    // FIXME: AVX2 is deliberately disabled due to poor performance
-#if 0
-    static bool avx2_available  = utils::CpuId::cpuHasAvx2();
-#else
+    // SHA-NI dispatch: getCachedArchLevel returns eZen if SHA-NI is available
+    static CpuArchLevel arch = CpuId::getCachedArchLevel(AlgorithmType::eSha2_256);
+    static bool shani_available = (arch >= CpuArchLevel::eZen);
+    // AVX2 path is deliberately disabled due to poor performance
     static bool avx2_available = false;
-#endif
 
     /* we need len to be multiple of cChunkSize */
     assert((len & cChunkSizeMask) == 0);
@@ -272,7 +272,9 @@ Sha2<digest_len>::finalize(Uint8* pBuf, Uint64 size)
      * Default padding is 'length encoding'
      */
 
-    static bool shani_available = CpuId::cpuHasShani();
+    // SHA-NI dispatch: getCachedArchLevel returns eZen if SHA-NI is available
+    static CpuArchLevel arch = CpuId::getCachedArchLevel(AlgorithmType::eSha2_256);
+    static bool shani_available = (arch >= CpuArchLevel::eZen);
 
     if (shani_available) {
         err = shani::ShaFinalize256(m_buffer,

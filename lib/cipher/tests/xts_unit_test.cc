@@ -34,7 +34,6 @@
 #include "alcp/cipher/aes_xts.hh"
 #include "alcp/utils/cpuid.hh"
 #include "debug_defs.hh"
-#include "dispatcher.hh"
 #include "gtest/gtest.h"
 
 #undef DEBUG
@@ -219,8 +218,8 @@ TEST(XTS, initiantiation_with_valid_input)
                     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
 
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
                 auto xts        = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
 
         alc_error_t err = ALC_ERROR_NONE;
@@ -251,8 +250,8 @@ TEST(XTS, valid_all_sizes_encrypt_decrypt_test)
                          0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
                          0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x00 };
     // clang-format on
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
         for (int i = 16; i < 512 * 20; i++) {
                         auto xts        = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey256Bit);
 
@@ -337,13 +336,13 @@ TEST(XTS, encrypt_huge)
     };
     alc_error_t err = ALC_ERROR_NONE;
 
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
             << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+                   typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
@@ -422,8 +421,8 @@ TEST(XTS, decrypt_huge)
         0x4e, 0x28, 0x0e, 0x2b, 0x11, 0x04, 0x8e, 0xe4, 0xab, 0x6e, 0xe1
     };
     alc_error_t                    err          = ALC_ERROR_NONE;
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
         std::vector<Uint8> output_buffer(cipherText.size(), 0xff);
 
                 auto xts        = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
@@ -502,8 +501,8 @@ TEST(XTS, encrypt_huge_multi_update)
 
     alc_error_t err = ALC_ERROR_NONE;
 
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 
         std::vector<Uint8> output_buffer(plainText.size(), 0xff);
                 auto               xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
@@ -614,8 +613,8 @@ TEST(XTS, encrypt_huge_multi_update_serial)
 
     std::vector<Uint8> output_buffer(plainText.size(), 0xff);
 
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
                 auto xts        = createCipherSeg(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
 
         if (xts == nullptr) {
@@ -753,14 +752,14 @@ TEST(XTS, encrypt_huge_multi_update_arbitrary)
 
     std::vector<Uint8> output_buffer(plainText.size(), 0xff);
 
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
 
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
             << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+                   typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
@@ -874,8 +873,8 @@ TEST(XTS, decrypt_huge_multi_update)
 
     std::vector<Uint8> output_buffer(cipherText.size(), 0xff);
 
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for ([[maybe_unused]] CpuCipherFeatures feature : cpu_features) {
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
                 auto xts        = createCipherSeg(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
 
         if (xts == nullptr) {

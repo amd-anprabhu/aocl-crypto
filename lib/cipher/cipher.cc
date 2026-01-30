@@ -36,10 +36,10 @@
 #include "alcp/cipher/chacha20.hh"
 #include "alcp/cipher/chacha20_poly1305.hh"
 
+using alcp::utils::AlgorithmType;
+using alcp::utils::CpuArchLevel;
 using alcp::utils::CpuId;
 namespace alcp::cipher {
-
-using alcp::utils::CpuCipherFeatures;
 
 namespace {
 
@@ -59,14 +59,14 @@ keyLenToIndex(CipherKeyLen k)
 }
 
 constexpr int
-archToIndex(CpuCipherFeatures a)
+archToIndex(CpuArchLevel a)
 {
     switch (a) {
-        case CpuCipherFeatures::eAesni:
+        case CpuArchLevel::eZen:
             return 0;
-        case CpuCipherFeatures::eVaes256:
+        case CpuArchLevel::eZen3:
             return 1;
-        case CpuCipherFeatures::eVaes512:
+        case CpuArchLevel::eZen4:
             return 2;
         default:
             return -1;
@@ -75,7 +75,7 @@ archToIndex(CpuCipherFeatures a)
 
 // Strategy dispatch table dimensions
 constexpr int NUM_KEY_LENS = 3; // 128, 192, 256
-constexpr int NUM_ARCHS    = 3; // eAesni, eVaes256, eVaes512
+constexpr int NUM_ARCHS    = 3; // eZen, eZen3, eZen4
 
 // -----------------------------------------------------------------------------
 // Template-based Strategy Dispatcher
@@ -83,7 +83,7 @@ constexpr int NUM_ARCHS    = 3; // eAesni, eVaes256, eVaes512
 // -----------------------------------------------------------------------------
 
 template<typename Interface,
-         template<CipherKeyLen, CpuCipherFeatures>
+         template<CipherKeyLen, utils::CpuArchLevel>
          class CipherT>
 struct CipherStrategy
 {
@@ -94,45 +94,45 @@ struct CipherStrategy
         // eKey128Bit row
         { []() -> Interface* {
              return new CipherT<CipherKeyLen::eKey128Bit,
-                                CpuCipherFeatures::eAesni>();
+                                CpuArchLevel::eZen>();
          },
           []() -> Interface* {
               return new CipherT<CipherKeyLen::eKey128Bit,
-                                 CpuCipherFeatures::eVaes256>();
+                                 CpuArchLevel::eZen3>();
           },
           []() -> Interface* {
               return new CipherT<CipherKeyLen::eKey128Bit,
-                                 CpuCipherFeatures::eVaes512>();
+                                 CpuArchLevel::eZen4>();
           } },
         // eKey192Bit row
         { []() -> Interface* {
              return new CipherT<CipherKeyLen::eKey192Bit,
-                                CpuCipherFeatures::eAesni>();
+                                CpuArchLevel::eZen>();
          },
           []() -> Interface* {
               return new CipherT<CipherKeyLen::eKey192Bit,
-                                 CpuCipherFeatures::eVaes256>();
+                                 CpuArchLevel::eZen3>();
           },
           []() -> Interface* {
               return new CipherT<CipherKeyLen::eKey192Bit,
-                                 CpuCipherFeatures::eVaes512>();
+                                 CpuArchLevel::eZen4>();
           } },
         // eKey256Bit row
         { []() -> Interface* {
              return new CipherT<CipherKeyLen::eKey256Bit,
-                                CpuCipherFeatures::eAesni>();
+                                CpuArchLevel::eZen>();
          },
           []() -> Interface* {
               return new CipherT<CipherKeyLen::eKey256Bit,
-                                 CpuCipherFeatures::eVaes256>();
+                                 CpuArchLevel::eZen3>();
           },
           []() -> Interface* {
               return new CipherT<CipherKeyLen::eKey256Bit,
-                                 CpuCipherFeatures::eVaes512>();
+                                 CpuArchLevel::eZen4>();
           } },
     };
 
-    static Interface* dispatch(CipherKeyLen keyLen, CpuCipherFeatures arch)
+    static Interface* dispatch(CipherKeyLen keyLen, CpuArchLevel arch)
     {
         int keyIdx  = keyLenToIndex(keyLen);
         int archIdx = archToIndex(arch);
@@ -153,46 +153,46 @@ struct GcmWithStateStrategy
         // eKey128Bit row
         { [](alc_cipher_state_t* s) -> iCipherAead* {
              return new GcmT<CipherKeyLen::eKey128Bit,
-                             CpuCipherFeatures::eAesni>(s);
+                             CpuArchLevel::eZen>(s);
          },
           [](alc_cipher_state_t* s) -> iCipherAead* {
               return new GcmT<CipherKeyLen::eKey128Bit,
-                              CpuCipherFeatures::eVaes256>(s);
+                              CpuArchLevel::eZen3>(s);
           },
           [](alc_cipher_state_t* s) -> iCipherAead* {
               return new GcmT<CipherKeyLen::eKey128Bit,
-                              CpuCipherFeatures::eVaes512>(s);
+                              CpuArchLevel::eZen4>(s);
           } },
         // eKey192Bit row
         { [](alc_cipher_state_t* s) -> iCipherAead* {
              return new GcmT<CipherKeyLen::eKey192Bit,
-                             CpuCipherFeatures::eAesni>(s);
+                             CpuArchLevel::eZen>(s);
          },
           [](alc_cipher_state_t* s) -> iCipherAead* {
               return new GcmT<CipherKeyLen::eKey192Bit,
-                              CpuCipherFeatures::eVaes256>(s);
+                              CpuArchLevel::eZen3>(s);
           },
           [](alc_cipher_state_t* s) -> iCipherAead* {
               return new GcmT<CipherKeyLen::eKey192Bit,
-                              CpuCipherFeatures::eVaes512>(s);
+                              CpuArchLevel::eZen4>(s);
           } },
         // eKey256Bit row
         { [](alc_cipher_state_t* s) -> iCipherAead* {
              return new GcmT<CipherKeyLen::eKey256Bit,
-                             CpuCipherFeatures::eAesni>(s);
+                             CpuArchLevel::eZen>(s);
          },
           [](alc_cipher_state_t* s) -> iCipherAead* {
               return new GcmT<CipherKeyLen::eKey256Bit,
-                              CpuCipherFeatures::eVaes256>(s);
+                              CpuArchLevel::eZen3>(s);
           },
           [](alc_cipher_state_t* s) -> iCipherAead* {
               return new GcmT<CipherKeyLen::eKey256Bit,
-                              CpuCipherFeatures::eVaes512>(s);
+                              CpuArchLevel::eZen4>(s);
           } },
     };
 
     static iCipherAead* dispatch(CipherKeyLen        keyLen,
-                                 CpuCipherFeatures   arch,
+                                 CpuArchLevel        arch,
                                  alc_cipher_state_t* state)
     {
         int keyIdx  = keyLenToIndex(keyLen);
@@ -216,53 +216,53 @@ struct GenericCipherStrategy
         { []() -> iCipher* {
              return new AesGenericCiphersT<Mode,
                                           CipherKeyLen::eKey128Bit,
-                                          CpuCipherFeatures::eAesni>();
+                                          CpuArchLevel::eZen>();
          },
           []() -> iCipher* {
               return new AesGenericCiphersT<Mode,
                                            CipherKeyLen::eKey128Bit,
-                                           CpuCipherFeatures::eVaes256>();
+                                           CpuArchLevel::eZen3>();
           },
           []() -> iCipher* {
               return new AesGenericCiphersT<Mode,
                                            CipherKeyLen::eKey128Bit,
-                                           CpuCipherFeatures::eVaes512>();
+                                           CpuArchLevel::eZen4>();
           } },
         // eKey192Bit row
         { []() -> iCipher* {
              return new AesGenericCiphersT<Mode,
                                           CipherKeyLen::eKey192Bit,
-                                          CpuCipherFeatures::eAesni>();
+                                          CpuArchLevel::eZen>();
          },
           []() -> iCipher* {
               return new AesGenericCiphersT<Mode,
                                            CipherKeyLen::eKey192Bit,
-                                           CpuCipherFeatures::eVaes256>();
+                                           CpuArchLevel::eZen3>();
           },
           []() -> iCipher* {
               return new AesGenericCiphersT<Mode,
                                            CipherKeyLen::eKey192Bit,
-                                           CpuCipherFeatures::eVaes512>();
+                                           CpuArchLevel::eZen4>();
           } },
         // eKey256Bit row
         { []() -> iCipher* {
              return new AesGenericCiphersT<Mode,
                                           CipherKeyLen::eKey256Bit,
-                                          CpuCipherFeatures::eAesni>();
+                                          CpuArchLevel::eZen>();
          },
           []() -> iCipher* {
               return new AesGenericCiphersT<Mode,
                                            CipherKeyLen::eKey256Bit,
-                                           CpuCipherFeatures::eVaes256>();
+                                           CpuArchLevel::eZen3>();
           },
           []() -> iCipher* {
               return new AesGenericCiphersT<Mode,
                                            CipherKeyLen::eKey256Bit,
-                                           CpuCipherFeatures::eVaes512>();
+                                           CpuArchLevel::eZen4>();
           } },
     };
 
-    static iCipher* dispatch(CipherKeyLen keyLen, CpuCipherFeatures arch)
+    static iCipher* dispatch(CipherKeyLen keyLen, CpuArchLevel arch)
     {
         int keyIdx  = keyLenToIndex(keyLen);
         int archIdx = archToIndex(arch);
@@ -284,34 +284,34 @@ struct XtsStrategy
         // eKey128Bit row
         { []() -> iCipher* {
              return new XtsT<CipherKeyLen::eKey128Bit,
-                             CpuCipherFeatures::eAesni>();
+                             CpuArchLevel::eZen>();
          },
           []() -> iCipher* {
               return new XtsT<CipherKeyLen::eKey128Bit,
-                              CpuCipherFeatures::eVaes256>();
+                              CpuArchLevel::eZen3>();
           },
           []() -> iCipher* {
               return new XtsT<CipherKeyLen::eKey128Bit,
-                              CpuCipherFeatures::eVaes512>();
+                              CpuArchLevel::eZen4>();
           } },
         // eKey192Bit row - not supported
         { nullptr, nullptr, nullptr },
         // eKey256Bit row
         { []() -> iCipher* {
              return new XtsT<CipherKeyLen::eKey256Bit,
-                             CpuCipherFeatures::eAesni>();
+                             CpuArchLevel::eZen>();
          },
           []() -> iCipher* {
               return new XtsT<CipherKeyLen::eKey256Bit,
-                              CpuCipherFeatures::eVaes256>();
+                              CpuArchLevel::eZen3>();
           },
           []() -> iCipher* {
               return new XtsT<CipherKeyLen::eKey256Bit,
-                              CpuCipherFeatures::eVaes512>();
+                              CpuArchLevel::eZen4>();
           } },
     };
 
-    static iCipher* dispatch(CipherKeyLen keyLen, CpuCipherFeatures arch)
+    static iCipher* dispatch(CipherKeyLen keyLen, CpuArchLevel arch)
     {
         int keyIdx  = keyLenToIndex(keyLen);
         int archIdx = archToIndex(arch);
@@ -332,34 +332,34 @@ struct XtsBlockStrategy
         // eKey128Bit row
         { []() -> iCipherSegment* {
              return new XtsBlockT<CipherKeyLen::eKey128Bit,
-                                  CpuCipherFeatures::eAesni>();
+                                  CpuArchLevel::eZen>();
          },
           []() -> iCipherSegment* {
               return new XtsBlockT<CipherKeyLen::eKey128Bit,
-                                   CpuCipherFeatures::eVaes256>();
+                                   CpuArchLevel::eZen3>();
           },
           []() -> iCipherSegment* {
               return new XtsBlockT<CipherKeyLen::eKey128Bit,
-                                   CpuCipherFeatures::eVaes512>();
+                                   CpuArchLevel::eZen4>();
           } },
         // eKey192Bit row - not supported
         { nullptr, nullptr, nullptr },
         // eKey256Bit row
         { []() -> iCipherSegment* {
              return new XtsBlockT<CipherKeyLen::eKey256Bit,
-                                  CpuCipherFeatures::eAesni>();
+                                  CpuArchLevel::eZen>();
          },
           []() -> iCipherSegment* {
               return new XtsBlockT<CipherKeyLen::eKey256Bit,
-                                   CpuCipherFeatures::eVaes256>();
+                                   CpuArchLevel::eZen3>();
           },
           []() -> iCipherSegment* {
               return new XtsBlockT<CipherKeyLen::eKey256Bit,
-                                   CpuCipherFeatures::eVaes512>();
+                                   CpuArchLevel::eZen4>();
           } },
     };
 
-    static iCipherSegment* dispatch(CipherKeyLen keyLen, CpuCipherFeatures arch)
+    static iCipherSegment* dispatch(CipherKeyLen keyLen, CpuArchLevel arch)
     {
         int keyIdx  = keyLenToIndex(keyLen);
         int archIdx = archToIndex(arch);
@@ -371,20 +371,20 @@ struct XtsBlockStrategy
     }
 };
 
-// CCM Strategy - only supports eAesni architecture
+// CCM Strategy - only supports eZen architecture (AESNI)
 struct CcmStrategy
 {
     using CreatorFn = iCipherAead* (*)();
 
     static constexpr CreatorFn creators[NUM_KEY_LENS] = {
         []() -> iCipherAead* {
-            return new Ccm<CipherKeyLen::eKey128Bit, CpuCipherFeatures::eAesni>();
+            return new Ccm<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen>();
         },
         []() -> iCipherAead* {
-            return new Ccm<CipherKeyLen::eKey192Bit, CpuCipherFeatures::eAesni>();
+            return new Ccm<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen>();
         },
         []() -> iCipherAead* {
-            return new Ccm<CipherKeyLen::eKey256Bit, CpuCipherFeatures::eAesni>();
+            return new Ccm<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen>();
         },
     };
 
@@ -399,36 +399,6 @@ struct CcmStrategy
     }
 };
 
-// CPU feature detection
-CpuCipherFeatures
-getCpuCipherFeature()
-{
-    CpuCipherFeatures cpu_feature = CpuCipherFeatures::eReference;
-
-    if (CpuId::cpuHasAesni() && CpuId::cpuHasAvx2()) {
-        cpu_feature = CpuCipherFeatures::eAesni;
-
-        if (CpuId::cpuHasVaes()) {
-            cpu_feature = CpuCipherFeatures::eVaes256;
-
-            if (CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-                && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_DQ)
-                && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW)) {
-                cpu_feature = CpuCipherFeatures::eVaes512;
-            }
-        }
-    }
-    return cpu_feature;
-}
-
-// Cached CPU feature - initialized once
-CpuCipherFeatures
-getCachedCpuFeature()
-{
-    static CpuCipherFeatures s_cpuFeatures = getCpuCipherFeature();
-    return s_cpuFeatures;
-}
-
 } // anonymous namespace
 
 iCipherAead*
@@ -436,14 +406,14 @@ createCipherAead(const CipherMode    mode,
                  const CipherKeyLen  keyLen,
                  alc_cipher_state_t* pCipherState)
 {
-    CpuCipherFeatures arch = getCachedCpuFeature();
+    CpuArchLevel arch = CpuId::getCachedArchLevel(AlgorithmType::eCipher);
 
     if (keyLenToIndex(keyLen) < 0) {
         printf("\n Error: key length not supported ");
         return nullptr;
     }
 
-    if (arch < CpuCipherFeatures::eAesni) {
+    if (arch < CpuArchLevel::eZen) {
         printf("\n Error: Reference kernel not supported ");
         return nullptr;
     }
@@ -453,7 +423,7 @@ createCipherAead(const CipherMode    mode,
             return GcmWithStateStrategy::dispatch(keyLen, arch, pCipherState);
 
         case CipherMode::eAesCCM:
-            // CCM only supports eAesni architecture
+            // CCM only supports eZen architecture
             return CcmStrategy::dispatch(keyLen);
 
         case CipherMode::eAesSIV:
@@ -465,7 +435,7 @@ createCipherAead(const CipherMode    mode,
                 printf("\n Error: ChaCha20-Poly1305 only supports 256-bit keys ");
                 return nullptr;
             }
-            if (arch >= CpuCipherFeatures::eVaes512) {
+            if (arch >= CpuArchLevel::eZen4) {
                 return new vaes512::ChaChaPoly();
             }
             return new ref::ChaChaPoly();
@@ -479,14 +449,14 @@ createCipherAead(const CipherMode    mode,
 iCipher*
 createCipher(const CipherMode mode, const CipherKeyLen keyLen)
 {
-    CpuCipherFeatures arch = getCachedCpuFeature();
+    CpuArchLevel arch = CpuId::getCachedArchLevel(AlgorithmType::eCipher);
 
     if (keyLenToIndex(keyLen) < 0) {
         printf("\n Error: key length not supported ");
         return nullptr;
     }
 
-    if (arch < CpuCipherFeatures::eAesni) {
+    if (arch < CpuArchLevel::eZen) {
         printf("\n Error: Reference kernel not supported ");
         return nullptr;
     }
@@ -513,7 +483,7 @@ createCipher(const CipherMode mode, const CipherKeyLen keyLen)
                 printf("\n Error: ChaCha20 only supports 256-bit keys ");
                 return nullptr;
             }
-            if (arch >= CpuCipherFeatures::eVaes512) {
+            if (arch >= CpuArchLevel::eZen4) {
                 return new vaes512::ChaCha256();
             }
             return new ref::ChaCha256();
@@ -527,9 +497,9 @@ createCipher(const CipherMode mode, const CipherKeyLen keyLen)
 iCipherSegment*
 createCipherSeg(const CipherMode mode, const CipherKeyLen keyLen)
 {
-    CpuCipherFeatures arch = getCachedCpuFeature();
+    CpuArchLevel arch = CpuId::getCachedArchLevel(AlgorithmType::eCipher);
 
-    if (arch < CpuCipherFeatures::eAesni) {
+    if (arch < CpuArchLevel::eZen) {
         printf("\n Error: Reference kernel not supported ");
         return nullptr;
     }

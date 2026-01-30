@@ -32,7 +32,7 @@
 
 #include "alcp/mac/poly1305.hh"
 
-using alcp::utils::CpuArchFeature;
+using alcp::utils::CpuArchLevel;
 
 std::string
 parseBytesToHexStr(const Uint8* bytes, const int length)
@@ -58,7 +58,7 @@ using alcp::mac::poly1305::Poly1305;
 
 TEST(POLY1305, INIT_TEST)
 {
-    Poly1305<CpuArchFeature::eDynamic> poly;
+    Poly1305<CpuArchLevel::eDynamic> poly;
 }
 
 TEST(POLY1305, BLK0)
@@ -72,7 +72,7 @@ TEST(POLY1305, BLK0)
     std::vector<Uint8> out = { 0xfd, 0x86, 0x1c, 0x71, 0x84, 0xf9, 0x8f, 0x45,
                                0xdc, 0x6d, 0x5b, 0x4d, 0xc6, 0xc0, 0x81, 0xe4 };
 
-    Poly1305<CpuArchFeature::eDynamic> poly;
+    Poly1305<CpuArchLevel::eDynamic> poly;
     std::vector<Uint8>                 mac(16);
     poly.init(key, 32);
     poly.update(blk, 16);
@@ -94,7 +94,7 @@ TEST(POLY1305, BLK_ALL)
     std::vector<Uint8> out = { 0xa8, 0x06, 0x1d, 0xc1, 0x30, 0x51, 0x36, 0xc6,
                                0xc2, 0x2b, 0x8b, 0xaf, 0x0c, 0x01, 0x27, 0xa9 };
 
-    Poly1305<CpuArchFeature::eDynamic> poly;
+    Poly1305<CpuArchLevel::eDynamic> poly;
     std::vector<Uint8>                 mac(16);
     poly.init(key, 32);
     poly.update(blk, sizeof(blk));
@@ -117,7 +117,7 @@ TEST(POLY1305, BLK_ALL_UPDATE_16)
     std::vector<Uint8> out = { 0xa8, 0x06, 0x1d, 0xc1, 0x30, 0x51, 0x36, 0xc6,
                                0xc2, 0x2b, 0x8b, 0xaf, 0x0c, 0x01, 0x27, 0xa9 };
 
-    Poly1305<CpuArchFeature::eDynamic> poly;
+    Poly1305<CpuArchLevel::eDynamic> poly;
     poly.init(key, 32);
     std::vector<Uint8> mac(16);
     poly.update(blk, 16);
@@ -142,7 +142,7 @@ TEST(POLY1305, BLK_ALL_UPDATE)
     std::vector<Uint8> out = { 0xa8, 0x06, 0x1d, 0xc1, 0x30, 0x51, 0x36, 0xc6,
                                0xc2, 0x2b, 0x8b, 0xaf, 0x0c, 0x01, 0x27, 0xa9 };
 
-    Poly1305<CpuArchFeature::eDynamic> poly;
+    Poly1305<CpuArchLevel::eDynamic> poly;
     poly.init(key, 32);
     std::vector<Uint8> mac(16);
     poly.update(blk, sizeof(blk));
@@ -166,7 +166,7 @@ TEST(POLY1305, BLK_ALL_UPDATE_RESET)
     std::vector<Uint8> out = { 0xa8, 0x06, 0x1d, 0xc1, 0x30, 0x51, 0x36, 0xc6,
                                0xc2, 0x2b, 0x8b, 0xaf, 0x0c, 0x01, 0x27, 0xa9 };
 
-    Poly1305<CpuArchFeature::eDynamic> poly;
+    Poly1305<CpuArchLevel::eDynamic> poly;
     poly.init(key, 32);
     std::vector<Uint8> mac(16);
     poly.update(blk, 16);
@@ -192,7 +192,7 @@ TEST(POLY1305, BLK_ALL_FINALIZE_RESET_FINALIZE)
     std::vector<Uint8> out = { 0xa8, 0x06, 0x1d, 0xc1, 0x30, 0x51, 0x36, 0xc6,
                                0xc2, 0x2b, 0x8b, 0xaf, 0x0c, 0x01, 0x27, 0xa9 };
 
-    Poly1305<CpuArchFeature::eDynamic> poly;
+    Poly1305<CpuArchLevel::eDynamic> poly;
     poly.init(key, 32);
     std::vector<Uint8> mac(16);
     poly.update(blk, sizeof(blk));
@@ -218,7 +218,7 @@ TEST(POLY1305, BLK_ALL_FINALIZE_UPDATE)
     std::vector<Uint8> out = { 0xa8, 0x06, 0x1d, 0xc1, 0x30, 0x51, 0x36, 0xc6,
                                0xc2, 0x2b, 0x8b, 0xaf, 0x0c, 0x01, 0x27, 0xa9 };
 
-    Poly1305<CpuArchFeature::eDynamic> poly;
+    Poly1305<CpuArchLevel::eDynamic> poly;
     poly.init(key, 32);
     std::vector<Uint8> mac(16);
     poly.update(blk, sizeof(blk));
@@ -242,7 +242,7 @@ TEST(POLY1305, BLK_ALL_FINALIZE_FINALIZE)
     std::vector<Uint8> out = { 0xa8, 0x06, 0x1d, 0xc1, 0x30, 0x51, 0x36, 0xc6,
                                0xc2, 0x2b, 0x8b, 0xaf, 0x0c, 0x01, 0x27, 0xa9 };
 
-    Poly1305<CpuArchFeature::eDynamic> poly;
+    Poly1305<CpuArchLevel::eDynamic> poly;
     poly.init(key, 32);
     std::vector<Uint8> mac(16);
     poly.finalize(blk, sizeof(blk));
@@ -309,7 +309,7 @@ TEST(POLY1305, BLK_X8_TO_X1)
     std::vector<Uint8> out = { 0x53, 0xc0, 0x52, 0x71, 0x74, 0x30, 0x71, 0x71,
                                0xf0, 0x67, 0xf2, 0xed, 0xae, 0x41, 0xf0, 0x7f };
 
-    Poly1305<CpuArchFeature::eDynamic> poly;
+    Poly1305<CpuArchLevel::eDynamic> poly;
 
     poly.init(key, 32);
 
@@ -381,7 +381,7 @@ TEST(POLY1305, BLK_X1_TO_X8)
     std::vector<Uint8> out = { 0x53, 0xc0, 0x52, 0x71, 0x74, 0x30, 0x71, 0x71,
                                0xf0, 0x67, 0xf2, 0xed, 0xae, 0x41, 0xf0, 0x7f };
 
-    Poly1305<CpuArchFeature::eDynamic> poly;
+    Poly1305<CpuArchLevel::eDynamic> poly;
 
     poly.init(key, 32);
 

@@ -30,11 +30,12 @@
 #include "alcp/cipher.hh"
 #include "alcp/cipher/common.hh"
 #include "alcp/utils/copy.hh"
-#include "alcp/utils/cpuid.hh"
 
 // TODO: Currently CMAC is AES-CMAC, Once IEncrypter is complete, revisit the
 // class design
 namespace alcp::mac {
+using utils::AlgorithmType;
+using utils::CpuArchLevel;
 using utils::CpuId;
 
 Cmac::Cmac()
@@ -88,7 +89,9 @@ Cmac::update(const Uint8* pMsgBuf, Uint64 size)
         return err;
     }
 
-    static bool has_avx2_aesni = CpuId::cpuHasAvx2() && CpuId::cpuHasAesni();
+    static bool has_avx2_aesni =
+        CpuId::getCachedArchLevel(AlgorithmType::eCipher)
+        >= CpuArchLevel::eZen;
 
     // No need to Process anything for empty block
     if (size == 0) {
@@ -192,7 +195,9 @@ Cmac::finalize(Uint8* pMsgBuf, Uint64 size)
         return err;
     }
 
-    static bool has_avx2_aesni = CpuId::cpuHasAvx2() && CpuId::cpuHasAesni();
+    static bool has_avx2_aesni =
+        CpuId::getCachedArchLevel(AlgorithmType::eCipher)
+        >= CpuArchLevel::eZen;
 
     if (has_avx2_aesni) {
         avx2::finalize(m_buff,

@@ -137,10 +137,7 @@ Sha2MB<digest_len>::dequeue(Uint8**      ppDstBuf,
 {
     alc_error_t err = ALC_ERROR_NONE;
 
-    static bool avx512_available =
-        CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_VL)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW);
+    static bool avx512_available = CpuId::cpuHasAvx512VL();
 
     if (__builtin_expect((m_num_buffers == 0) || (numBuffers == 0)
                              || (numBuffers > m_num_buffers),

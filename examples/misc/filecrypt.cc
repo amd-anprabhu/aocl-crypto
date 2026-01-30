@@ -165,10 +165,10 @@ namespace framework {
 
         void writeBytes(const std::vector<Uint8>& in)
         {
-            if (!write_mode) {
+            if (!write_mode || in.empty()) {
                 return;
             }
-            oFile->write(reinterpret_cast<const char*>(&in.at(0)), in.size());
+            oFile->write(reinterpret_cast<const char*>(in.data()), in.size());
             oFile->flush();
         }
         ~File()
@@ -347,6 +347,8 @@ namespace crypto {
             auto cipher = createCipherFromString(mode);
 
             if (cipher == nullptr) {
+                std::cerr << "Error: Failed to create cipher for mode: " << mode
+                          << " (CPU features not supported?)" << std::endl;
                 assert(cipher != nullptr); // To be caught in debugging
                 return std::vector<Uint8>(0);
             }
@@ -354,7 +356,7 @@ namespace crypto {
             err =
                 cipher->init(getPtr(key), key.size() * 8, getPtr(iv), iv.size());
             if (err != ALC_ERROR_NONE) {
-                printf("Error: Unable to Init \n");
+                std::cerr << "Error: Unable to initialize cipher" << std::endl;
                 delete cipher;
                 return std::vector<Uint8>(0);
             }
@@ -362,7 +364,7 @@ namespace crypto {
             Uint64 outlen = 0;
             err = cipher->encrypt(getPtr(in), getPtr(out), in.size(), &outlen);
             if (err != ALC_ERROR_NONE) {
-                printf("Error: Unable to Encrypt \n");
+                std::cerr << "Error: Unable to encrypt" << std::endl;
                 delete cipher;
                 return std::vector<Uint8>(0);
             }
@@ -386,6 +388,8 @@ namespace crypto {
             auto        cipher = createCipherFromString(mode);
 
             if (cipher == nullptr) {
+                std::cerr << "Error: Failed to create cipher for mode: " << mode
+                          << " (CPU features not supported?)" << std::endl;
                 assert(cipher != nullptr); // To be caught in debugging
                 return std::vector<Uint8>(0);
             }
@@ -393,7 +397,7 @@ namespace crypto {
             err =
                 cipher->init(getPtr(key), key.size() * 8, getPtr(iv), iv.size());
             if (err != ALC_ERROR_NONE) {
-                printf("Error: Unable to Init \n");
+                std::cerr << "Error: Unable to initialize cipher" << std::endl;
                 delete cipher;
                 return std::vector<Uint8>(0);
             }
@@ -401,7 +405,7 @@ namespace crypto {
             Uint64 outlen = 0;
             err = cipher->decrypt(getPtr(in), getPtr(out), in.size(), &outlen);
             if (err != ALC_ERROR_NONE) {
-                printf("Error: Unable to Encrypt \n");
+                std::cerr << "Error: Unable to decrypt" << std::endl;
                 delete cipher;
                 return std::vector<Uint8>(0);
             }
@@ -559,6 +563,12 @@ main(int argc, char const* argv[])
     if (isDecrypt) {
         Decryptor d(std::make_unique<Crypt>());
         data = d.decrypt(algorithm, data, key, iv);
+    }
+
+    if (data.empty()) {
+        std::cerr << "Error: Encryption/Decryption failed, no output produced"
+                  << std::endl;
+        return -1;
     }
 
     fo.writeBytes(data);

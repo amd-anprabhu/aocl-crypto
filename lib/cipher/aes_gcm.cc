@@ -29,7 +29,6 @@
 #include "alcp/cipher/aes_gcm.hh"
 #include "alcp/cipher/cipher_wrapper.hh"
 #include "alcp/utils/compare.hh"
-#include "alcp/utils/cpuid.hh"
 
 #include <immintrin.h>
 #include <wmmintrin.h>
@@ -42,7 +41,7 @@ namespace alcp::cipher {
 
 
 // init implementation
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 GcmT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv, Uint64 ivLen)
 {
@@ -95,7 +94,7 @@ GcmT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv,
 }
 
 // Helper function to process buffered AAD data
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 inline alc_error_t
 GcmT<keyLenBits, arch>::processBufferedAad()
 {
@@ -128,7 +127,7 @@ GcmT<keyLenBits, arch>::processBufferedAad()
 #define INTERNAL_TAG_MATCH 1
 
 // setAad implementation
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 GcmT<keyLenBits, arch>::setAad(const Uint8* pInput, Uint64 aadLen)
 {
@@ -174,7 +173,7 @@ GcmT<keyLenBits, arch>::setAad(const Uint8* pInput, Uint64 aadLen)
 }
 
 // setTagLength implementation
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 GcmT<keyLenBits, arch>::setTagLength(Uint64 tagLength)
 {
@@ -189,7 +188,7 @@ GcmT<keyLenBits, arch>::setTagLength(Uint64 tagLength)
 }
 
 // decrypt implementation
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 GcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
                                Uint8*       pOutput,
@@ -324,13 +323,13 @@ GcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
 }
 
 // Helper function to call the appropriate decryption backend
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 GcmT<keyLenBits, arch>::decryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64 len)
 {
     alc_error_t err = ALC_ERROR_NONE;
 
-    if constexpr (arch == CpuCipherFeatures::eVaes512) {
+    if constexpr (arch == CpuArchLevel::eZen4) {
         if constexpr (keyLenBits == CipherKeyLen::eKey128Bit) {
             err = vaes512::decryptGcm128(pInput,
                                          pOutput,
@@ -359,7 +358,7 @@ GcmT<keyLenBits, arch>::decryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64
                                          &m_gcm_ctx);
             return err;
         }
-    } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
+    } else if constexpr (arch == CpuArchLevel::eZen3) {
         if constexpr (keyLenBits == CipherKeyLen::eKey128Bit) {
             err = vaes::decryptGcm128(pInput,
                                       pOutput,
@@ -388,7 +387,7 @@ GcmT<keyLenBits, arch>::decryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64
                                       &m_gcm_ctx);
             return err;
         }
-    } else if constexpr (arch == CpuCipherFeatures::eAesni) {
+    } else if constexpr (arch == CpuArchLevel::eZen) {
         err = aesni::CryptGcm(pInput,
                               pOutput,
                               len,
@@ -403,7 +402,7 @@ GcmT<keyLenBits, arch>::decryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64
 }
 
 // encrypt implementation
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 GcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
                                Uint8*       pOutput,
@@ -539,13 +538,13 @@ GcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
 
 
 // Helper function to call the appropriate encryption backend
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 GcmT<keyLenBits, arch>::encryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64 len)
 {
     alc_error_t err = ALC_ERROR_NONE;
 
-    if constexpr (arch == CpuCipherFeatures::eVaes512) {
+    if constexpr (arch == CpuArchLevel::eZen4) {
         if constexpr (keyLenBits == CipherKeyLen::eKey128Bit) {
             err = vaes512::encryptGcm128(pInput,
                                          pOutput,
@@ -574,7 +573,7 @@ GcmT<keyLenBits, arch>::encryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64
                                          &m_gcm_ctx);
             return err;
         }
-    } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
+    } else if constexpr (arch == CpuArchLevel::eZen3) {
         if constexpr (keyLenBits == CipherKeyLen::eKey128Bit) {
             err = vaes::encryptGcm128(pInput,
                                       pOutput,
@@ -603,7 +602,7 @@ GcmT<keyLenBits, arch>::encryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64
                                       &m_gcm_ctx);
             return err;
         }
-    } else if constexpr (arch == CpuCipherFeatures::eAesni) {
+    } else if constexpr (arch == CpuArchLevel::eZen) {
         err = aesni::CryptGcm(pInput,
                               pOutput,
                               len,
@@ -618,7 +617,7 @@ GcmT<keyLenBits, arch>::encryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64
 }
 
 // getTag implementation
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 GcmT<keyLenBits, arch>::getTag(Uint8* ptag, Uint64 tagLen)
 {
@@ -704,16 +703,16 @@ GcmT<keyLenBits, arch>::getTag(Uint8* ptag, Uint64 tagLen)
 }
 
 // Explicit template instantiations for GcmT
-template class GcmT<CipherKeyLen::eKey128Bit, CpuCipherFeatures::eVaes512>;
-template class GcmT<CipherKeyLen::eKey192Bit, CpuCipherFeatures::eVaes512>;
-template class GcmT<CipherKeyLen::eKey256Bit, CpuCipherFeatures::eVaes512>;
+template class GcmT<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen4>;
+template class GcmT<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen4>;
+template class GcmT<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen4>;
 
-template class GcmT<CipherKeyLen::eKey128Bit, CpuCipherFeatures::eVaes256>;
-template class GcmT<CipherKeyLen::eKey192Bit, CpuCipherFeatures::eVaes256>;
-template class GcmT<CipherKeyLen::eKey256Bit, CpuCipherFeatures::eVaes256>;
+template class GcmT<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen3>;
+template class GcmT<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen3>;
+template class GcmT<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen3>;
 
-template class GcmT<CipherKeyLen::eKey128Bit, CpuCipherFeatures::eAesni>;
-template class GcmT<CipherKeyLen::eKey192Bit, CpuCipherFeatures::eAesni>;
-template class GcmT<CipherKeyLen::eKey256Bit, CpuCipherFeatures::eAesni>;
+template class GcmT<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen>;
+template class GcmT<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen>;
+template class GcmT<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen>;
 
 } // namespace alcp::cipher
