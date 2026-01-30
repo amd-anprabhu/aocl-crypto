@@ -44,10 +44,14 @@ Cmac::Cmac()
 Cmac::Cmac(const Cmac& cmac)
     : m_keyManager() // KeyManager is non-copyable, create new instance
 {
+    if (cmac.m_keyManager.isKeySet()) {
+        m_keyManager.copyKeyStateFrom(cmac.m_keyManager);
+        m_encrypt_keys = m_keyManager.getEncryptKeys();
+    } else {
+        m_encrypt_keys = nullptr;
+    }
     utils::CopyBytes(m_k1, cmac.m_k1, cAESBlockSize);
     utils::CopyBytes(m_k2, cmac.m_k2, cAESBlockSize);
-    // Note: m_encrypt_keys will be set when init() is called
-    m_encrypt_keys = nullptr;
     utils::CopyBytes(m_buff, cmac.m_buff, cAESBlockSize);
     m_buff_offset = cmac.m_buff_offset;
     utils::CopyBytes(m_buffEnc, cmac.m_buffEnc, cAESBlockSize);

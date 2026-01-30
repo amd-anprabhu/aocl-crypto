@@ -394,8 +394,8 @@ main(int argc, char** argv)
                 testlibs.insert(testlibs.begin(),
                                 static_cast<Int64>(LibrarySelect::OPENSSL));
 #else
-                printErrors("OpenSSL unavailable at compile time!");
-                return -1;
+                printErrors(
+                    "OpenSSL unavailable at compile time! Defaulting to ALCP.");
 #endif
             }
             if (std::get<bool>(argsMap["USE_IPP"].value) == true) {
@@ -403,13 +403,18 @@ main(int argc, char** argv)
                 testlibs.insert(testlibs.begin(),
                                 static_cast<Int64>(LibrarySelect::IPP));
 #else
-                printErrors("IPP unavailable at compile time!");
-                return -1;
+                printErrors(
+                    "IPP unavailable at compile time! Defaulting to ALCP.");
 #endif
             }
         }
     } catch (const std::bad_variant_access& e) {
         std::cout << e.what() << '\n';
+    }
+
+    // If the requested library isn't compiled in, run ALCP instead of failing.
+    if (testlibs.empty()) {
+        testlibs.insert(testlibs.begin(), static_cast<Int64>(LibrarySelect::ALCP));
     }
 
     /* check if custom block size is provided by user */

@@ -79,14 +79,13 @@ ALCP_prov_aes_siv_newctx(void*        provctx,
 
         if (alcp_is_error(err)) {
             printf("Failure in SIV AEAD Request\n");
-        }
-
-        if (err == ALC_ERROR_NONE) {
-            ALCP_prov_siv_initctx(provctx, ctx, keybits, mode);
-        } else {
+            OPENSSL_free(ctx->base.handle.ch_context);
+            ctx->base.handle.ch_context = NULL;
             OPENSSL_clear_free(ctx, sizeof(*ctx));
             return NULL;
         }
+
+        ALCP_prov_siv_initctx(provctx, ctx, keybits, mode);
     }
     EXIT();
     return ctx;
@@ -99,7 +98,7 @@ aes_siv_freectx(void* vctx)
     ALCP_PROV_AES_CTX* ctx = (ALCP_PROV_AES_CTX*)vctx;
     if ((ctx != NULL) && (ctx->base.handle.ch_context != NULL)) {
         // free alcp
-        alcp_cipher_finish(&(ctx->base.handle));
+        alcp_cipher_aead_finish(&(ctx->base.handle));
         OPENSSL_free(ctx->base.handle.ch_context);
         ctx->base.handle.ch_context = NULL;
     }

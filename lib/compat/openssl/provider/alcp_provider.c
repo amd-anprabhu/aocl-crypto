@@ -38,9 +38,6 @@ static void
 ALCP_prov_freectx(alc_prov_ctx_t* alcpctx)
 {
     if (alcpctx != NULL) {
-        if (alcpctx->libctx != NULL) {
-            OSSL_LIB_CTX_free(alcpctx->libctx);
-        }
         OPENSSL_free(alcpctx);
     }
 }
@@ -273,15 +270,7 @@ OSSL_provider_init(const OSSL_CORE_HANDLE* handle,
         printf("\n alcp provider init failed");
         return 0;
     } else {
-#if 1
-        alcpctx->libctx = OSSL_LIB_CTX_new_from_dispatch(handle, in);
-#else
-        alcpctx->libctx = OSSL_LIB_CTX_new();
-#endif
-        if (alcpctx->libctx == NULL) {
-            ALCP_teardown((void*)alcpctx);
-            return 0;
-        }
+        alcpctx->libctx          = NULL;
         alcpctx->ap_core_handle = handle;
     }
     alcpctx->corebiometh = alcp_bio_prov_init_bio_method();
