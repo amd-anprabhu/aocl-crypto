@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -36,13 +36,15 @@
 #include "alcp/utils/cpuid.hh"
 #include "debug_defs.hh"
 #include "randomize.hh"
+#include <exception>
+#include <iostream>
 
 #undef DEBUG
 
 // Factory removed
-using alcp::cipher::createCipher;
-using alcp::cipher::CipherMode;
 using alcp::cipher::CipherKeyLen;
+using alcp::cipher::CipherMode;
+using alcp::cipher::createCipher;
 using alcp::cipher::iCipher;
 namespace alcp::cipher::unittest::cfb {
 std::vector<Uint8> key = { 0x4b, 0x59, 0x9b, 0x08, 0x42, 0x1c, 0x8e, 0xe5,
@@ -114,18 +116,18 @@ using namespace alcp::cipher::unittest;
 using namespace alcp::cipher::unittest::cfb;
 TEST(CFB, creation)
 {
-    std::vector<CpuArchLevel> cpuFeatures = alcp::utils::CpuId::getSupportedArchLevels();
+    std::vector<CpuArchLevel> cpuFeatures =
+        alcp::utils::CpuId::getSupportedArchLevels();
     for ([[maybe_unused]] CpuArchLevel feature : cpuFeatures) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
-            << static_cast<
-                   typename std::underlying_type<CpuArchLevel>::type>(
+            << static_cast<typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
         // Factory removed
-        auto cfb        = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+        auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
         if (cfb == nullptr) {
             delete cfb;
             FAIL();
@@ -137,7 +139,7 @@ TEST(CFB, creation)
 TEST(CFB, BasicEncryption)
 {
     // Factory removed
-    auto cfb        = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
 
     if (cfb == nullptr) {
         delete cfb;
@@ -158,7 +160,7 @@ TEST(CFB, BasicEncryption)
 TEST(CFB, BasicDecryption)
 {
     // Factory removed
-    auto cfb        = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
 
     if (cfb == nullptr) {
         delete cfb;
@@ -182,7 +184,7 @@ TEST(CFB, MultiUpdateEncryption)
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
     // Factory removed
-    auto cfb        = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+    auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
 
     if (cfb == nullptr) {
         delete cfb;
@@ -213,12 +215,13 @@ TEST(CFB, MultiUpdateDecryption)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
     for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
         // Factory removed
-        auto cfb        = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
+        auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey128Bit);
 
         if (cfb == nullptr) {
             delete cfb;
@@ -266,22 +269,23 @@ TEST(CFB, RandomEncryptDecryptTest)
     random->getRandomBytes(key_256, 32);
     random->getRandomBytes(iv, 16);
 
-    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
     for (int i = (cTextSize - 16); i > 16; i -= 16)
         for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
-            std::cout
-                << "Cpu Feature:"
-                << static_cast<
-                       typename std::underlying_type<CpuArchLevel>::type>(
-                       feature)
-                << std::endl;
+            std::cout << "Cpu Feature:"
+                      << static_cast<
+                             typename std::underlying_type<CpuArchLevel>::type>(
+                             feature)
+                      << std::endl;
 #endif
             const std::vector<Uint8> plainTextVect(plain_text_vect.begin() + i,
                                                    plain_text_vect.end());
             std::vector<Uint8>       plainTextOut(plainTextVect.size());
-            auto cfb = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey256Bit);
+            auto                     cfb =
+                createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey256Bit);
 
             if (cfb == nullptr) {
                 delete cfb;
@@ -320,6 +324,18 @@ TEST(CFB, RandomEncryptDecryptTest)
 int
 main(int argc, char** argv)
 {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    try {
+        ::testing::InitGoogleTest(&argc, argv);
+        return RUN_ALL_TESTS();
+
+    } catch (const std::exception& e) {
+        std::cerr << "Unhandled exception: " << e.what() << std::endl;
+        return 1;
+    } catch (const char* e) {
+        std::cerr << "Unhandled exception: " << e << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "Unknown exception caught" << std::endl;
+        return 1;
+    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -177,9 +177,9 @@ TEST(Sha256Test, object_copy_test)
 
 TEST_P(Sha256Test, multibuffer_digest_generate)
 {
-    const auto [plaintext, digest]   = GetParam().second;
-    std::unique_ptr<Sha256MB> sha256 = std::make_unique<Sha256MB>();
-    Uint8                     hash[DigestSize];
+    const auto [plaintext, digest]             = GetParam().second;
+    std::unique_ptr<Sha256MB> sha256           = std::make_unique<Sha256MB>();
+    Uint8                     hash[DigestSize] = { 0 };
     std::stringstream         ss;
 
     const Uint8* pp_src[16];

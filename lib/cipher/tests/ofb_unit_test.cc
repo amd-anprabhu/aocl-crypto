@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -35,14 +35,16 @@
 #include "alcp/cipher/cipher_wrapper.hh"
 #include "debug_defs.hh"
 #include "randomize.hh"
+#include <exception>
+#include <iostream>
 
 #undef DEBUG
 
 // Factory removed
-using alcp::cipher::iCipher;
-using alcp::cipher::createCipher;
-using alcp::cipher::CipherMode;
 using alcp::cipher::CipherKeyLen;
+using alcp::cipher::CipherMode;
+using alcp::cipher::createCipher;
+using alcp::cipher::iCipher;
 namespace alcp::cipher::unittest::ofb {
 std::vector<Uint8> key = { 0x0d, 0x3c, 0x13, 0x53, 0xea, 0x0f, 0x01, 0x06,
                            0x83, 0x47, 0x98, 0xc8, 0x6d, 0x3d, 0xc7, 0x4e };
@@ -115,7 +117,7 @@ using namespace alcp::cipher::unittest::ofb;
 
 TEST(OFB, creation)
 {
-        auto ofb        = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
+    auto ofb = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
     if (ofb == nullptr) {
         delete ofb;
         FAIL();
@@ -126,7 +128,7 @@ TEST(OFB, creation)
 TEST(OFB, BasicEncryption)
 {
 
-        auto ofb        = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
+    auto ofb = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
 
     if (ofb == nullptr) {
         delete ofb;
@@ -145,7 +147,7 @@ TEST(OFB, BasicEncryption)
 
 TEST(OFB, BasicDecryption)
 {
-        auto ofb        = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
+    auto ofb = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
 
     if (ofb == nullptr) {
         delete ofb;
@@ -167,7 +169,7 @@ TEST(OFB, MultiUpdateEncryption)
 #ifndef OFB_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-        auto ofb        = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
+    auto ofb = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
 
     if (ofb == nullptr) {
         delete ofb;
@@ -202,7 +204,7 @@ TEST(OFB, MultiUpdateDecryption)
 #ifndef OFB_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-        auto ofb        = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
+    auto ofb = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
 
     if (ofb == nullptr) {
         delete ofb;
@@ -252,7 +254,7 @@ TEST(OFB, RandomEncryptDecryptTest)
                                                plainText_vect.end());
         std::vector<Uint8>       plainTextOut(plainTextVect.size());
 
-                auto ofb        = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey256Bit);
+        auto ofb = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey256Bit);
 
         if (ofb == nullptr) {
             delete ofb;
@@ -301,6 +303,18 @@ TEST(OFB, RandomEncryptDecryptTest)
 int
 main(int argc, char** argv)
 {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    try {
+        ::testing::InitGoogleTest(&argc, argv);
+        return RUN_ALL_TESTS();
+
+    } catch (const std::exception& e) {
+        std::cerr << "Unhandled exception: " << e.what() << std::endl;
+        return 1;
+    } catch (const char* e) {
+        std::cerr << "Unhandled exception: " << e << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "Unknown exception caught" << std::endl;
+        return 1;
+    }
 }

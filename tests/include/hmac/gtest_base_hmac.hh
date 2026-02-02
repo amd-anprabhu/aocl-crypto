@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -137,7 +137,7 @@ Hmac_KAT(alc_digest_mode_t HmacDigestMode)
                 std::vector<Uint8*>       mb_hmac(buffers);
 
                 for (Uint64 i = 0; i < buffers; ++i) {
-                    mb_msg[i]  = &(msg[0]);
+                    mb_msg[i]  = msg.data();
                     mb_hmac[i] = (Uint8*)std::malloc(hash_bytes);
                     ASSERT_NE(mb_hmac[i], nullptr);
                 }

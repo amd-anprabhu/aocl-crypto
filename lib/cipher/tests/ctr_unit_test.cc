@@ -36,13 +36,15 @@
 #include "alcp/utils/cpuid.hh"
 #include "debug_defs.hh"
 #include "randomize.hh"
+#include <exception>
+#include <iostream>
 
 #undef DEBUG
 
 // Factory removed
-using alcp::cipher::createCipher;
-using alcp::cipher::CipherMode;
 using alcp::cipher::CipherKeyLen;
+using alcp::cipher::CipherMode;
+using alcp::cipher::createCipher;
 using alcp::cipher::iCipher;
 namespace alcp::cipher::unittest::ctr {
 std::vector<Uint8> key = { 0x78, 0xfd, 0x59, 0x2e, 0x80, 0x4d, 0x37, 0x66,
@@ -169,18 +171,18 @@ using namespace alcp::cipher::unittest;
 using namespace alcp::cipher::unittest::ctr;
 TEST(CTR, creation)
 {
-    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
     for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
-            << static_cast<
-                   typename std::underlying_type<CpuArchLevel>::type>(
+            << static_cast<typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
         // Factory removed
-        auto ctr        = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
+        auto ctr = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
         if (ctr == nullptr) {
             delete ctr;
             FAIL();
@@ -192,7 +194,7 @@ TEST(CTR, creation)
 TEST(CTR, BasicEncryption)
 {
     // Factory removed
-    auto ctr        = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
+    auto ctr = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
 
     if (ctr == nullptr) {
         delete ctr;
@@ -224,7 +226,7 @@ TEST(CTR, BasicEncryption)
 TEST(CTR, BasicDecryption)
 {
     // Factory removed
-    auto ctr        = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
+    auto ctr = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
 
     if (ctr == nullptr) {
         delete ctr;
@@ -261,12 +263,13 @@ TEST(CTR, MultiUpdateEncryption)
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
 
-    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
     for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
         // Factory removed
-        auto ctr        = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
+        auto ctr = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
 
         if (ctr == nullptr) {
             delete ctr;
@@ -297,12 +300,13 @@ TEST(CTR, MultiUpdateDecryption)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
     for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
         // Factory removed
-        auto ctr        = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
+        auto ctr = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
 
         if (ctr == nullptr) {
             delete ctr;
@@ -335,7 +339,8 @@ TEST(CTR, MultiUpdateDecryption)
 /**
  * @brief Test that verifies separate key/IV initialization works correctly.
  *
- * This tests the feature where iCipher::init() can be called as below with Key and IV serparately
+ * This tests the feature where iCipher::init() can be called as below with Key
+ * and IV serparately
  *   1. init(nullptr, 0, iv, ivlen)  - IV only
  *   2. init(key, keylen, nullptr, 0) - Key only
  *
@@ -345,6 +350,8 @@ TEST(CTR, SeparateKeyIvInit)
     // Use the test vectors from the namespace
     auto ctr = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
     ASSERT_NE(ctr, nullptr) << "Failed to create CTR cipher";
+    if (ctr == nullptr)
+        return;
 
     std::vector<Uint8> output(cipherText.size());
 
@@ -362,8 +369,7 @@ TEST(CTR, SeparateKeyIvInit)
     // Step 3: Encrypt
     Uint64 outlen = 0;
     err = ctr->encrypt(&plainText[0], &output[0], plainText.size(), &outlen);
-    EXPECT_FALSE(alcp_is_error(err))
-        << "encrypt failed after separate init";
+    EXPECT_FALSE(alcp_is_error(err)) << "encrypt failed after separate init";
     EXPECT_EQ(outlen, plainText.size()) << "Encrypt output length mismatch";
 
     // Verify encryption result matches expected ciphertext
@@ -375,6 +381,8 @@ TEST(CTR, SeparateKeyIvInit)
     // Test Pattern 2: Key first, then IV
     ctr = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
     ASSERT_NE(ctr, nullptr) << "Failed to create CTR cipher (2)";
+    if (ctr == nullptr)
+        return;
 
     std::vector<Uint8> decrypted(plainText.size());
 
@@ -390,9 +398,9 @@ TEST(CTR, SeparateKeyIvInit)
 
     // Step 3: Decrypt (CTR mode is symmetric)
     outlen = 0;
-    err = ctr->decrypt(&cipherText[0], &decrypted[0], cipherText.size(), &outlen);
-    EXPECT_FALSE(alcp_is_error(err))
-        << "decrypt failed after separate init";
+    err =
+        ctr->decrypt(&cipherText[0], &decrypted[0], cipherText.size(), &outlen);
+    EXPECT_FALSE(alcp_is_error(err)) << "decrypt failed after separate init";
     EXPECT_EQ(outlen, cipherText.size()) << "Decrypt output length mismatch";
 
     // Verify decryption matches original plaintext
@@ -404,6 +412,8 @@ TEST(CTR, SeparateKeyIvInit)
     // Test Pattern 3: Combined init still works (sanity check)
     ctr = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
     ASSERT_NE(ctr, nullptr) << "Failed to create CTR cipher (3)";
+    if (ctr == nullptr)
+        return;
 
     std::vector<Uint8> output2(cipherText.size());
 
@@ -414,8 +424,7 @@ TEST(CTR, SeparateKeyIvInit)
 
     outlen = 0;
     err = ctr->encrypt(&plainText[0], &output2[0], plainText.size(), &outlen);
-    EXPECT_FALSE(alcp_is_error(err))
-        << "encrypt failed after combined init";
+    EXPECT_FALSE(alcp_is_error(err)) << "encrypt failed after combined init";
 
     // Both encryption methods should produce the same result
     EXPECT_EQ(output, output2)
@@ -442,22 +451,23 @@ TEST(CTR, RandomEncryptDecryptTest)
     random->getRandomBytes(key_256, 32);
     random->getRandomBytes(iv, 16);
 
-    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
     for (int i = (cTextSize - 16); i > 16; i -= 16)
         for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
-            std::cout
-                << "Cpu Feature:"
-                << static_cast<
-                       typename std::underlying_type<CpuArchLevel>::type>(
-                       feature)
-                << std::endl;
+            std::cout << "Cpu Feature:"
+                      << static_cast<
+                             typename std::underlying_type<CpuArchLevel>::type>(
+                             feature)
+                      << std::endl;
 #endif
             const std::vector<Uint8> plainTextVect(plain_text_vect.begin() + i,
                                                    plain_text_vect.end());
             std::vector<Uint8>       plainTextOut(plainTextVect.size());
-            auto ctr = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey256Bit);
+            auto                     ctr =
+                createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey256Bit);
 
             if (ctr == nullptr) {
                 delete ctr;
@@ -519,6 +529,18 @@ TEST(CTR, RandomEncryptDecryptTest)
 int
 main(int argc, char** argv)
 {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    try {
+        ::testing::InitGoogleTest(&argc, argv);
+        return RUN_ALL_TESTS();
+
+    } catch (const std::exception& e) {
+        std::cerr << "Unhandled exception: " << e.what() << std::endl;
+        return 1;
+    } catch (const char* e) {
+        std::cerr << "Unhandled exception: " << e << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "Unknown exception caught" << std::endl;
+        return 1;
+    }
 }

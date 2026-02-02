@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -160,7 +160,7 @@ Digest_KAT(alc_digest_mode_t mode, bool ctx_copy, bool test_squeeze)
             data.m_digest_dup = &(digest_dup_[0]);
             /* FIXME: Hack when msg is NULL, this case is not currently handled
              * in some of the digest apis */
-            data.m_msg = msg.empty() ? &Temp : msg.data();
+            data.m_msg      = msg.empty() ? &Temp : msg.data();
             bool isMsgEmpty = std::all_of(
                 msg.begin(), msg.end(), [](int i) { return i == 0; });
             if (isMsgEmpty) {
@@ -239,7 +239,7 @@ Digest_KAT(alc_digest_mode_t mode, bool ctx_copy, bool test_squeeze)
                 msg_ptr = &Temp;
                 msg_len = 0;
             } else {
-                msg_ptr = &(msg_buf[0]);
+                msg_ptr = msg_buf.data();
             }
             if (isMsgEmpty) {
                 msg_len = 0;
@@ -295,7 +295,7 @@ Digest_KAT(alc_digest_mode_t mode, bool ctx_copy, bool test_squeeze)
             data.m_digest_dup = &(digest_dup[0]);
             /* FIXME: Hack when msg is NULL, this case is not currently handled
              * in some of the digest apis */
-            data.m_msg = msg.empty() ? &Temp : msg.data();
+            data.m_msg      = msg.empty() ? &Temp : msg.data();
             bool isMsgEmpty = std::all_of(
                 msg.begin(), msg.end(), [](int i) { return i == 0; });
             if (isMsgEmpty) {

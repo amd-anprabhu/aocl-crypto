@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -38,6 +38,8 @@
 #include "alcp/utils/cpuid.hh"
 #include "debug_defs.hh"
 #include "randomize.hh"
+#include <exception>
+#include <iostream>
 
 #undef DEBUG
 
@@ -46,9 +48,9 @@ using alcp::cipher::Cbc;
 #endif
 
 // Factory removed
-using alcp::cipher::createCipher;
-using alcp::cipher::CipherMode;
 using alcp::cipher::CipherKeyLen;
+using alcp::cipher::CipherMode;
+using alcp::cipher::createCipher;
 using alcp::cipher::iCipher;
 namespace alcp::cipher::unittest::cbc {
 
@@ -142,18 +144,18 @@ using namespace alcp::cipher::unittest;
 using namespace alcp::cipher::unittest::cbc;
 TEST(CBC, creation)
 {
-    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
     for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
-            << static_cast<
-                   typename std::underlying_type<CpuArchLevel>::type>(
+            << static_cast<typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
         // Factory removed
-        auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
         if (cbc == nullptr) {
             delete cbc;
             FAIL();
@@ -165,7 +167,8 @@ TEST(CBC, creation)
 TEST(CBC, BasicEncryption)
 {
     // Factory removed
-    auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
+    auto cbc = createCipher(CipherMode::eAesCBC,
+                            CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
         delete cbc;
@@ -189,7 +192,8 @@ TEST(CBC, BasicEncryption)
 TEST(CBC, BasicDecryption)
 {
     // Factory removed
-    auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
+    auto cbc = createCipher(CipherMode::eAesCBC,
+                            CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
         delete cbc;
@@ -213,7 +217,8 @@ TEST(CBC, BasicDecryption)
 TEST(CBC, ContextCopyEncryption)
 {
     // Factory removed
-    auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
+    auto cbc = createCipher(CipherMode::eAesCBC,
+                            CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
         delete cbc;
@@ -225,7 +230,7 @@ TEST(CBC, ContextCopyEncryption)
 
     // Copy the context
     // Factory removed
-    auto cbc_copy        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    auto cbc_copy = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
     if (cbc_copy == nullptr) {
         delete cbc;
         FAIL();
@@ -247,7 +252,8 @@ TEST(CBC, ContextCopyEncryption)
 TEST(CBC, ContextCopyDecryption)
 {
     // Factory removed
-    auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
+    auto cbc = createCipher(CipherMode::eAesCBC,
+                            CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
         delete cbc;
@@ -259,7 +265,7 @@ TEST(CBC, ContextCopyDecryption)
 
     // Copy the context
     // Factory removed
-    auto cbc_copy        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    auto cbc_copy = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
     if (cbc_copy == nullptr) {
         delete cbc;
         FAIL();
@@ -284,7 +290,8 @@ TEST(CBC, MultiUpdateEncryption)
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
     // Factory removed
-    auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
+    auto cbc = createCipher(CipherMode::eAesCBC,
+                            CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
         delete cbc;
@@ -319,7 +326,8 @@ TEST(CBC, MultiUpdateEncryptionSmallChunks)
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
     // Factory removed
-    auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
+    auto cbc = createCipher(CipherMode::eAesCBC,
+                            CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
         delete cbc;
@@ -379,20 +387,22 @@ TEST(CBC, MultiUpdateDecryption)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
     for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
-            << static_cast<
-                   typename std::underlying_type<CpuArchLevel>::type>(
+            << static_cast<typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
         // Factory removed
-        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
+        auto cbc =
+            createCipher(CipherMode::eAesCBC,
+                         CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
         if (cbc == nullptr) {
             delete cbc;
@@ -429,7 +439,8 @@ TEST(CBC, MultiUpdateDecryptionSmallChunks)
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
     // Factory removed
-    auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
+    auto cbc = createCipher(CipherMode::eAesCBC,
+                            CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
         delete cbc;
@@ -489,21 +500,22 @@ TEST(CBC, InplaceEncryption)
 #ifndef CBC_INPLACE_BUFFER
     GTEST_SKIP() << "In-place encryption functionality disabled!";
 #endif
-    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
     for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
-            << static_cast<
-                   typename std::underlying_type<CpuArchLevel>::type>(
+            << static_cast<typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
         // Factory removed
         auto cbc =
-            createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
+            createCipher(CipherMode::eAesCBC,
+                         CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
         if (cbc == nullptr) {
             delete cbc;
@@ -537,21 +549,22 @@ TEST(CBC, InplaceDecryption)
 #ifndef CBC_INPLACE_BUFFER
     GTEST_SKIP() << "In-place decryption functionality disabled!";
 #endif
-    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
     for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
-            << static_cast<
-                   typename std::underlying_type<CpuArchLevel>::type>(
+            << static_cast<typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
         // Factory removed
         auto cbc =
-            createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit); // KeySize is 128 bits
+            createCipher(CipherMode::eAesCBC,
+                         CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
         if (cbc == nullptr) {
             delete cbc;
@@ -649,22 +662,22 @@ TEST(CBC, RandomEncryptDecryptTest)
     random->getRandomBytes(key_256, 32);
     random->getRandomBytes(iv, 16);
 
-    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
     for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
-            << static_cast<
-                   typename std::underlying_type<CpuArchLevel>::type>(
+            << static_cast<typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
         const std::vector<Uint8> plainTextVect(plain_text_vect.begin(),
                                                plain_text_vect.end());
         std::vector<Uint8>       plainTextOut(plainTextVect.size());
-            // Factory removed
-            auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey256Bit);
+        // Factory removed
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey256Bit);
 
         if (cbc == nullptr) {
             delete cbc;
@@ -742,7 +755,8 @@ TEST(CBC, MultiBufferRandomTest)
         cipher_text_vect[i] = new Uint8[cTextSize];
     }
 
-    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
     for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
         /* FIXME: run this test only for zen4 for now? */
@@ -757,14 +771,14 @@ TEST(CBC, MultiBufferRandomTest)
             FAIL() << "Failed to create CBC cipher";
         }
         cbc->init(key_256, 256, nullptr, 0);
-        
+
         // Get iMultibuffer interface via dynamic_cast
         auto* mb = dynamic_cast<alcp::cipher::iMultibuffer*>(cbc);
         if (mb == nullptr) {
             delete cbc;
             FAIL() << "CBC cipher does not support multibuffer operations";
         }
-        
+
         // Call multibuffer methods via iMultibuffer interface
         mb->multibufferInit(
             key_256, 256, iv_vect.data(), iv_vect.size(), num_buffers);
@@ -812,10 +826,11 @@ TEST(CBC, MultiUpdateArbitrarySizesVariousUpdateCounts)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
     for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
         // Factory removed
-        auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
 
         if (cbc == nullptr) {
             delete cbc;
@@ -863,7 +878,10 @@ TEST(CBC, MultiUpdateArbitrarySizesVariousUpdateCounts)
             // Test decryption with multi-update - create separate factory for
             // second cipher
             // Factory removed
-            auto cbc2        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+            auto cbc2 =
+                createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+            if (cbc2 == nullptr)
+                return;
             cbc2->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
             size_t output_offset = 0;
@@ -906,6 +924,18 @@ TEST(CBC, MultiUpdateArbitrarySizesVariousUpdateCounts)
 int
 main(int argc, char** argv)
 {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    try {
+        ::testing::InitGoogleTest(&argc, argv);
+        return RUN_ALL_TESTS();
+
+    } catch (const std::exception& e) {
+        std::cerr << "Unhandled exception: " << e.what() << std::endl;
+        return 1;
+    } catch (const char* e) {
+        std::cerr << "Unhandled exception: " << e << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "Unknown exception caught" << std::endl;
+        return 1;
+    }
 }

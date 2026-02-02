@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -188,7 +188,7 @@ TEST(Sha224Test, call_finalize_twice_test)
 {
     std::unique_ptr<Sha224> sha224 = std::make_unique<Sha224>();
     // calling finalize multiple times shoud not result in error
-    Uint8 hash[DigestSize];
+    Uint8 hash[DigestSize] = { 0 };
     EXPECT_EQ(ALC_ERROR_NONE, sha224->finalize(hash, DigestSize));
     EXPECT_EQ(ALC_ERROR_NONE, sha224->finalize(hash, DigestSize));
 }
@@ -250,9 +250,9 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(Sha224Test, multibuffer_digest_generate)
 {
-    const auto [plaintext, digest]   = GetParam().second;
-    std::unique_ptr<Sha224MB> sha224 = std::make_unique<Sha224MB>();
-    Uint8                     hash[DigestSize];
+    const auto [plaintext, digest]             = GetParam().second;
+    std::unique_ptr<Sha224MB> sha224           = std::make_unique<Sha224MB>();
+    Uint8                     hash[DigestSize] = { 0 };
     std::stringstream         ss;
 
     const Uint8* pp_src[16];

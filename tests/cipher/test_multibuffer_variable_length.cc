@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025-2026, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,7 +28,8 @@
 
 /**
  * @file test_multibuffer_variable_length.cc
- * @brief Test variable-length multi-buffer AES encryption (>32 buffers with mixed lengths)
+ * @brief Test variable-length multi-buffer AES encryption (>32 buffers with
+ * mixed lengths)
  */
 
 #include <algorithm>
@@ -46,9 +47,11 @@
 #include "alcp/utils/cpuid.hh"
 
 #include "rng_base.hh"
+#include <exception>
+#include <iostream>
 
-using alcp::Uint8;
 using alcp::Uint64;
+using alcp::Uint8;
 
 class VariableLengthMultibufferTest : public ::testing::Test
 {
@@ -65,11 +68,11 @@ class VariableLengthMultibufferTest : public ::testing::Test
     }
 
     // Helper: Single-buffer reference encryption using standard API
-    std::vector<Uint8> encryptReference(alc_cipher_mode_t mode,
-                                         int key_bits,
-                                         const std::vector<Uint8>& key,
-                                         const std::vector<Uint8>& iv,
-                                         const std::vector<Uint8>& plaintext)
+    std::vector<Uint8> encryptReference(alc_cipher_mode_t         mode,
+                                        int                       key_bits,
+                                        const std::vector<Uint8>& key,
+                                        const std::vector<Uint8>& iv,
+                                        const std::vector<Uint8>& plaintext)
     {
         alc_cipher_handle_t handle;
         handle.ch_context = malloc(alcp_cipher_context_size());
@@ -84,8 +87,8 @@ class VariableLengthMultibufferTest : public ::testing::Test
         }
 
         // Initialize with key and IV
-        err = alcp_cipher_init(&handle, key.data(), key.size() * 8,
-                              iv.data(), iv.size());
+        err = alcp_cipher_init(
+            &handle, key.data(), key.size() * 8, iv.data(), iv.size());
         if (alcp_is_error(err)) {
             alcp_cipher_finish(&handle);
             free(handle.ch_context);
@@ -93,9 +96,12 @@ class VariableLengthMultibufferTest : public ::testing::Test
         }
 
         std::vector<Uint8> ciphertext(plaintext.size());
-        Uint64 outlen = 0;
-        err = alcp_cipher_encrypt(&handle, plaintext.data(), ciphertext.data(),
-                                  plaintext.size(), &outlen);
+        Uint64             outlen = 0;
+        err                       = alcp_cipher_encrypt(&handle,
+                                  plaintext.data(),
+                                  ciphertext.data(),
+                                  plaintext.size(),
+                                  &outlen);
 
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
@@ -115,10 +121,10 @@ TEST_F(VariableLengthMultibufferTest, UniformLengths_40Buffers)
     const int num_buffers = 40;
     const int buffer_size = 1024; // 64 blocks each
 
-    std::vector<Uint8> key = generateRandom(16); // AES-128
+    std::vector<Uint8>              key = generateRandom(16); // AES-128
     std::vector<std::vector<Uint8>> ivs;
     std::vector<std::vector<Uint8>> plaintexts;
-    std::vector<Uint64> lengths;
+    std::vector<Uint64>             lengths;
 
     // Generate test data
     for (int i = 0; i < num_buffers; i++) {
@@ -130,8 +136,8 @@ TEST_F(VariableLengthMultibufferTest, UniformLengths_40Buffers)
     // Get reference ciphertexts
     std::vector<std::vector<Uint8>> expected_ciphertexts;
     for (int i = 0; i < num_buffers; i++) {
-        expected_ciphertexts.push_back(
-            encryptReference(ALC_AES_MODE_CBC, 128, key, ivs[i], plaintexts[i]));
+        expected_ciphertexts.push_back(encryptReference(
+            ALC_AES_MODE_CBC, 128, key, ivs[i], plaintexts[i]));
     }
 
     // Create cipher handle using C API
@@ -144,25 +150,26 @@ TEST_F(VariableLengthMultibufferTest, UniformLengths_40Buffers)
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
     // Initialize cipher (required before multibuffer_init)
-    err = alcp_cipher_init(&handle, key.data(), key.size() * 8, ivs[0].data(), 16);
+    err = alcp_cipher_init(
+        &handle, key.data(), key.size() * 8, ivs[0].data(), 16);
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
     // Prepare pointer arrays
-    std::vector<const Uint8*> plaintext_ptrs(num_buffers);
-    std::vector<const Uint8*> iv_ptrs(num_buffers);
-    std::vector<Uint8*> ciphertext_ptrs(num_buffers);
+    std::vector<const Uint8*>       plaintext_ptrs(num_buffers);
+    std::vector<const Uint8*>       iv_ptrs(num_buffers);
+    std::vector<Uint8*>             ciphertext_ptrs(num_buffers);
     std::vector<std::vector<Uint8>> ciphertexts(num_buffers);
 
     for (int i = 0; i < num_buffers; i++) {
         plaintext_ptrs[i] = plaintexts[i].data();
-        iv_ptrs[i] = ivs[i].data();
+        iv_ptrs[i]        = ivs[i].data();
         ciphertexts[i].resize(buffer_size);
         ciphertext_ptrs[i] = ciphertexts[i].data();
     }
 
     // Initialize multibuffer
-    err = alcp_multibuffer_init(&handle, nullptr, 0,
-                                iv_ptrs.data(), 16, num_buffers);
+    err = alcp_multibuffer_init(
+        &handle, nullptr, 0, iv_ptrs.data(), 16, num_buffers);
     if (err == ALC_ERROR_NOT_SUPPORTED) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
@@ -171,13 +178,13 @@ TEST_F(VariableLengthMultibufferTest, UniformLengths_40Buffers)
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
     // Flush with variable lengths
-    err = alcp_flush(&handle, plaintext_ptrs.data(),
-                             lengths.data(), num_buffers);
+    err =
+        alcp_flush(&handle, plaintext_ptrs.data(), lengths.data(), num_buffers);
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
     // Dequeue with variable lengths
-    err = alcp_dequeue(&handle, ciphertext_ptrs.data(),
-                               num_buffers, lengths.data());
+    err = alcp_dequeue(
+        &handle, ciphertext_ptrs.data(), num_buffers, lengths.data());
     if (err == ALC_ERROR_NO_FALLBACK) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
@@ -200,24 +207,24 @@ TEST_F(VariableLengthMultibufferTest, UniformLengths_40Buffers)
 TEST_F(VariableLengthMultibufferTest, VariableLengths_48Buffers)
 {
 #ifndef AES_MULTI_UPDATE
-    GTEST_SKIP() << "Variable-length multi-buffer requires AES_MULTI_UPDATE to be enabled. "
+    GTEST_SKIP() << "Variable-length multi-buffer requires AES_MULTI_UPDATE to "
+                    "be enabled. "
                  << "Configure with -DALCP_ENABLE_CIPHER_MULTI_UPDATE=ON";
 #endif
     const int num_buffers = 48;
 
-    std::vector<Uint8> key = generateRandom(16); // AES-128
+    std::vector<Uint8>              key = generateRandom(16); // AES-128
     std::vector<std::vector<Uint8>> ivs;
     std::vector<std::vector<Uint8>> plaintexts;
-    std::vector<Uint64> lengths;
+    std::vector<Uint64>             lengths;
 
     // Generate variable-length test data
     std::vector<size_t> sizes = {
-        16, 32, 48, 64, 128, 256, 512, 1024,  // Various sizes
-        16, 32, 48, 64, 128, 256, 512, 1024,  // Repeat pattern
-        16, 32, 48, 64, 128, 256, 512, 1024,
-        16, 32, 48, 64, 128, 256, 512, 1024,
-        16, 32, 48, 64, 128, 256, 512, 1024,
-        16, 32, 48, 64, 128, 256, 512, 1024
+        16,  32,   48,  64,  128,  256, 512, 1024, // Various sizes
+        16,  32,   48,  64,  128,  256, 512, 1024, // Repeat pattern
+        16,  32,   48,  64,  128,  256, 512, 1024, 16,  32,  48,
+        64,  128,  256, 512, 1024, 16,  32,  48,   64,  128, 256,
+        512, 1024, 16,  32,  48,   64,  128, 256,  512, 1024
     };
 
     for (int i = 0; i < num_buffers; i++) {
@@ -230,8 +237,8 @@ TEST_F(VariableLengthMultibufferTest, VariableLengths_48Buffers)
     // Get reference ciphertexts
     std::vector<std::vector<Uint8>> expected_ciphertexts;
     for (int i = 0; i < num_buffers; i++) {
-        expected_ciphertexts.push_back(
-            encryptReference(ALC_AES_MODE_CBC, 128, key, ivs[i], plaintexts[i]));
+        expected_ciphertexts.push_back(encryptReference(
+            ALC_AES_MODE_CBC, 128, key, ivs[i], plaintexts[i]));
     }
 
     // Create cipher handle
@@ -242,25 +249,26 @@ TEST_F(VariableLengthMultibufferTest, VariableLengths_48Buffers)
     alc_error_t err = alcp_cipher_request(ALC_AES_MODE_CBC, 128, &handle);
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
-    err = alcp_cipher_init(&handle, key.data(), key.size() * 8, ivs[0].data(), 16);
+    err = alcp_cipher_init(
+        &handle, key.data(), key.size() * 8, ivs[0].data(), 16);
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
     // Prepare pointer arrays
-    std::vector<const Uint8*> plaintext_ptrs(num_buffers);
-    std::vector<const Uint8*> iv_ptrs(num_buffers);
-    std::vector<Uint8*> ciphertext_ptrs(num_buffers);
+    std::vector<const Uint8*>       plaintext_ptrs(num_buffers);
+    std::vector<const Uint8*>       iv_ptrs(num_buffers);
+    std::vector<Uint8*>             ciphertext_ptrs(num_buffers);
     std::vector<std::vector<Uint8>> ciphertexts(num_buffers);
 
     for (int i = 0; i < num_buffers; i++) {
         plaintext_ptrs[i] = plaintexts[i].data();
-        iv_ptrs[i] = ivs[i].data();
+        iv_ptrs[i]        = ivs[i].data();
         ciphertexts[i].resize(lengths[i]);
         ciphertext_ptrs[i] = ciphertexts[i].data();
     }
 
     // Initialize multibuffer
-    err = alcp_multibuffer_init(&handle, nullptr, 0,
-                                iv_ptrs.data(), 16, num_buffers);
+    err = alcp_multibuffer_init(
+        &handle, nullptr, 0, iv_ptrs.data(), 16, num_buffers);
     if (err == ALC_ERROR_NOT_SUPPORTED) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
@@ -269,12 +277,12 @@ TEST_F(VariableLengthMultibufferTest, VariableLengths_48Buffers)
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
     // Flush and dequeue with variable lengths
-    err = alcp_flush(&handle, plaintext_ptrs.data(),
-                             lengths.data(), num_buffers);
+    err =
+        alcp_flush(&handle, plaintext_ptrs.data(), lengths.data(), num_buffers);
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
-    err = alcp_dequeue(&handle, ciphertext_ptrs.data(),
-                               num_buffers, lengths.data());
+    err = alcp_dequeue(
+        &handle, ciphertext_ptrs.data(), num_buffers, lengths.data());
     if (err == ALC_ERROR_NO_FALLBACK) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
@@ -292,28 +300,31 @@ TEST_F(VariableLengthMultibufferTest, VariableLengths_48Buffers)
     }
 }
 
-// Test 3: Maximum buffers (126 - just under MAX_CIPHER_BUFFER_SIZE) with highly variable lengths
+// Test 3: Maximum buffers (126 - just under MAX_CIPHER_BUFFER_SIZE) with highly
+// variable lengths
 TEST_F(VariableLengthMultibufferTest, MaxBuffers_HighlyVariableLength)
 {
 #ifndef AES_MULTI_UPDATE
-    GTEST_SKIP() << "Variable-length multi-buffer requires AES_MULTI_UPDATE to be enabled. "
+    GTEST_SKIP() << "Variable-length multi-buffer requires AES_MULTI_UPDATE to "
+                    "be enabled. "
                  << "Configure with -DALCP_ENABLE_CIPHER_MULTI_UPDATE=ON";
 #endif
-    const int num_buffers = 126;  // MAX_CIPHER_BUFFER_SIZE is 127, dequeue uses >= check
+    const int num_buffers =
+        126; // MAX_CIPHER_BUFFER_SIZE is 127, dequeue uses >= check
 
-    std::vector<Uint8> key = generateRandom(32); // AES-256
+    std::vector<Uint8>              key = generateRandom(32); // AES-256
     std::vector<std::vector<Uint8>> ivs;
     std::vector<std::vector<Uint8>> plaintexts;
-    std::vector<Uint64> lengths;
+    std::vector<Uint64>             lengths;
 
     // Generate highly variable lengths
-    std::mt19937 gen(42);  // Fixed seed for reproducibility
-    std::uniform_int_distribution<> dis(1, 128);  // 1-128 blocks
+    std::mt19937                    gen(42); // Fixed seed for reproducibility
+    std::uniform_int_distribution<> dis(1, 128); // 1-128 blocks
 
     for (int i = 0; i < num_buffers; i++) {
         ivs.push_back(generateRandom(16));
         size_t num_blocks = dis(gen);
-        size_t size = num_blocks * 16;  // Multiple of block size
+        size_t size       = num_blocks * 16; // Multiple of block size
         plaintexts.push_back(generateRandom(size));
         lengths.push_back(size);
     }
@@ -321,8 +332,8 @@ TEST_F(VariableLengthMultibufferTest, MaxBuffers_HighlyVariableLength)
     // Get reference ciphertexts
     std::vector<std::vector<Uint8>> expected_ciphertexts;
     for (int i = 0; i < num_buffers; i++) {
-        expected_ciphertexts.push_back(
-            encryptReference(ALC_AES_MODE_CBC, 256, key, ivs[i], plaintexts[i]));
+        expected_ciphertexts.push_back(encryptReference(
+            ALC_AES_MODE_CBC, 256, key, ivs[i], plaintexts[i]));
     }
 
     // Create cipher handle
@@ -333,25 +344,26 @@ TEST_F(VariableLengthMultibufferTest, MaxBuffers_HighlyVariableLength)
     alc_error_t err = alcp_cipher_request(ALC_AES_MODE_CBC, 256, &handle);
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
-    err = alcp_cipher_init(&handle, key.data(), key.size() * 8, ivs[0].data(), 16);
+    err = alcp_cipher_init(
+        &handle, key.data(), key.size() * 8, ivs[0].data(), 16);
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
     // Prepare pointer arrays
-    std::vector<const Uint8*> plaintext_ptrs(num_buffers);
-    std::vector<const Uint8*> iv_ptrs(num_buffers);
-    std::vector<Uint8*> ciphertext_ptrs(num_buffers);
+    std::vector<const Uint8*>       plaintext_ptrs(num_buffers);
+    std::vector<const Uint8*>       iv_ptrs(num_buffers);
+    std::vector<Uint8*>             ciphertext_ptrs(num_buffers);
     std::vector<std::vector<Uint8>> ciphertexts(num_buffers);
 
     for (int i = 0; i < num_buffers; i++) {
         plaintext_ptrs[i] = plaintexts[i].data();
-        iv_ptrs[i] = ivs[i].data();
+        iv_ptrs[i]        = ivs[i].data();
         ciphertexts[i].resize(lengths[i]);
         ciphertext_ptrs[i] = ciphertexts[i].data();
     }
 
     // Initialize multibuffer
-    err = alcp_multibuffer_init(&handle, nullptr, 0,
-                                iv_ptrs.data(), 16, num_buffers);
+    err = alcp_multibuffer_init(
+        &handle, nullptr, 0, iv_ptrs.data(), 16, num_buffers);
     if (err == ALC_ERROR_NOT_SUPPORTED) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
@@ -360,12 +372,12 @@ TEST_F(VariableLengthMultibufferTest, MaxBuffers_HighlyVariableLength)
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
     // Flush and dequeue
-    err = alcp_flush(&handle, plaintext_ptrs.data(),
-                             lengths.data(), num_buffers);
+    err =
+        alcp_flush(&handle, plaintext_ptrs.data(), lengths.data(), num_buffers);
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
-    err = alcp_dequeue(&handle, ciphertext_ptrs.data(),
-                               num_buffers, lengths.data());
+    err = alcp_dequeue(
+        &handle, ciphertext_ptrs.data(), num_buffers, lengths.data());
     if (err == ALC_ERROR_NO_FALLBACK) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
@@ -387,15 +399,16 @@ TEST_F(VariableLengthMultibufferTest, MaxBuffers_HighlyVariableLength)
 TEST_F(VariableLengthMultibufferTest, EdgeCase_33Buffers)
 {
 #ifndef AES_MULTI_UPDATE
-    GTEST_SKIP() << "Variable-length multi-buffer requires AES_MULTI_UPDATE to be enabled. "
+    GTEST_SKIP() << "Variable-length multi-buffer requires AES_MULTI_UPDATE to "
+                    "be enabled. "
                  << "Configure with -DALCP_ENABLE_CIPHER_MULTI_UPDATE=ON";
 #endif
     const int num_buffers = 33;
 
-    std::vector<Uint8> key = generateRandom(24); // AES-192
+    std::vector<Uint8>              key = generateRandom(24); // AES-192
     std::vector<std::vector<Uint8>> ivs;
     std::vector<std::vector<Uint8>> plaintexts;
-    std::vector<Uint64> lengths;
+    std::vector<Uint64>             lengths;
 
     // Mixed lengths: some small, some large
     for (int i = 0; i < num_buffers; i++) {
@@ -408,8 +421,8 @@ TEST_F(VariableLengthMultibufferTest, EdgeCase_33Buffers)
     // Get reference ciphertexts
     std::vector<std::vector<Uint8>> expected_ciphertexts;
     for (int i = 0; i < num_buffers; i++) {
-        expected_ciphertexts.push_back(
-            encryptReference(ALC_AES_MODE_CFB, 192, key, ivs[i], plaintexts[i]));
+        expected_ciphertexts.push_back(encryptReference(
+            ALC_AES_MODE_CFB, 192, key, ivs[i], plaintexts[i]));
     }
 
     // Create cipher handle (CFB mode)
@@ -420,25 +433,26 @@ TEST_F(VariableLengthMultibufferTest, EdgeCase_33Buffers)
     alc_error_t err = alcp_cipher_request(ALC_AES_MODE_CFB, 192, &handle);
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
-    err = alcp_cipher_init(&handle, key.data(), key.size() * 8, ivs[0].data(), 16);
+    err = alcp_cipher_init(
+        &handle, key.data(), key.size() * 8, ivs[0].data(), 16);
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
     // Prepare pointer arrays
-    std::vector<const Uint8*> plaintext_ptrs(num_buffers);
-    std::vector<const Uint8*> iv_ptrs(num_buffers);
-    std::vector<Uint8*> ciphertext_ptrs(num_buffers);
+    std::vector<const Uint8*>       plaintext_ptrs(num_buffers);
+    std::vector<const Uint8*>       iv_ptrs(num_buffers);
+    std::vector<Uint8*>             ciphertext_ptrs(num_buffers);
     std::vector<std::vector<Uint8>> ciphertexts(num_buffers);
 
     for (int i = 0; i < num_buffers; i++) {
         plaintext_ptrs[i] = plaintexts[i].data();
-        iv_ptrs[i] = ivs[i].data();
+        iv_ptrs[i]        = ivs[i].data();
         ciphertexts[i].resize(lengths[i]);
         ciphertext_ptrs[i] = ciphertexts[i].data();
     }
 
     // Initialize multibuffer
-    err = alcp_multibuffer_init(&handle, nullptr, 0,
-                                iv_ptrs.data(), 16, num_buffers);
+    err = alcp_multibuffer_init(
+        &handle, nullptr, 0, iv_ptrs.data(), 16, num_buffers);
     if (err == ALC_ERROR_NOT_SUPPORTED) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
@@ -447,12 +461,12 @@ TEST_F(VariableLengthMultibufferTest, EdgeCase_33Buffers)
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
     // Flush and dequeue
-    err = alcp_flush(&handle, plaintext_ptrs.data(),
-                             lengths.data(), num_buffers);
+    err =
+        alcp_flush(&handle, plaintext_ptrs.data(), lengths.data(), num_buffers);
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
-    err = alcp_dequeue(&handle, ciphertext_ptrs.data(),
-                               num_buffers, lengths.data());
+    err = alcp_dequeue(
+        &handle, ciphertext_ptrs.data(), num_buffers, lengths.data());
     if (err == ALC_ERROR_NO_FALLBACK) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
@@ -476,10 +490,10 @@ TEST_F(VariableLengthMultibufferTest, MinimumLength_64Buffers)
     const int num_buffers = 64;
     const int buffer_size = 16; // Single block
 
-    std::vector<Uint8> key = generateRandom(16); // AES-128
+    std::vector<Uint8>              key = generateRandom(16); // AES-128
     std::vector<std::vector<Uint8>> ivs;
     std::vector<std::vector<Uint8>> plaintexts;
-    std::vector<Uint64> lengths;
+    std::vector<Uint64>             lengths;
 
     for (int i = 0; i < num_buffers; i++) {
         ivs.push_back(generateRandom(16));
@@ -490,8 +504,8 @@ TEST_F(VariableLengthMultibufferTest, MinimumLength_64Buffers)
     // Get reference ciphertexts
     std::vector<std::vector<Uint8>> expected_ciphertexts;
     for (int i = 0; i < num_buffers; i++) {
-        expected_ciphertexts.push_back(
-            encryptReference(ALC_AES_MODE_CBC, 128, key, ivs[i], plaintexts[i]));
+        expected_ciphertexts.push_back(encryptReference(
+            ALC_AES_MODE_CBC, 128, key, ivs[i], plaintexts[i]));
     }
 
     // Create cipher handle
@@ -502,25 +516,26 @@ TEST_F(VariableLengthMultibufferTest, MinimumLength_64Buffers)
     alc_error_t err = alcp_cipher_request(ALC_AES_MODE_CBC, 128, &handle);
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
-    err = alcp_cipher_init(&handle, key.data(), key.size() * 8, ivs[0].data(), 16);
+    err = alcp_cipher_init(
+        &handle, key.data(), key.size() * 8, ivs[0].data(), 16);
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
     // Prepare pointer arrays
-    std::vector<const Uint8*> plaintext_ptrs(num_buffers);
-    std::vector<const Uint8*> iv_ptrs(num_buffers);
-    std::vector<Uint8*> ciphertext_ptrs(num_buffers);
+    std::vector<const Uint8*>       plaintext_ptrs(num_buffers);
+    std::vector<const Uint8*>       iv_ptrs(num_buffers);
+    std::vector<Uint8*>             ciphertext_ptrs(num_buffers);
     std::vector<std::vector<Uint8>> ciphertexts(num_buffers);
 
     for (int i = 0; i < num_buffers; i++) {
         plaintext_ptrs[i] = plaintexts[i].data();
-        iv_ptrs[i] = ivs[i].data();
+        iv_ptrs[i]        = ivs[i].data();
         ciphertexts[i].resize(buffer_size);
         ciphertext_ptrs[i] = ciphertexts[i].data();
     }
 
     // Initialize multibuffer
-    err = alcp_multibuffer_init(&handle, nullptr, 0,
-                                iv_ptrs.data(), 16, num_buffers);
+    err = alcp_multibuffer_init(
+        &handle, nullptr, 0, iv_ptrs.data(), 16, num_buffers);
     if (err == ALC_ERROR_NOT_SUPPORTED) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
@@ -529,12 +544,12 @@ TEST_F(VariableLengthMultibufferTest, MinimumLength_64Buffers)
     ASSERT_EQ(err, ALC_ERROR_NONE);
 
     // Flush and dequeue
-    err = alcp_flush(&handle, plaintext_ptrs.data(),
-                             lengths.data(), num_buffers);
+    err =
+        alcp_flush(&handle, plaintext_ptrs.data(), lengths.data(), num_buffers);
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
-    err = alcp_dequeue(&handle, ciphertext_ptrs.data(),
-                               num_buffers, lengths.data());
+    err = alcp_dequeue(
+        &handle, ciphertext_ptrs.data(), num_buffers, lengths.data());
     if (err == ALC_ERROR_NO_FALLBACK) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
@@ -555,17 +570,30 @@ TEST_F(VariableLengthMultibufferTest, MinimumLength_64Buffers)
 int
 main(int argc, char** argv)
 {
-    ::testing::InitGoogleTest(&argc, argv);
+    try {
+        ::testing::InitGoogleTest(&argc, argv);
 
-    // Skip if running with IPP (-i) or OpenSSL (-o) flags
-    // This test only validates ALCP's variable-length multi-buffer implementation
-    for (int i = 1; i < argc; i++) {
-        if (std::string(argv[i]) == "-i" || std::string(argv[i]) == "-o") {
-            std::cout << "Skipping: This test only validates ALCP implementation"
-                      << std::endl;
-            return 0;
+        // Skip if running with IPP (-i) or OpenSSL (-o) flags
+        // This test only validates ALCP's variable-length multi-buffer
+        // implementation
+        for (int i = 1; i < argc; i++) {
+            if (std::string(argv[i]) == "-i" || std::string(argv[i]) == "-o") {
+                std::cout
+                    << "Skipping: This test only validates ALCP implementation"
+                    << std::endl;
+                return 0;
+            }
         }
-    }
 
-    return RUN_ALL_TESTS();
+        return RUN_ALL_TESTS();
+    } catch (const std::exception& e) {
+        std::cerr << "Unhandled exception: " << e.what() << std::endl;
+        return 1;
+    } catch (const char* e) {
+        std::cerr << "Unhandled exception: " << e << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "Unknown exception caught" << std::endl;
+        return 1;
+    }
 }
