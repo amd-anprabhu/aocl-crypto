@@ -267,6 +267,13 @@ class ALCP_API_EXPORT CpuId
      * @brief Returns true if currently executing CPU is Zen5
      */
     static bool cpuIsZen5();
+    /**
+     * @brief Returns true if currently executing cpu is an AMD CPU
+     *
+     * @return true
+     * @return false
+     */
+    static bool cpuIsAmd();
 
   private:
     class Impl;

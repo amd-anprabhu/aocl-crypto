@@ -27,6 +27,7 @@
  */
 
 #include "alcp/alcp.h"
+#include "alcp/utils/cpuid.hh"
 #include "ecdh/alc_ecdh.hh"
 #include "ecdh/ecdh.hh"
 #include "ecdh/gtest_base_ecdh.hh"
@@ -34,9 +35,14 @@
 #include <exception>
 #include <iostream>
 
+using alcp::utils::CpuId;
+
 /* All tests to be added here */
 TEST(ECDH, KAT_x25519)
 {
+    if (!CpuId::cpuIsAmd()) {
+        GTEST_SKIP() << "ECDH tests are skipped on non-AMD (Intel) machines";
+    }
     alc_ec_info_t info;
     info.ecCurveId     = ALCP_EC_CURVE25519;
     info.ecCurveType   = ALCP_EC_CURVE_TYPE_MONTGOMERY;
@@ -46,6 +52,9 @@ TEST(ECDH, KAT_x25519)
 
 TEST(ECDH, KAT_p256)
 {
+    if (!CpuId::cpuIsAmd()) {
+        GTEST_SKIP() << "ECDH tests are skipped on non-AMD (Intel) machines";
+    }
     alc_ec_info_t info;
     info.ecCurveId     = ALCP_EC_SECP256R1;
     info.ecCurveType   = ALCP_EC_CURVE_TYPE_SHORT_WEIERSTRASS;
