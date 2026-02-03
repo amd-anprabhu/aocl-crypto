@@ -1,4 +1,4 @@
- # Copyright (C) 2021-2025, Advanced Micro Devices. All rights reserved.
+ # Copyright (C) 2021-2026, Advanced Micro Devices. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions are met:
@@ -47,7 +47,7 @@ ELSEIF(WIN32)
 ENDIF(UNIX)
 
 # Set the release version
-set(AOCL_RELEASE_VERSION "5.1.1" CACHE STRING "AOCL RELEASE VERSION")
+set(AOCL_RELEASE_VERSION "5.2.2" CACHE STRING "AOCL RELEASE VERSION")
 
 PROJECT (ALCP
          VERSION ${AOCL_RELEASE_VERSION}
@@ -306,8 +306,8 @@ IF (ALCP_ENABLE_EXAMPLES)
 ENDIF (ALCP_ENABLE_EXAMPLES)
 
 # docs, etc which should be part of the package
-FILE(GLOB INSTALL_DOCS_REL_NOTES
-			${CMAKE_CURRENT_SOURCE_DIR}/docs/ReleaseNotes.txt)
+FILE(GLOB INSTALL_DOCS_CHANGELOG
+			${CMAKE_CURRENT_SOURCE_DIR}/CHANGELOG.md)
 FILE(GLOB INSTALL_DOCS_COMPAT
 			${CMAKE_CURRENT_SOURCE_DIR}/docs/compat/*.md)
 FILE(GLOB INSTALL_DOCS_LICENSE
@@ -316,7 +316,7 @@ FILE(GLOB INSTALL_DOCS_README
 			${CMAKE_CURRENT_SOURCE_DIR}/README.md)
 
 # install docs
-INSTALL(FILES ${INSTALL_DOCS_REL_NOTES}
+INSTALL(FILES ${INSTALL_DOCS_CHANGELOG}
 		DESTINATION .)
 INSTALL(FILES ${INSTALL_DOCS_COMPAT}
 		DESTINATION docs)

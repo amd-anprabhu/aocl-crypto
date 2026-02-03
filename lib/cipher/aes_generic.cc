@@ -107,6 +107,12 @@ AesGenericCiphersT<mode, keyLenBits, arch>::init(const Uint8* pKey,
 {
     alc_error_t err = ALC_ERROR_NONE;
 
+    // Set IV if provided (do this first so key-only init can check IV state)
+    if (pIv != nullptr && ivLen > 0) {
+        m_ivManager.setIv(pIv, static_cast<Uint32>(ivLen));
+        m_stateManager.onIvSet();
+    }
+
     // Set key if provided
     if (pKey != nullptr && keyLen != 0) {
         // Set the key using KeyManager (inherits from Rijndael)
@@ -118,12 +124,17 @@ AesGenericCiphersT<mode, keyLenBits, arch>::init(const Uint8* pKey,
 
         // Update state manager (key pointers auto-populated by KeyManager)
         m_stateManager.onKeySet();
-    }
 
-    // Set IV if provided
-    if (pIv != nullptr && ivLen > 0) {
-        m_ivManager.setIv(pIv, static_cast<Uint32>(ivLen));
-        m_stateManager.onIvSet();
+        // For non-AEAD modes: If IV was not set in this call and not previously
+        // set, use default zero IV. This is done to match OpenSSL's behavior where the
+        // IV buffer is zero-initialized and usable by default. By doing this here,
+        // we can match OpenSSL's provider layer and not have to do the state management in the provider layer
+
+        if (!m_ivManager.isIvSet()) {
+            static constexpr Uint8 zero_iv[16] = { 0 };
+            m_ivManager.setIv(zero_iv, 16);
+            m_stateManager.onIvSet();
+        }
     }
 
     return err;

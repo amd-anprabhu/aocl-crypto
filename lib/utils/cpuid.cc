@@ -104,6 +104,7 @@ class CpuId::Impl
     bool cpuIsZen3();
     bool cpuIsZen4();
     bool cpuIsZen5();
+    bool cpuIsAmd();
 };
 
 CpuId::Impl::Impl()
@@ -484,6 +485,25 @@ CpuId::Impl::cpuIsZen5()
     return zen5_flag;
 }
 
+/**
+ * @brief Validates requested CPU arch against actual CPU capabilities
+ *
+ * When AOCL_ENABLE_INSTRUCTION is set, this function checks if the requested
+ * architecture level is compatible with the actual CPU. It returns true if
+ * the requested cpuZenVer is at or below the forced architecture level.
+ */
+bool
+CpuId::Impl::cpuIsAmd()
+{
+#ifdef ALCP_ENABLE_AOCL_UTILS
+    static bool state = Impl::m_cpu->isAMD();
+#else
+    // Default to true when AOCL_UTILS is not available (assumes AMD)
+    static bool state = true;
+#endif
+    return state;
+}
+
 bool
 CpuId::cpuHasAesni()
 {
@@ -602,6 +622,12 @@ bool
 CpuId::cpuIsZen5()
 {
     return pImpl.get()->cpuIsZen5();
+}
+
+bool
+CpuId::cpuIsAmd()
+{
+    return pImpl.get()->cpuIsAmd();
 }
 
 bool

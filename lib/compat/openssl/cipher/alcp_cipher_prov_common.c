@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -25,6 +25,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
+
 #include <assert.h>
 #include <inttypes.h>
 
@@ -51,7 +52,6 @@ static const OSSL_PARAM alcp_prov_cipher_known_gettable_params[] = {
 const OSSL_PARAM*
 ALCP_prov_cipher_generic_gettable_params(ossl_unused void* provctx)
 {
-    printf("\n generic gettable ctx params ");
     return alcp_prov_cipher_known_gettable_params;
 }
 
@@ -246,43 +246,34 @@ cipher_generic_init_internal(ALCP_PROV_CIPHER_CTX* ctx,
                              const OSSL_PARAM      params[],
                              int                   enc)
 {
-
     alc_prov_cipher_data_t*     cipherctx    = &(ctx->prov_cipher_data);
     _alc_cipher_generic_data_t* genCipherctx = &(cipherctx->generic);
     ENTER();
 
+    /* Reset context state*/
     genCipherctx->num     = 0;
     genCipherctx->bufsz   = 0;
     genCipherctx->updated = 0;
     cipherctx->enc        = enc ? 1 : 0;
 
-    // if (!ossl_prov_is_running())
-    // return 0;
-
+    /* Store IV in provider context if provided - similar to OpenSSL's ossl_cipher_generic_initiv */
     if (iv != NULL && cipherctx->mode != EVP_CIPH_ECB_MODE) {
-
-        alc_error_t err = alcp_cipher_init(&(ctx->handle), NULL, 0, iv, ivlen);
-        if (alcp_is_error(err)) {
-            return 0;
+        if (ivlen > 0 && ivlen <= sizeof(cipherctx->iv_buff)) {
+            memcpy(cipherctx->iv_buff, iv, ivlen);
+            memcpy(genCipherctx->oiv_buff, iv, ivlen);
+            cipherctx->ivState = 1;
         }
     }
 
+    /* Reset IV from original IV for CBC/CFB/OFB */
     if (iv == NULL && cipherctx->ivState
         && (cipherctx->mode == EVP_CIPH_CBC_MODE
             || cipherctx->mode == EVP_CIPH_CFB_MODE
             || cipherctx->mode == EVP_CIPH_OFB_MODE)) {
-        /* reset IV for these modes to keep compatibility with 1.1.1 */
         memcpy(cipherctx->iv_buff, genCipherctx->oiv_buff, cipherctx->ivLen);
-
-        // setIv, this maynot be necessary since iv is buffered.
-        // this can be removed after verification.
-        alc_error_t err = alcp_cipher_init(
-            &(ctx->handle), NULL, 0, cipherctx->iv_buff, ivlen);
-        if (alcp_is_error(err)) {
-            return 0;
-        }
     }
 
+    /* Set key if provided - similar to OpenSSL's hw->init(ctx, key, keylen) */
     if (key != NULL) {
         if (genCipherctx->variable_keylength == 0) {
             if (keylen != cipherctx->keyLen_in_bytes) {
@@ -293,14 +284,32 @@ cipher_generic_init_internal(ALCP_PROV_CIPHER_CTX* ctx,
             cipherctx->keyLen_in_bytes = keylen;
         }
 
+        /* Call alcp_cipher_init with key only - library handles this correctly */
         alc_error_t err = alcp_cipher_init(
             &(ctx->handle), key, cipherctx->keyLen_in_bytes * 8, NULL, 0);
         if (alcp_is_error(err)) {
             return 0;
         }
-
         cipherctx->isKeySet = 1;
     }
+    /* Set IV if provided - separate from key init*/
+    if (iv != NULL && cipherctx->mode != EVP_CIPH_ECB_MODE) {
+        alc_error_t err = alcp_cipher_init(&(ctx->handle), NULL, 0, iv, ivlen);
+        if (alcp_is_error(err)) {
+            return 0;
+        }
+    } else if (iv == NULL && cipherctx->ivState
+               && (cipherctx->mode == EVP_CIPH_CBC_MODE
+                   || cipherctx->mode == EVP_CIPH_CFB_MODE
+                   || cipherctx->mode == EVP_CIPH_OFB_MODE)) {
+        /* Reset IV from stored original IV*/
+        alc_error_t err = alcp_cipher_init(
+            &(ctx->handle), NULL, 0, cipherctx->iv_buff, cipherctx->ivLen);
+        if (alcp_is_error(err)) {
+            return 0;
+        }
+    }
+
     return ALCP_prov_cipher_generic_set_ctx_params(ctx, params);
 }
 
@@ -424,21 +433,20 @@ ALCP_prov_cipher_generic_block_update(void*        vctx,
 
         /* This only fails if padding is publicly invalid */
         *outl = inl;
-#if 0        
-        if (!cipherctx->enc
-            && !ALCP_prov_cipher_tlsunpadblock(ctx->base.libctx,
-                                          genCipherctx->tlsversion,
-                                          out,
-                                          outl,
-                                          blksz,
-                                          &genCipherctx->tlsmac,
-                                          &genCipherctx->alloced,
-                                          genCipherctx->tlsmacsize,
-                                          0)) {
-            ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
-            return 0;
-        }
-#endif
+        /* TODO: Implement TLS CBC unpadding for provider compatibility */
+        // if (!cipherctx->enc
+        //     && !ALCP_prov_cipher_tlsunpadblock(ctx->libctx,
+        //                                   genCipherctx->tlsversion,
+        //                                   out,
+        //                                   outl,
+        //                                   blksz,
+        //                                   &genCipherctx->tlsmac,
+        //                                   &genCipherctx->alloced,
+        //                                   genCipherctx->tlsmacsize,
+        //                                   0)) {
+        //     ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
+        //     return 0;
+        // }
         return 1;
     }
 
@@ -588,15 +596,14 @@ ALCP_prov_cipher_generic_block_final(void*   vctx,
         return 0;
     }
 
-    
     if (cipherctx->enc) {
-        // FIXME: input and output buffer are same, this might fail
         err = alcp_cipher_encrypt(
             &(ctx->handle), cipherctx->buf, cipherctx->buf, blksz, outl);
     } else {
         err = alcp_cipher_decrypt(
             &(ctx->handle), cipherctx->buf, cipherctx->buf, blksz, outl);
     }
+
     if (alcp_is_error(err)) {
         printf("Error: cipher encrypt/decrypt failed \n");
         // ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
