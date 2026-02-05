@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
  * Portions of this file consist of AI-generated content.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -437,6 +437,7 @@ poly1305_multx8_radix44(__m512i& a0,
     d2l = _mm512_madd52lo_epu64(d2l, a1, r1);
     d2h = _mm512_madd52hi_epu64(d2h, a1, r1);
 
+    // Third round - optimized scheduling
     d0l = _mm512_madd52lo_epu64(d0l, a2, s1);
     d0h = _mm512_madd52hi_epu64(d0h, a2, s1);
     d1l = _mm512_madd52lo_epu64(d1l, a2, s2);
@@ -1105,7 +1106,7 @@ poly1305_update_radix44(Poly1305State44& state, const Uint8* pMsg, Uint64 len)
             state.msg_buffer_len = 0;
         }
     }
-    if (len > 256) {
+    if (len >= 128) {
         poly1305_blocksx8_radix44(state, pMsg, len);
     }
     if (len >= 16) {
