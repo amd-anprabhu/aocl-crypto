@@ -211,6 +211,56 @@ known_answer_map_t KATDataset{
 } // namespace alcp::cipher::unittest::xts
 using namespace alcp::cipher::unittest;
 using namespace alcp::cipher::unittest::xts;
+
+// Test fixture class for XTS tests with helper functions
+// Note: XTS uses double-length keys (256-bit for AES-128, 512-bit for AES-256)
+class XTSTest : public ::testing::Test
+{
+  protected:
+    // For XTS, the key size returned is the double-key size
+    static size_t getKeySizeBytes(CipherKeyLen keyLen)
+    {
+        switch (keyLen) {
+            case CipherKeyLen::eKey128Bit: return 32;  // XTS-AES-128 uses 256-bit key
+            case CipherKeyLen::eKey256Bit: return 64;  // XTS-AES-256 uses 512-bit key
+            default: return 32;
+        }
+    }
+
+    static size_t getKeySizeBits(CipherKeyLen keyLen)
+    {
+        switch (keyLen) {
+            case CipherKeyLen::eKey128Bit: return 128;
+            case CipherKeyLen::eKey256Bit: return 256;
+            default: return 128;
+        }
+    }
+};
+
+// Parameterized test fixture for key size variations
+// Note: XTS only supports 128-bit and 256-bit keys (not 192-bit)
+class XTSKeySizeTest : public ::testing::TestWithParam<CipherKeyLen>
+{
+  protected:
+    static size_t getKeySizeBytes(CipherKeyLen keyLen)
+    {
+        switch (keyLen) {
+            case CipherKeyLen::eKey128Bit: return 32;  // XTS-AES-128 uses 256-bit key
+            case CipherKeyLen::eKey256Bit: return 64;  // XTS-AES-256 uses 512-bit key
+            default: return 32;
+        }
+    }
+
+    static size_t getKeySizeBits(CipherKeyLen keyLen)
+    {
+        switch (keyLen) {
+            case CipherKeyLen::eKey128Bit: return 128;
+            case CipherKeyLen::eKey256Bit: return 256;
+            default: return 128;
+        }
+    }
+};
+
 TEST(XTS, initiantiation_with_valid_input)
 {
     Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
@@ -1043,73 +1093,103 @@ TEST_P(XTS_KAT, valid_encrypt_decrypt_test)
 
 // Comprehensive Corner Case Tests for XTS
 
-// Test both key sizes (128 and 256 bits) with encrypt/decrypt roundtrip
-TEST(XTS, AllKeySizesRoundtrip)
+// Parameterized test for all key sizes (128 and 256 bits only for XTS)
+TEST_P(XTSKeySizeTest, EncryptDecryptRoundTrip)
 {
-    std::vector<Uint8> iv(16, 0x01);
-    std::vector<Uint8> plaintext(64);
-    alc_error_t err;
+    CipherKeyLen keyLen = GetParam();
+    size_t keySize = getKeySizeBytes(keyLen);  // Returns double-key size for XTS
+    size_t keyBits = getKeySizeBits(keyLen);
 
-    for (size_t i = 0; i < plaintext.size(); i++) {
-        plaintext[i] = static_cast<Uint8>(i % 256);
-    }
+    std::vector<Uint8> testKey(keySize, 0x42);
+    std::vector<Uint8> testIv(16, 0x01);
+    std::vector<Uint8> input(64, 0x55);
+    std::vector<Uint8> output(64), decrypted(64);
 
-    // 128-bit key (XTS uses double key, so 32 bytes total)
-    {
-        std::vector<Uint8> key(32, 0x42);
-        std::vector<Uint8> ciphertext(64), decrypted(64);
+    auto xts = createCipher(CipherMode::eAesXTS, keyLen);
+    ASSERT_NE(xts, nullptr) << "Failed to create AES-XTS-" << keyBits;
 
-        auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+    alc_error_t err = xts->init(&testKey[0], keyBits, &testIv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen = 0;
+    err = xts->encrypt(&input[0], &output[0], 64, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 64);
+
+    // Decrypt with new object
+    auto xts2 = createCipher(CipherMode::eAesXTS, keyLen);
+    ASSERT_NE(xts2, nullptr);
+    err = xts2->init(&testKey[0], keyBits, &testIv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen2 = 0;
+    err = xts2->decrypt(&output[0], &decrypted[0], 64, &outlen2);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete xts;
+    delete xts2;
+}
+
+// Test with multiple data sizes for each key size
+TEST_P(XTSKeySizeTest, VariousDataSizes)
+{
+    CipherKeyLen keyLen = GetParam();
+    size_t keySize = getKeySizeBytes(keyLen);
+    size_t keyBits = getKeySizeBits(keyLen);
+
+    std::vector<Uint8> testKey(keySize, 0x42);
+    std::vector<Uint8> testIv(16, 0x00);
+
+    // Test various data sizes (XTS requires minimum 16 bytes)
+    std::vector<size_t> dataSizes = { 16, 17, 32, 64, 128, 256, 512, 1024 };
+
+    for (size_t dataSize : dataSizes) {
+        std::vector<Uint8> input(dataSize);
+        for (size_t i = 0; i < dataSize; i++) {
+            input[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> output(dataSize), decrypted(dataSize);
+
+        auto xts = createCipher(CipherMode::eAesXTS, keyLen);
         ASSERT_NE(xts, nullptr);
 
-        err = xts->init(key.data(), 128, iv.data(), 16);
+        alc_error_t err = xts->init(&testKey[0], keyBits, &testIv[0], 16);
         EXPECT_EQ(err, ALC_ERROR_NONE);
         Uint64 outlen = 0;
-        err = xts->encrypt(plaintext.data(), ciphertext.data(), 64, &outlen);
+        err = xts->encrypt(&input[0], &output[0], dataSize, &outlen);
         EXPECT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, dataSize) << "Key: " << keyBits << " bits, Data: " << dataSize << " bytes";
 
         // Decrypt with new object
-        auto xts2 = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
+        auto xts2 = createCipher(CipherMode::eAesXTS, keyLen);
         ASSERT_NE(xts2, nullptr);
-        err = xts2->init(key.data(), 128, iv.data(), 16);
+        err = xts2->init(&testKey[0], keyBits, &testIv[0], 16);
         EXPECT_EQ(err, ALC_ERROR_NONE);
         Uint64 outlen2 = 0;
-        err = xts2->decrypt(ciphertext.data(), decrypted.data(), 64, &outlen2);
+        err = xts2->decrypt(&output[0], &decrypted[0], dataSize, &outlen2);
         EXPECT_EQ(err, ALC_ERROR_NONE);
-        EXPECT_EQ(decrypted, plaintext);
-
-        delete xts;
-        delete xts2;
-    }
-
-    // 256-bit key (XTS uses double key, so 64 bytes total)
-    {
-        std::vector<Uint8> key(64, 0x43);
-        std::vector<Uint8> ciphertext(64), decrypted(64);
-
-        auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey256Bit);
-        ASSERT_NE(xts, nullptr);
-
-        err = xts->init(key.data(), 256, iv.data(), 16);
-        EXPECT_EQ(err, ALC_ERROR_NONE);
-        Uint64 outlen = 0;
-        err = xts->encrypt(plaintext.data(), ciphertext.data(), 64, &outlen);
-        EXPECT_EQ(err, ALC_ERROR_NONE);
-
-        // Decrypt with new object
-        auto xts2 = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey256Bit);
-        ASSERT_NE(xts2, nullptr);
-        err = xts2->init(key.data(), 256, iv.data(), 16);
-        EXPECT_EQ(err, ALC_ERROR_NONE);
-        Uint64 outlen2 = 0;
-        err = xts2->decrypt(ciphertext.data(), decrypted.data(), 64, &outlen2);
-        EXPECT_EQ(err, ALC_ERROR_NONE);
-        EXPECT_EQ(decrypted, plaintext);
+        EXPECT_EQ(decrypted, input) << "Key: " << keyBits << " bits, Data: " << dataSize << " bytes";
 
         delete xts;
         delete xts2;
     }
 }
+
+// Instantiate the parameterized tests for XTS key sizes (128 and 256 only, no 192)
+INSTANTIATE_TEST_SUITE_P(
+    AllKeySizes,
+    XTSKeySizeTest,
+    ::testing::Values(
+        CipherKeyLen::eKey128Bit,
+        CipherKeyLen::eKey256Bit
+    ),
+    [](const ::testing::TestParamInfo<CipherKeyLen>& info) {
+        switch (info.param) {
+            case CipherKeyLen::eKey128Bit: return "Key128Bit";
+            case CipherKeyLen::eKey256Bit: return "Key256Bit";
+            default: return "Unknown";
+        }
+    }
+);
 
 // Test minimum plaintext size (16 bytes = 1 block)
 TEST(XTS, MinimumPlaintextSize)

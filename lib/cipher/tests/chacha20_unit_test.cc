@@ -35,6 +35,119 @@
 #include "alcp/utils/benchmark.hh"
 #if 1
 using namespace alcp::cipher;
+
+// Test fixture class for ChaCha20 tests with common key/IV setup
+class ChaCha20Test : public ::testing::Test
+{
+  protected:
+    // Standard 256-bit key for ChaCha20
+    static constexpr Uint8 testKey[32] = {
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f
+    };
+
+    // 12-byte nonce
+    static constexpr Uint8 testIv12[12] = {
+        0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+        0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c
+    };
+
+    // 16-byte IV (counter + nonce)
+    static constexpr Uint8 testIv16[16] = {
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x00
+    };
+
+    // Helper function for encrypt/decrypt roundtrip test
+    static bool encryptDecryptRoundtrip(size_t dataSize, const Uint8* key, size_t keyBits,
+                                        const Uint8* iv, size_t ivLen)
+    {
+        std::vector<Uint8> plaintext(dataSize);
+        for (size_t i = 0; i < dataSize; i++) {
+            plaintext[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> ciphertext(dataSize), decrypted(dataSize);
+
+        ref::ChaCha256 enc, dec;
+        enc.setKey(key, keyBits);
+        enc.setIv(iv, ivLen);
+        dec.setKey(key, keyBits);
+        dec.setIv(iv, ivLen);
+
+        Uint64 outlen1 = 0, outlen2 = 0;
+        enc.encrypt(plaintext.data(), ciphertext.data(), dataSize, &outlen1);
+        dec.decrypt(ciphertext.data(), decrypted.data(), dataSize, &outlen2);
+
+        return (decrypted == plaintext);
+    }
+};
+
+// Static member definitions
+constexpr Uint8 ChaCha20Test::testKey[32];
+constexpr Uint8 ChaCha20Test::testIv12[12];
+constexpr Uint8 ChaCha20Test::testIv16[16];
+
+// Parameterized test fixture for data size variations
+class ChaCha20DataSizeTest : public ::testing::TestWithParam<size_t>
+{
+  protected:
+    static constexpr Uint8 testKey[32] = {
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f
+    };
+
+    static constexpr Uint8 testIv[12] = {
+        0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+        0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c
+    };
+};
+
+// Static member definitions
+constexpr Uint8 ChaCha20DataSizeTest::testKey[32];
+constexpr Uint8 ChaCha20DataSizeTest::testIv[12];
+
+// Parameterized test: encrypt/decrypt roundtrip for various data sizes
+TEST_P(ChaCha20DataSizeTest, EncryptDecryptRoundTrip)
+{
+    size_t dataSize = GetParam();
+
+    std::vector<Uint8> plaintext(dataSize);
+    for (size_t i = 0; i < dataSize; i++) {
+        plaintext[i] = static_cast<Uint8>(i % 256);
+    }
+    std::vector<Uint8> ciphertext(dataSize), decrypted(dataSize);
+
+    ref::ChaCha256 enc, dec;
+    enc.setKey(testKey, sizeof(testKey) * 8);
+    enc.setIv(testIv, sizeof(testIv));
+    dec.setKey(testKey, sizeof(testKey) * 8);
+    dec.setIv(testIv, sizeof(testIv));
+
+    Uint64 outlen1 = 0, outlen2 = 0;
+    enc.encrypt(plaintext.data(), ciphertext.data(), dataSize, &outlen1);
+    dec.decrypt(ciphertext.data(), decrypted.data(), dataSize, &outlen2);
+
+    EXPECT_EQ(decrypted, plaintext) << "Mismatch for data size: " << dataSize;
+}
+
+// Instantiate parameterized tests for various data sizes
+INSTANTIATE_TEST_SUITE_P(
+    VariousDataSizes,
+    ChaCha20DataSizeTest,
+    ::testing::Values(
+        1, 7, 15, 16, 17, 31, 32, 33, 63, 64, 65,
+        100, 127, 128, 129, 191, 192, 193, 255, 256, 257,
+        512, 1000, 1024, 4096
+    ),
+    [](const ::testing::TestParamInfo<size_t>& info) {
+        return "Size_" + std::to_string(info.param);
+    }
+);
+
 TEST(Chacha20, QuarterRoundTest)
 {
     Uint32 a = 0x11111111;

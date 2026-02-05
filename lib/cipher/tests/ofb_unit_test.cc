@@ -115,6 +115,46 @@ std::vector<Uint8> cipherText = {
 using namespace alcp::cipher::unittest;
 using namespace alcp::cipher::unittest::ofb;
 
+// Test fixture class for OFB tests with helper functions
+class OFBTest : public ::testing::Test
+{
+  protected:
+    static size_t getKeySizeBytes(CipherKeyLen keyLen)
+    {
+        switch (keyLen) {
+            case CipherKeyLen::eKey128Bit: return 16;
+            case CipherKeyLen::eKey192Bit: return 24;
+            case CipherKeyLen::eKey256Bit: return 32;
+            default: return 16;
+        }
+    }
+
+    static size_t getKeySizeBits(CipherKeyLen keyLen)
+    {
+        return getKeySizeBytes(keyLen) * 8;
+    }
+};
+
+// Parameterized test fixture for key size variations
+class OFBKeySizeTest : public ::testing::TestWithParam<CipherKeyLen>
+{
+  protected:
+    static size_t getKeySizeBytes(CipherKeyLen keyLen)
+    {
+        switch (keyLen) {
+            case CipherKeyLen::eKey128Bit: return 16;
+            case CipherKeyLen::eKey192Bit: return 24;
+            case CipherKeyLen::eKey256Bit: return 32;
+            default: return 16;
+        }
+    }
+
+    static size_t getKeySizeBits(CipherKeyLen keyLen)
+    {
+        return getKeySizeBytes(keyLen) * 8;
+    }
+};
+
 TEST(OFB, creation)
 {
     auto ofb = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
@@ -302,75 +342,89 @@ TEST(OFB, RandomEncryptDecryptTest)
 
 // Comprehensive Corner Case Tests for OFB
 
-// Test all key sizes (128, 192, 256 bits)
-TEST(OFB, AllKeySizes)
+// Parameterized test for all key sizes (128, 192, 256 bits)
+TEST_P(OFBKeySizeTest, EncryptDecryptRoundTrip)
 {
-    // 128-bit key
-    {
-        std::vector<Uint8> key_128(16, 0x42);
-        std::vector<Uint8> test_iv(16, 0x00);
-        std::vector<Uint8> input(32, 0x55);
-        std::vector<Uint8> output(32), decrypted(32);
+    CipherKeyLen keyLen = GetParam();
+    size_t keySize = getKeySizeBytes(keyLen);
+    size_t keyBits = getKeySizeBits(keyLen);
 
-        auto ofb = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
-        ASSERT_NE(ofb, nullptr) << "Failed to create AES-OFB-128";
+    std::vector<Uint8> testKey(keySize, 0x42);
+    std::vector<Uint8> testIv(16, 0x00);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32), decrypted(32);
 
-        ofb->init(&key_128[0], 128, &test_iv[0], 16);
+    auto ofb = createCipher(CipherMode::eAesOFB, keyLen);
+    ASSERT_NE(ofb, nullptr) << "Failed to create AES-OFB-" << keyBits;
+
+    ofb->init(&testKey[0], keyBits, &testIv[0], 16);
+    Uint64 outlen = 0;
+    EXPECT_EQ(ofb->encrypt(&input[0], &output[0], 32, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 32);
+
+    ofb->init(&testKey[0], keyBits, &testIv[0], 16);
+    outlen = 0;
+    EXPECT_EQ(ofb->decrypt(&output[0], &decrypted[0], 32, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete ofb;
+}
+
+// Test with multiple data sizes for each key size
+TEST_P(OFBKeySizeTest, VariousDataSizes)
+{
+    CipherKeyLen keyLen = GetParam();
+    size_t keySize = getKeySizeBytes(keyLen);
+    size_t keyBits = getKeySizeBits(keyLen);
+
+    std::vector<Uint8> testKey(keySize, 0x42);
+    std::vector<Uint8> testIv(16, 0x00);
+
+    // Test various data sizes (OFB handles any size)
+    std::vector<size_t> dataSizes = { 1, 15, 16, 17, 32, 64, 128, 256, 512, 1024 };
+
+    for (size_t dataSize : dataSizes) {
+        std::vector<Uint8> input(dataSize);
+        for (size_t i = 0; i < dataSize; i++) {
+            input[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> output(dataSize), decrypted(dataSize);
+
+        auto ofb = createCipher(CipherMode::eAesOFB, keyLen);
+        ASSERT_NE(ofb, nullptr);
+
+        ofb->init(&testKey[0], keyBits, &testIv[0], 16);
         Uint64 outlen = 0;
-        EXPECT_EQ(ofb->encrypt(&input[0], &output[0], 32, &outlen), ALC_ERROR_NONE);
-        EXPECT_EQ(outlen, 32);
+        EXPECT_EQ(ofb->encrypt(&input[0], &output[0], dataSize, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, dataSize) << "Key: " << keyBits << " bits, Data: " << dataSize << " bytes";
 
-        ofb->init(&key_128[0], 128, &test_iv[0], 16);
+        ofb->init(&testKey[0], keyBits, &testIv[0], 16);
         outlen = 0;
-        EXPECT_EQ(ofb->decrypt(&output[0], &decrypted[0], 32, &outlen), ALC_ERROR_NONE);
-        EXPECT_EQ(decrypted, input);
-        delete ofb;
-    }
+        EXPECT_EQ(ofb->decrypt(&output[0], &decrypted[0], dataSize, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, input) << "Key: " << keyBits << " bits, Data: " << dataSize << " bytes";
 
-    // 192-bit key
-    {
-        std::vector<Uint8> key_192(24, 0x42);
-        std::vector<Uint8> test_iv(16, 0x00);
-        std::vector<Uint8> input(32, 0x55);
-        std::vector<Uint8> output(32), decrypted(32);
-
-        auto ofb = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey192Bit);
-        ASSERT_NE(ofb, nullptr) << "Failed to create AES-OFB-192";
-
-        ofb->init(&key_192[0], 192, &test_iv[0], 16);
-        Uint64 outlen = 0;
-        EXPECT_EQ(ofb->encrypt(&input[0], &output[0], 32, &outlen), ALC_ERROR_NONE);
-        EXPECT_EQ(outlen, 32);
-
-        ofb->init(&key_192[0], 192, &test_iv[0], 16);
-        outlen = 0;
-        EXPECT_EQ(ofb->decrypt(&output[0], &decrypted[0], 32, &outlen), ALC_ERROR_NONE);
-        EXPECT_EQ(decrypted, input);
-        delete ofb;
-    }
-
-    // 256-bit key
-    {
-        std::vector<Uint8> key_256(32, 0x42);
-        std::vector<Uint8> test_iv(16, 0x00);
-        std::vector<Uint8> input(32, 0x55);
-        std::vector<Uint8> output(32), decrypted(32);
-
-        auto ofb = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey256Bit);
-        ASSERT_NE(ofb, nullptr) << "Failed to create AES-OFB-256";
-
-        ofb->init(&key_256[0], 256, &test_iv[0], 16);
-        Uint64 outlen = 0;
-        EXPECT_EQ(ofb->encrypt(&input[0], &output[0], 32, &outlen), ALC_ERROR_NONE);
-        EXPECT_EQ(outlen, 32);
-
-        ofb->init(&key_256[0], 256, &test_iv[0], 16);
-        outlen = 0;
-        EXPECT_EQ(ofb->decrypt(&output[0], &decrypted[0], 32, &outlen), ALC_ERROR_NONE);
-        EXPECT_EQ(decrypted, input);
         delete ofb;
     }
 }
+
+// Instantiate the parameterized tests for all key sizes
+INSTANTIATE_TEST_SUITE_P(
+    AllKeySizes,
+    OFBKeySizeTest,
+    ::testing::Values(
+        CipherKeyLen::eKey128Bit,
+        CipherKeyLen::eKey192Bit,
+        CipherKeyLen::eKey256Bit
+    ),
+    [](const ::testing::TestParamInfo<CipherKeyLen>& info) {
+        switch (info.param) {
+            case CipherKeyLen::eKey128Bit: return "Key128Bit";
+            case CipherKeyLen::eKey192Bit: return "Key192Bit";
+            case CipherKeyLen::eKey256Bit: return "Key256Bit";
+            default: return "Unknown";
+        }
+    }
+);
 
 // Test single block (16 bytes) encryption/decryption
 TEST(OFB, SingleBlock)
