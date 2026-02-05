@@ -322,9 +322,7 @@ TEST(CMACSIV, decTest2)
 }
 #endif
 
-// ============================================================================
 // Comprehensive Corner Case Tests for SIV
-// ============================================================================
 
 template<typename T>
 T*
@@ -918,9 +916,7 @@ TEST(CMACSIV, SeparateCipherObjects)
     delete siv2;
 }
 
-// ============================================================================
 // Negative Tests for SIV - Null Pointer and Edge Cases
-// ============================================================================
 
 // Test null pointer for key in init
 TEST(CMACSIV_Negative, NullKeyPointer)

@@ -321,9 +321,7 @@ TEST(CFB, RandomEncryptDecryptTest)
         }
 }
 
-// ============================================================================
 // Comprehensive Corner Case Tests for CFB
-// ============================================================================
 
 // Test all key sizes (128, 192, 256 bits)
 TEST(CFB, AllKeySizes)
@@ -734,9 +732,7 @@ TEST(CFB, ContextCopy)
     delete cfb_copy;
 }
 
-// ============================================================================
 // Negative Tests for CFB - Null Pointer and Edge Cases
-// ============================================================================
 
 // Test null pointer for key in init
 TEST(CFB_Negative, NullKeyPointer)

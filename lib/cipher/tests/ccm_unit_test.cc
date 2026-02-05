@@ -818,9 +818,7 @@ TEST(CCM, InvalidNonceLen)
     delete pCcmObj;
 }
 
-// ============================================================================
 // Comprehensive Corner Case Tests for CCM
-// ============================================================================
 
 // Test all key sizes (128, 192, 256 bits) with encrypt/decrypt roundtrip
 TEST(CCM, AllKeySizesRoundtrip)
@@ -2193,9 +2191,7 @@ TEST(CCM, KeyAffectsOutput)
     }
 }
 
-// ============================================================================
 // Negative Tests for CCM - Null Pointer and Edge Cases
-// ============================================================================
 
 // Test null pointer for key in init
 TEST(CCM_Negative, NullKeyPointer)

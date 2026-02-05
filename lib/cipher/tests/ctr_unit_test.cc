@@ -526,9 +526,7 @@ TEST(CTR, RandomEncryptDecryptTest)
         }
 }
 
-// ============================================================================
 // Comprehensive Corner Case Tests for CTR
-// ============================================================================
 
 // Test all key sizes (128, 192, 256 bits)
 TEST(CTR, AllKeySizes)
@@ -1007,9 +1005,7 @@ TEST(CTR, CounterIncrement)
     delete ctr;
 }
 
-// ============================================================================
 // Negative Tests for CTR - Null Pointer and Edge Cases
-// ============================================================================
 
 // Test null pointer for key in init
 TEST(CTR_Negative, NullKeyPointer)

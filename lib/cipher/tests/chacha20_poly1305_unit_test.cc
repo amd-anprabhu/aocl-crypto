@@ -240,9 +240,7 @@ TEST(Chacha20Poly1305, PerformanceTest)
     }
 }
 
-// ============================================================================
 // Comprehensive Corner Case Tests for ChaCha20-Poly1305
-// ============================================================================
 
 // Test determinism (same inputs always produce same output)
 TEST(Chacha20Poly1305, Determinism)
@@ -718,9 +716,7 @@ TEST(Chacha20Poly1305, BlockBoundarySizes)
     }
 }
 
-// ============================================================================
 // Negative Tests for ChaCha20-Poly1305 - Null Pointer and Edge Cases
-// ============================================================================
 
 // Test null pointer for key in init
 TEST(Chacha20Poly1305_Negative, NullKeyPointer)

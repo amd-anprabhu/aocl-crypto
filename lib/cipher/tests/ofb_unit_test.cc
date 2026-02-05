@@ -300,9 +300,7 @@ TEST(OFB, RandomEncryptDecryptTest)
     }
 }
 
-// ============================================================================
 // Comprehensive Corner Case Tests for OFB
-// ============================================================================
 
 // Test all key sizes (128, 192, 256 bits)
 TEST(OFB, AllKeySizes)
@@ -828,9 +826,7 @@ TEST(OFB, SymmetricProperty)
     delete ofb2;
 }
 
-// ============================================================================
 // Negative Tests for OFB Mode
-// ============================================================================
 
 // Test null key pointer during initialization
 TEST(OFB_Negative, NullKeyPointer)

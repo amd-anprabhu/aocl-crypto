@@ -921,9 +921,7 @@ TEST(CBC, MultiUpdateArbitrarySizesVariousUpdateCounts)
     }
 }
 
-// ============================================================================
 // Comprehensive Corner Case Tests for CBC
-// ============================================================================
 
 // Test all key sizes (128, 192, 256 bits)
 TEST(CBC, AllKeySizes)
@@ -1505,9 +1503,7 @@ TEST(CBC, Determinism)
     EXPECT_EQ(output2, output3) << "Round 2 and 3 should produce same output";
 }
 
-// ============================================================================
 // Negative Tests for CBC - Null Pointer and Edge Cases
-// ============================================================================
 
 // Test null pointer for key in init
 TEST(CBC_Negative, NullKeyPointer)

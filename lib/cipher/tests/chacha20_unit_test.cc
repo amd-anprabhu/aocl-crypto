@@ -292,9 +292,7 @@ TEST(Chacha20, PerformanceTest)
     }
 }
 
-// ============================================================================
 // Comprehensive Corner Case Tests for ChaCha20
-// ============================================================================
 
 // Test determinism (same inputs always produce same output)
 TEST(Chacha20, Determinism)
@@ -736,9 +734,7 @@ TEST(Chacha20, BlockBoundarySizes)
     }
 }
 
-// ============================================================================
 // Negative Tests for ChaCha20 - Null Pointer and Edge Cases
-// ============================================================================
 
 // Test null pointer for key in setKey
 TEST(Chacha20_Negative, NullKeyPointer)

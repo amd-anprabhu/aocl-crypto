@@ -1041,9 +1041,7 @@ TEST_P(XTS_KAT, valid_encrypt_decrypt_test)
 }
 #endif
 
-// ============================================================================
 // Comprehensive Corner Case Tests for XTS
-// ============================================================================
 
 // Test both key sizes (128 and 256 bits) with encrypt/decrypt roundtrip
 TEST(XTS, AllKeySizesRoundtrip)
@@ -1596,9 +1594,7 @@ TEST(XTS, EncryptDoesNotModifyInput)
     delete xts;
 }
 
-// ============================================================================
 // Negative Tests for XTS - Null Pointer and Edge Cases
-// ============================================================================
 
 // Test null pointer for key in init
 TEST(XTS_Negative, NullKeyPointer)

@@ -319,9 +319,7 @@ TEST(GCM, Instantiation)
     }
 }
 
-// ============================================================================
 // Negative Tests for GCM - Null Pointer and Edge Cases
-// ============================================================================
 
 // Test null pointer for key in init
 TEST(GCM_Negative, NullKeyPointer)
@@ -800,9 +798,7 @@ int main(int argc, char** argv)
     return RUN_ALL_TESTS();
 }
 
-// ============================================================================
 // Comprehensive Corner Case Tests for GCM
-// ============================================================================
 
 // Test all key sizes (128, 192, 256 bits) with encrypt/decrypt roundtrip
 TEST(GCM, AllKeySizesRoundtrip)
