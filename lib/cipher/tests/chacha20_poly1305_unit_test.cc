@@ -727,15 +727,12 @@ TEST(Chacha20Poly1305_Negative, NullKeyPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
 
-    // TODO: Uncomment when null key validation is implemented
-    /*
     Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
                       0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
 
     ref::ChaChaPoly256 chacha_poly;
     alc_error_t err = chacha_poly.init(nullptr, 256, nonce, sizeof(nonce));
     EXPECT_TRUE(alcp_is_error(err)) << "init with null key should fail";
-    */
 }
 
 // Test null pointer for nonce in init
@@ -743,8 +740,6 @@ TEST(Chacha20Poly1305_Negative, NullNoncePointer)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null nonce pointer";
 
-    // TODO: Uncomment when null nonce validation is implemented
-    /*
     Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
                     0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
                     0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
@@ -753,7 +748,6 @@ TEST(Chacha20Poly1305_Negative, NullNoncePointer)
     ref::ChaChaPoly256 chacha_poly;
     alc_error_t err = chacha_poly.init(key, sizeof(key) * 8, nullptr, 12);
     EXPECT_TRUE(alcp_is_error(err)) << "init with null nonce should fail";
-    */
 }
 
 // Test null pointer for input in encrypt
@@ -761,8 +755,6 @@ TEST(Chacha20Poly1305_Negative, NullInputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
                     0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
                     0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
@@ -777,7 +769,6 @@ TEST(Chacha20Poly1305_Negative, NullInputPointerEncrypt)
     Uint64 outlen = 0;
     alc_error_t err = chacha_poly.encrypt(nullptr, output.data(), 32, &outlen);
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input should fail";
-    */
 }
 
 // Test null pointer for output in encrypt
@@ -785,8 +776,6 @@ TEST(Chacha20Poly1305_Negative, NullOutputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
                     0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
                     0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
@@ -801,7 +790,6 @@ TEST(Chacha20Poly1305_Negative, NullOutputPointerEncrypt)
     Uint64 outlen = 0;
     alc_error_t err = chacha_poly.encrypt(input.data(), nullptr, 32, &outlen);
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null output should fail";
-    */
 }
 
 // Test null pointer for input in decrypt
@@ -809,8 +797,6 @@ TEST(Chacha20Poly1305_Negative, NullInputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
                     0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
                     0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
@@ -825,7 +811,6 @@ TEST(Chacha20Poly1305_Negative, NullInputPointerDecrypt)
     Uint64 outlen = 0;
     alc_error_t err = chacha_poly.decrypt(nullptr, output.data(), 32, &outlen);
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null input should fail";
-    */
 }
 
 // Test null pointer for output in decrypt
@@ -833,8 +818,6 @@ TEST(Chacha20Poly1305_Negative, NullOutputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
                     0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
                     0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
@@ -849,7 +832,6 @@ TEST(Chacha20Poly1305_Negative, NullOutputPointerDecrypt)
     Uint64 outlen = 0;
     alc_error_t err = chacha_poly.decrypt(input.data(), nullptr, 32, &outlen);
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null output should fail";
-    */
 }
 
 // Test null pointer for AAD in setAad
@@ -857,8 +839,6 @@ TEST(Chacha20Poly1305_Negative, NullAADPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null AAD pointer";
 
-    // TODO: Uncomment when null AAD validation is implemented
-    /*
     Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
                     0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
                     0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
@@ -870,7 +850,6 @@ TEST(Chacha20Poly1305_Negative, NullAADPointer)
     chacha_poly.init(key, sizeof(key) * 8, nonce, sizeof(nonce));
     alc_error_t err = chacha_poly.setAad(nullptr, 12);
     EXPECT_TRUE(alcp_is_error(err)) << "setAad with null AAD should fail";
-    */
 }
 
 // Test null pointer for tag in getTag
@@ -878,8 +857,6 @@ TEST(Chacha20Poly1305_Negative, NullTagPointerGetTag)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null tag pointer";
 
-    // TODO: Uncomment when null tag validation is implemented
-    /*
     Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
                     0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
                     0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
@@ -896,7 +873,6 @@ TEST(Chacha20Poly1305_Negative, NullTagPointerGetTag)
     chacha_poly.encrypt(plaintext.data(), ciphertext.data(), 32, &outlen);
     alc_error_t err = chacha_poly.getTag(nullptr, 16);
     EXPECT_TRUE(alcp_is_error(err)) << "getTag with null tag should fail";
-    */
 }
 
 // Test zero key length
@@ -904,8 +880,6 @@ TEST(Chacha20Poly1305_Negative, ZeroKeyLength)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate zero key length";
 
-    // TODO: Uncomment when zero key length validation is implemented
-    /*
     Uint8 key[32] = { 0 };
     Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
                       0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
@@ -913,7 +887,6 @@ TEST(Chacha20Poly1305_Negative, ZeroKeyLength)
     ref::ChaChaPoly256 chacha_poly;
     alc_error_t err = chacha_poly.init(key, 0, nonce, sizeof(nonce));
     EXPECT_TRUE(alcp_is_error(err)) << "init with zero key length should fail";
-    */
 }
 
 // Test zero nonce length
@@ -921,8 +894,6 @@ TEST(Chacha20Poly1305_Negative, ZeroNonceLength)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate zero nonce length";
 
-    // TODO: Uncomment when zero nonce length validation is implemented
-    /*
     Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
                     0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
                     0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
@@ -932,7 +903,6 @@ TEST(Chacha20Poly1305_Negative, ZeroNonceLength)
     ref::ChaChaPoly256 chacha_poly;
     alc_error_t err = chacha_poly.init(key, sizeof(key) * 8, nonce, 0);
     EXPECT_TRUE(alcp_is_error(err)) << "init with zero nonce length should fail";
-    */
 }
 
 // Test zero length input (should succeed or be handled gracefully)

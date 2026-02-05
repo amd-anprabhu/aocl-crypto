@@ -837,8 +837,6 @@ TEST(OFB_Negative, NullKeyPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
 
-    // TODO: Uncomment when null key validation is implemented
-    /*
     std::vector<Uint8> test_iv(16, 0x00);
     std::vector<Uint8> input(32, 0xAA);
     std::vector<Uint8> output(32);
@@ -851,7 +849,6 @@ TEST(OFB_Negative, NullKeyPointer)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with null key should fail";
 
     delete ofb;
-    */
 }
 
 // Test null IV pointer during initialization
@@ -865,8 +862,6 @@ TEST(OFB_Negative, NullKeyAndIVPointers)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
 
-    // TODO: Uncomment when null key validation is implemented
-    /*
     auto ofb = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
     ASSERT_NE(ofb, nullptr);
 
@@ -875,7 +870,6 @@ TEST(OFB_Negative, NullKeyAndIVPointers)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with null key and IV should fail";
 
     delete ofb;
-    */
 }
 
 // Test null input pointer during encryption
@@ -885,8 +879,6 @@ TEST(OFB_Negative, NullInputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
     std::vector<Uint8> output(32);
@@ -903,7 +895,6 @@ TEST(OFB_Negative, NullInputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input should fail";
 
     delete ofb;
-    */
 }
 
 // Test null input pointer during decryption
@@ -913,8 +904,6 @@ TEST(OFB_Negative, NullInputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
     std::vector<Uint8> output(32);
@@ -931,7 +920,6 @@ TEST(OFB_Negative, NullInputPointerDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null input should fail";
 
     delete ofb;
-    */
 }
 
 // Test null output pointer during encryption
@@ -941,8 +929,6 @@ TEST(OFB_Negative, NullOutputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
     std::vector<Uint8> input(32, 0xCC);
@@ -959,7 +945,6 @@ TEST(OFB_Negative, NullOutputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null output should fail";
 
     delete ofb;
-    */
 }
 
 // Test null output pointer during decryption
@@ -969,8 +954,6 @@ TEST(OFB_Negative, NullOutputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
     std::vector<Uint8> input(32, 0xCC);
@@ -987,7 +970,6 @@ TEST(OFB_Negative, NullOutputPointerDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null output should fail";
 
     delete ofb;
-    */
 }
 
 // Test null input and output pointers during encryption
@@ -997,8 +979,6 @@ TEST(OFB_Negative, NullInputAndOutputPointersEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null pointers (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
 
@@ -1014,7 +994,6 @@ TEST(OFB_Negative, NullInputAndOutputPointersEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input and output should fail";
 
     delete ofb;
-    */
 }
 
 // Test null input and output pointers during decryption
@@ -1024,8 +1003,6 @@ TEST(OFB_Negative, NullInputAndOutputPointersDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null pointers (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
 
@@ -1041,7 +1018,6 @@ TEST(OFB_Negative, NullInputAndOutputPointersDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null input and output should fail";
 
     delete ofb;
-    */
 }
 
 // Test zero length encryption
@@ -1119,8 +1095,6 @@ TEST(OFB_Negative, ZeroKeySize)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate zero key size";
 
-    // TODO: Uncomment when zero key size validation is implemented
-    /*
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
 
@@ -1132,7 +1106,6 @@ TEST(OFB_Negative, ZeroKeySize)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with zero key size should fail";
 
     delete ofb;
-    */
 }
 
 // Test multiple consecutive null pointer calls
@@ -1179,8 +1152,6 @@ TEST(OFB_Negative, RecoveryAfterError)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer so error recovery test is not applicable";
 
-    // TODO: Uncomment when null key validation is implemented
-    /*
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
     std::vector<Uint8> input(32, 0xCC);
@@ -1211,7 +1182,6 @@ TEST(OFB_Negative, RecoveryAfterError)
     EXPECT_EQ(decrypted, input) << "Decrypted data should match original";
 
     delete ofb;
-    */
 }
 
 // Test same buffer for input and output (in-place operation)

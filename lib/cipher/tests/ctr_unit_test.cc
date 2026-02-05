@@ -1057,8 +1057,6 @@ TEST(CTR_Negative, NullInputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> output(32);
@@ -1074,7 +1072,6 @@ TEST(CTR_Negative, NullInputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input should fail";
 
     delete ctr;
-    */
 }
 
 // Test null pointer for input in decrypt
@@ -1083,8 +1080,6 @@ TEST(CTR_Negative, NullInputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> output(32);
@@ -1100,7 +1095,6 @@ TEST(CTR_Negative, NullInputPointerDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null input should fail";
 
     delete ctr;
-    */
 }
 
 // Test null pointer for output in encrypt
@@ -1109,8 +1103,6 @@ TEST(CTR_Negative, NullOutputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -1126,7 +1118,6 @@ TEST(CTR_Negative, NullOutputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null output should fail";
 
     delete ctr;
-    */
 }
 
 // Test null pointer for output in decrypt
@@ -1135,8 +1126,6 @@ TEST(CTR_Negative, NullOutputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -1152,7 +1141,6 @@ TEST(CTR_Negative, NullOutputPointerDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null output should fail";
 
     delete ctr;
-    */
 }
 
 // Test null pointer for output length in encrypt
@@ -1247,8 +1235,6 @@ TEST(CTR_Negative, ZeroIVLength)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate IV length";
 
-    // TODO: Uncomment when IV length validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
 
@@ -1259,7 +1245,6 @@ TEST(CTR_Negative, ZeroIVLength)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with zero IV length should fail";
 
     delete ctr;
-    */
 }
 
 // Test invalid key length (not 128, 192, or 256 bits)
@@ -1284,8 +1269,6 @@ TEST(CTR_Negative, InvalidIVLength)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate IV length";
 
-    // TODO: Uncomment when IV length validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(8, 0x24); // 8-byte IV (invalid for CTR)
 
@@ -1296,7 +1279,6 @@ TEST(CTR_Negative, InvalidIVLength)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with invalid IV length (8 bytes) should fail";
 
     delete ctr;
-    */
 }
 
 // Test encryption without initialization
@@ -1529,8 +1511,6 @@ TEST(CTR_Negative, SmallIVLength)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate IV length";
 
-    // TODO: Uncomment when IV length validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(4, 0x24); // 4-byte IV (invalid for CTR)
 
@@ -1541,7 +1521,6 @@ TEST(CTR_Negative, SmallIVLength)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with 4-byte IV should fail";
 
     delete ctr;
-    */
 }
 
 // Test cipher reuse after error

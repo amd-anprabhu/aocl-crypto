@@ -2202,8 +2202,6 @@ TEST(CCM_Negative, NullKeyPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
 
-    // TODO: Uncomment when null key validation is implemented
-    /*
     std::vector<Uint8> nonce(12, 0x00);
 
     auto aead = createCipherAead(CipherMode::eAesCCM, CipherKeyLen::eKey128Bit);
@@ -2221,7 +2219,6 @@ TEST(CCM_Negative, NullKeyPointer)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with null key should fail";
 
     delete aead;
-    */
 }
 
 // Test null pointer for nonce/IV in init
@@ -2229,8 +2226,6 @@ TEST(CCM_Negative, NullNoncePointer)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate null nonce pointer";
 
-    // TODO: Uncomment when null nonce validation is implemented
-    /*
     std::vector<Uint8> key(16, 0x42);
 
     auto aead = createCipherAead(CipherMode::eAesCCM, CipherKeyLen::eKey128Bit);
@@ -2249,7 +2244,6 @@ TEST(CCM_Negative, NullNoncePointer)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with null nonce should fail";
 
     delete aead;
-    */
 }
 
 // Test null pointer for both key and nonce in init
@@ -2257,8 +2251,6 @@ TEST(CCM_Negative, NullKeyAndNoncePointers)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
 
-    // TODO: Uncomment when null key validation is implemented
-    /*
     auto aead = createCipherAead(CipherMode::eAesCCM, CipherKeyLen::eKey128Bit);
     ASSERT_NE(aead, nullptr);
 
@@ -2274,7 +2266,6 @@ TEST(CCM_Negative, NullKeyAndNoncePointers)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with null key and nonce should fail";
 
     delete aead;
-    */
 }
 
 // Test null pointer for input in encrypt
@@ -2282,8 +2273,6 @@ TEST(CCM_Negative, NullInputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
     std::vector<Uint8> output(32);
@@ -2307,7 +2296,6 @@ TEST(CCM_Negative, NullInputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input should fail";
 
     delete aead;
-    */
 }
 
 // Test null pointer for output in encrypt
@@ -2315,8 +2303,6 @@ TEST(CCM_Negative, NullOutputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -2340,7 +2326,6 @@ TEST(CCM_Negative, NullOutputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null output should fail";
 
     delete aead;
-    */
 }
 
 // Test null pointer for input in decrypt
@@ -2348,8 +2333,6 @@ TEST(CCM_Negative, NullInputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
     std::vector<Uint8> output(32);
@@ -2373,7 +2356,6 @@ TEST(CCM_Negative, NullInputPointerDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null input should fail";
 
     delete aead;
-    */
 }
 
 // Test null pointer for output in decrypt
@@ -2381,8 +2363,6 @@ TEST(CCM_Negative, NullOutputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -2406,7 +2386,6 @@ TEST(CCM_Negative, NullOutputPointerDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null output should fail";
 
     delete aead;
-    */
 }
 
 // Test null pointer for tag in getTag
@@ -2414,8 +2393,6 @@ TEST(CCM_Negative, NullTagPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null tag pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -2443,7 +2420,6 @@ TEST(CCM_Negative, NullTagPointer)
     EXPECT_TRUE(alcp_is_error(err)) << "getTag with null pointer should fail";
 
     delete aead;
-    */
 }
 
 // Test null pointer for AAD in setAad
@@ -2451,8 +2427,6 @@ TEST(CCM_Negative, NullAADPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null AAD pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
 
@@ -2474,7 +2448,6 @@ TEST(CCM_Negative, NullAADPointer)
     EXPECT_TRUE(alcp_is_error(err)) << "setAad with null pointer should fail";
 
     delete aead;
-    */
 }
 
 // Test zero key length
@@ -2482,8 +2455,6 @@ TEST(CCM_Negative, ZeroKeyLength)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate zero key length";
 
-    // TODO: Uncomment when zero key length validation is implemented
-    /*
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
 
@@ -2502,7 +2473,6 @@ TEST(CCM_Negative, ZeroKeyLength)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with zero key length should fail";
 
     delete aead;
-    */
 }
 
 // Test invalid key length (not 128, 192, or 256 bits)
@@ -2740,8 +2710,6 @@ TEST(CCM_Negative, ZeroNonceLength)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate zero nonce length";
 
-    // TODO: Uncomment when zero nonce length validation is implemented
-    /*
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
 
@@ -2761,7 +2729,6 @@ TEST(CCM_Negative, ZeroNonceLength)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with zero nonce length should fail";
 
     delete aead;
-    */
 }
 
 // Test zero tag length

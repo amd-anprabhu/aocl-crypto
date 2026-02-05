@@ -1605,8 +1605,6 @@ TEST(XTS_Negative, NullKeyPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
 
-    // TODO: Uncomment when null key validation is implemented
-    /*
     std::vector<Uint8> iv(16, 0x01);
 
     auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
@@ -1616,7 +1614,6 @@ TEST(XTS_Negative, NullKeyPointer)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with null key should fail";
 
     delete xts;
-    */
 }
 
 // Test null pointer for IV in init
@@ -1624,8 +1621,6 @@ TEST(XTS_Negative, NullIVPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null IV pointer";
 
-    // TODO: Uncomment when null IV validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
 
     auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
@@ -1635,7 +1630,6 @@ TEST(XTS_Negative, NullIVPointer)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with null IV should fail";
 
     delete xts;
-    */
 }
 
 // Test null pointer for input in encrypt
@@ -1643,8 +1637,6 @@ TEST(XTS_Negative, NullInputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> iv(16, 0x01);
     std::vector<Uint8> output(32);
@@ -1660,7 +1652,6 @@ TEST(XTS_Negative, NullInputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input should fail";
 
     delete xts;
-    */
 }
 
 // Test null pointer for output in encrypt
@@ -1668,8 +1659,6 @@ TEST(XTS_Negative, NullOutputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> iv(16, 0x01);
     std::vector<Uint8> input(32, 0x55);
@@ -1685,7 +1674,6 @@ TEST(XTS_Negative, NullOutputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null output should fail";
 
     delete xts;
-    */
 }
 
 // Test null pointer for both input and output in encrypt
@@ -1693,8 +1681,6 @@ TEST(XTS_Negative, NullInputAndOutputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null pointers (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> iv(16, 0x01);
 
@@ -1709,7 +1695,6 @@ TEST(XTS_Negative, NullInputAndOutputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input and output should fail";
 
     delete xts;
-    */
 }
 
 // Test null pointer for input in decrypt
@@ -1717,8 +1702,6 @@ TEST(XTS_Negative, NullInputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> iv(16, 0x01);
     std::vector<Uint8> output(32);
@@ -1734,7 +1717,6 @@ TEST(XTS_Negative, NullInputPointerDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null input should fail";
 
     delete xts;
-    */
 }
 
 // Test null pointer for output in decrypt
@@ -1742,8 +1724,6 @@ TEST(XTS_Negative, NullOutputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> iv(16, 0x01);
     std::vector<Uint8> input(32, 0x55);
@@ -1759,7 +1739,6 @@ TEST(XTS_Negative, NullOutputPointerDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null output should fail";
 
     delete xts;
-    */
 }
 
 // Test zero key length
@@ -1767,8 +1746,6 @@ TEST(XTS_Negative, ZeroKeyLength)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate zero key length";
 
-    // TODO: Uncomment when zero key length validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> iv(16, 0x01);
 
@@ -1779,7 +1756,6 @@ TEST(XTS_Negative, ZeroKeyLength)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with zero key length should fail";
 
     delete xts;
-    */
 }
 
 // Test invalid key length (not 128 or 256 bits)
@@ -1837,8 +1813,6 @@ TEST(XTS_Negative, ZeroIVLength)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate zero IV length";
 
-    // TODO: Uncomment when zero IV length validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> iv(16, 0x01);
 
@@ -1849,7 +1823,6 @@ TEST(XTS_Negative, ZeroIVLength)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with zero IV length should fail";
 
     delete xts;
-    */
 }
 
 // Test plaintext less than minimum size (XTS requires at least 16 bytes)

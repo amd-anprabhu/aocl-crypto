@@ -328,8 +328,6 @@ TEST(GCM_Negative, NullKeyPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
 
-    // TODO: Uncomment when null key validation is implemented
-    /*
     std::vector<Uint8> iv(12, 0x00);
 
     auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
@@ -339,7 +337,6 @@ TEST(GCM_Negative, NullKeyPointer)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with null key should fail";
 
     delete aead;
-    */
 }
 
 // Test null pointer for IV/nonce in init
@@ -363,8 +360,6 @@ TEST(GCM_Negative, NullKeyAndIVPointers)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
 
-    // TODO: Uncomment when null key validation is implemented
-    /*
     auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
     ASSERT_NE(aead, nullptr);
 
@@ -372,7 +367,6 @@ TEST(GCM_Negative, NullKeyAndIVPointers)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with null key and IV should fail";
 
     delete aead;
-    */
 }
 
 // Test null pointer for input in encrypt
@@ -380,8 +374,6 @@ TEST(GCM_Negative, NullInputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> iv(12, 0x24);
     std::vector<Uint8> output(32);
@@ -397,7 +389,6 @@ TEST(GCM_Negative, NullInputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input should fail";
 
     delete aead;
-    */
 }
 
 // Test null pointer for output in encrypt
@@ -405,8 +396,6 @@ TEST(GCM_Negative, NullOutputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> iv(12, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -422,7 +411,6 @@ TEST(GCM_Negative, NullOutputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null output should fail";
 
     delete aead;
-    */
 }
 
 // Test null pointer for output length in encrypt
@@ -472,8 +460,6 @@ TEST(GCM_Negative, NullTagPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null tag pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> iv(12, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -493,7 +479,6 @@ TEST(GCM_Negative, NullTagPointer)
     EXPECT_TRUE(alcp_is_error(err)) << "getTag with null pointer should fail";
 
     delete aead;
-    */
 }
 
 // Test null pointer for AAD in setAad
@@ -501,8 +486,6 @@ TEST(GCM_Negative, NullAADPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null AAD pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> iv(12, 0x24);
 
@@ -516,7 +499,6 @@ TEST(GCM_Negative, NullAADPointer)
     (void)err;
 
     delete aead;
-    */
 }
 
 // Test zero key length
@@ -524,8 +506,6 @@ TEST(GCM_Negative, ZeroKeyLength)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate zero key length";
 
-    // TODO: Uncomment when zero key length validation is implemented
-    /*
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> iv(12, 0x24);
 
@@ -536,7 +516,6 @@ TEST(GCM_Negative, ZeroKeyLength)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with zero key length should fail";
 
     delete aead;
-    */
 }
 
 // Test invalid key length (not 128, 192, or 256 bits)
@@ -637,8 +616,6 @@ TEST(GCM_Negative, InvalidTagLengths)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate all invalid tag lengths";
 
-    // TODO: Uncomment when invalid tag length validation is implemented
-    /*
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> iv(12, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -664,7 +641,6 @@ TEST(GCM_Negative, InvalidTagLengths)
 
         delete aead;
     }
-    */
 }
 
 // Test reuse after error

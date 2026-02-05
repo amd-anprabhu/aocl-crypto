@@ -927,8 +927,6 @@ TEST(CMACSIV_Negative, NullKeyPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
 
-    // TODO: Uncomment when null key validation is implemented
-    /*
     auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
     ASSERT_NE(siv, nullptr);
 
@@ -936,7 +934,6 @@ TEST(CMACSIV_Negative, NullKeyPointer)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with null key should fail";
 
     delete siv;
-    */
 }
 
 // Test null pointer for input in encrypt
@@ -944,8 +941,6 @@ TEST(CMACSIV_Negative, NullInputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> output(32);
 
@@ -960,7 +955,6 @@ TEST(CMACSIV_Negative, NullInputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input should fail";
 
     delete siv;
-    */
 }
 
 // Test null pointer for output in encrypt
@@ -968,8 +962,6 @@ TEST(CMACSIV_Negative, NullOutputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> input(32, 0x55);
 
@@ -984,7 +976,6 @@ TEST(CMACSIV_Negative, NullOutputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null output should fail";
 
     delete siv;
-    */
 }
 
 // Test null pointer for both input and output in encrypt
@@ -992,8 +983,6 @@ TEST(CMACSIV_Negative, NullInputAndOutputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null pointers (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
 
     auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
@@ -1007,7 +996,6 @@ TEST(CMACSIV_Negative, NullInputAndOutputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input and output should fail";
 
     delete siv;
-    */
 }
 
 // Test null pointer for input in decrypt
@@ -1015,8 +1003,6 @@ TEST(CMACSIV_Negative, NullInputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> output(32);
 
@@ -1031,7 +1017,6 @@ TEST(CMACSIV_Negative, NullInputPointerDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null input should fail";
 
     delete siv;
-    */
 }
 
 // Test null pointer for output in decrypt
@@ -1039,8 +1024,6 @@ TEST(CMACSIV_Negative, NullOutputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> input(32, 0x55);
 
@@ -1055,7 +1038,6 @@ TEST(CMACSIV_Negative, NullOutputPointerDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null output should fail";
 
     delete siv;
-    */
 }
 
 // Test null pointer for tag in getTag
@@ -1063,8 +1045,6 @@ TEST(CMACSIV_Negative, NullTagPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null tag pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> input(32, 0x55);
     std::vector<Uint8> output(32);
@@ -1083,7 +1063,6 @@ TEST(CMACSIV_Negative, NullTagPointer)
     EXPECT_TRUE(alcp_is_error(err)) << "getTag with null pointer should fail";
 
     delete siv;
-    */
 }
 
 // Test null pointer for AAD in setAad
@@ -1091,8 +1070,6 @@ TEST(CMACSIV_Negative, NullAADPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null AAD pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
 
     auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
@@ -1105,7 +1082,6 @@ TEST(CMACSIV_Negative, NullAADPointer)
     EXPECT_TRUE(alcp_is_error(err)) << "setAad with null pointer should fail";
 
     delete siv;
-    */
 }
 
 // Test zero key length
@@ -1113,8 +1089,6 @@ TEST(CMACSIV_Negative, ZeroKeyLength)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate zero key length";
 
-    // TODO: Uncomment when zero key length validation is implemented
-    /*
     std::vector<Uint8> key(32, 0x42);
 
     auto siv = createCipherAead(CipherMode::eAesSIV, CipherKeyLen::eKey128Bit);
@@ -1124,7 +1098,6 @@ TEST(CMACSIV_Negative, ZeroKeyLength)
     EXPECT_TRUE(alcp_is_error(err)) << "Init with zero key length should fail";
 
     delete siv;
-    */
 }
 
 // Test invalid key length (not 128, 192, or 256 bits)

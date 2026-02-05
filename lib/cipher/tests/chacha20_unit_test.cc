@@ -745,12 +745,9 @@ TEST(Chacha20_Negative, NullKeyPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
 
-    // TODO: Uncomment when null key validation is implemented
-    /*
     ref::ChaCha256 chacha20_obj;
     alc_error_t err = chacha20_obj.setKey(nullptr, 256);
     EXPECT_TRUE(alcp_is_error(err)) << "setKey with null key should fail";
-    */
 }
 
 // Test null pointer for IV in setIv
@@ -758,8 +755,6 @@ TEST(Chacha20_Negative, NullIVPointer)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null IV pointer";
 
-    // TODO: Uncomment when null IV validation is implemented
-    /*
     Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
                     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -769,7 +764,6 @@ TEST(Chacha20_Negative, NullIVPointer)
     chacha20_obj.setKey(key, sizeof(key) * 8);
     alc_error_t err = chacha20_obj.setIv(nullptr, 12);
     EXPECT_TRUE(alcp_is_error(err)) << "setIv with null IV should fail";
-    */
 }
 
 // Test null pointer for input in encrypt
@@ -777,8 +771,6 @@ TEST(Chacha20_Negative, NullInputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
                     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -794,7 +786,6 @@ TEST(Chacha20_Negative, NullInputPointerEncrypt)
     Uint64 outlen = 0;
     alc_error_t err = chacha20_obj.encrypt(nullptr, output.data(), 32, &outlen);
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input should fail";
-    */
 }
 
 // Test null pointer for output in encrypt
@@ -802,8 +793,6 @@ TEST(Chacha20_Negative, NullOutputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
                     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -819,7 +808,6 @@ TEST(Chacha20_Negative, NullOutputPointerEncrypt)
     Uint64 outlen = 0;
     alc_error_t err = chacha20_obj.encrypt(input.data(), nullptr, 32, &outlen);
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null output should fail";
-    */
 }
 
 // Test null pointer for both input and output in encrypt
@@ -827,8 +815,6 @@ TEST(Chacha20_Negative, NullInputAndOutputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null pointers (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
                     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -843,7 +829,6 @@ TEST(Chacha20_Negative, NullInputAndOutputPointerEncrypt)
     Uint64 outlen = 0;
     alc_error_t err = chacha20_obj.encrypt(nullptr, nullptr, 32, &outlen);
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input and output should fail";
-    */
 }
 
 // Test null pointer for input in decrypt
@@ -851,8 +836,6 @@ TEST(Chacha20_Negative, NullInputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
                     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -868,7 +851,6 @@ TEST(Chacha20_Negative, NullInputPointerDecrypt)
     Uint64 outlen = 0;
     alc_error_t err = chacha20_obj.decrypt(nullptr, output.data(), 32, &outlen);
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null input should fail";
-    */
 }
 
 // Test null pointer for output in decrypt
@@ -876,8 +858,6 @@ TEST(Chacha20_Negative, NullOutputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented
-    /*
     Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
                     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -893,7 +873,6 @@ TEST(Chacha20_Negative, NullOutputPointerDecrypt)
     Uint64 outlen = 0;
     alc_error_t err = chacha20_obj.decrypt(input.data(), nullptr, 32, &outlen);
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null output should fail";
-    */
 }
 
 // Test zero key length
@@ -901,13 +880,10 @@ TEST(Chacha20_Negative, ZeroKeyLength)
 {
     GTEST_SKIP() << "Skipped: Implementation does not validate zero key length";
 
-    // TODO: Uncomment when zero key length validation is implemented
-    /*
     Uint8 key[32] = { 0 };
     ref::ChaCha256 chacha20_obj;
     alc_error_t err = chacha20_obj.setKey(key, 0);
     EXPECT_TRUE(alcp_is_error(err)) << "setKey with zero key length should fail";
-    */
 }
 
 // Test invalid key length (ChaCha20 requires 256-bit key)
@@ -935,8 +911,6 @@ TEST(Chacha20_Negative, ZeroIVLength)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate zero IV length";
 
-    // TODO: Uncomment when zero IV length validation is implemented
-    /*
     Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
                     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -947,7 +921,6 @@ TEST(Chacha20_Negative, ZeroIVLength)
     chacha20_obj.setKey(key, sizeof(key) * 8);
     alc_error_t err = chacha20_obj.setIv(iv, 0);
     EXPECT_TRUE(alcp_is_error(err)) << "setIv with zero IV length should fail";
-    */
 }
 
 // Test zero length input (should succeed or be handled gracefully)

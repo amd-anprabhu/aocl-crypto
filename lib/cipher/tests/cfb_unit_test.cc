@@ -775,8 +775,6 @@ TEST(CFB_Negative, NullInputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> output(32);
@@ -793,7 +791,6 @@ TEST(CFB_Negative, NullInputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input should fail";
 
     delete cfb;
-    */
 }
 
 // Test null pointer for input ciphertext in decrypt
@@ -803,8 +800,6 @@ TEST(CFB_Negative, NullInputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> output(32);
@@ -821,7 +816,6 @@ TEST(CFB_Negative, NullInputPointerDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null input should fail";
 
     delete cfb;
-    */
 }
 
 // Test null pointer for output in encrypt
@@ -831,8 +825,6 @@ TEST(CFB_Negative, NullOutputPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -849,7 +841,6 @@ TEST(CFB_Negative, NullOutputPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null output should fail";
 
     delete cfb;
-    */
 }
 
 // Test null pointer for output in decrypt
@@ -859,8 +850,6 @@ TEST(CFB_Negative, NullOutputPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -877,7 +866,6 @@ TEST(CFB_Negative, NullOutputPointerDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null output should fail";
 
     delete cfb;
-    */
 }
 
 // Test null pointer for output length in encrypt
@@ -887,8 +875,6 @@ TEST(CFB_Negative, NullOutlenPointerEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null outlen pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -905,7 +891,6 @@ TEST(CFB_Negative, NullOutlenPointerEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null outlen should fail";
 
     delete cfb;
-    */
 }
 
 // Test null pointer for output length in decrypt
@@ -915,8 +900,6 @@ TEST(CFB_Negative, NullOutlenPointerDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null outlen pointer (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -933,7 +916,6 @@ TEST(CFB_Negative, NullOutlenPointerDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null outlen should fail";
 
     delete cfb;
-    */
 }
 
 // Test all null pointers in encrypt
@@ -943,8 +925,6 @@ TEST(CFB_Negative, AllNullPointersEncrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null pointers (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
 
@@ -959,7 +939,6 @@ TEST(CFB_Negative, AllNullPointersEncrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with all null pointers should fail";
 
     delete cfb;
-    */
 }
 
 // Test all null pointers in decrypt
@@ -969,8 +948,6 @@ TEST(CFB_Negative, AllNullPointersDecrypt)
 {
     GTEST_SKIP() << "Skipped: Implementation may not validate null pointers (could segfault)";
 
-    // TODO: Uncomment when null pointer validation is implemented in the cipher
-    /*
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
 
@@ -985,7 +962,6 @@ TEST(CFB_Negative, AllNullPointersDecrypt)
     EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with all null pointers should fail";
 
     delete cfb;
-    */
 }
 
 // Test zero key length
