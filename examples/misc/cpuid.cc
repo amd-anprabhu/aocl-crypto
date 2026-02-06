@@ -109,7 +109,11 @@ checkBmi2Support()
 void
 checkAMDSupport()
 {
-    std::cout << "======AMD FLAGS=======" << std::endl;
+    std::cout << "======AMD FLAGS SUPPORT=======" << std::endl;
+    printBoolMsg("AMD",  CpuId::cpuIsAmd());
+    printBoolMsg("ZEN3", CpuId::cpuIsZen3());
+    printBoolMsg("ZEN4", CpuId::cpuIsZen4());
+    printBoolMsg("ZEN5", CpuId::cpuIsZen5());
     printBoolMsg("ZEN_BASELINE (ADX+AVX2+BMI2)",
                  CpuId::cpuHasAdx() && CpuId::cpuHasAvx2()
                      && CpuId::cpuHasBmi2());
