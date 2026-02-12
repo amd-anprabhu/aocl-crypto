@@ -398,16 +398,103 @@ namespace alcp::cipher { namespace aesni {
         return ALC_ERROR_NONE;
     }
 
+    // GF(2^128) multiplication: a * b mod p(x),
+    // where p(x) = x^128 + x^7 + x^2 + x + 1 (IEEE Std 1619-2025, Section 5.2)
+    // Uses PCLMULQDQ (Karatsuba) + 3-step reduction with poly = 0x87.
+    static inline __m128i GfMul128(__m128i a, __m128i b)
+    {
+        // Carryless multiply to get 256-bit result
+        __m128i lo = _mm_clmulepi64_si128(a, b, 0x00);  // a_lo * b_lo
+        __m128i hi = _mm_clmulepi64_si128(a, b, 0x11);  // a_hi * b_hi
+        __m128i mid1 = _mm_clmulepi64_si128(a, b, 0x01); // a_lo * b_hi
+        __m128i mid2 = _mm_clmulepi64_si128(a, b, 0x10); // a_hi * b_lo
+        __m128i mid = _mm_xor_si128(mid1, mid2);
+
+        // Combine: result = hi:lo with mid added in the middle
+        __m128i mid_lo = _mm_slli_si128(mid, 8);  // shift mid left by 64 bits
+        __m128i mid_hi = _mm_srli_si128(mid, 8);  // shift mid right by 64 bits
+        lo = _mm_xor_si128(lo, mid_lo);
+        hi = _mm_xor_si128(hi, mid_hi);
+
+        // Now reduce 256-bit result (hi:lo) mod x^128 + x^7 + x^2 + x + 1
+        // For reduction: x^128 = x^7 + x^2 + x + 1, so multiply hi by 0x87 and XOR
+        __m128i poly = _mm_set_epi64x(0, 0x87);
+
+        // Reduce hi part
+        __m128i hi_reduced_lo = _mm_clmulepi64_si128(hi, poly, 0x00);
+        __m128i hi_reduced_hi = _mm_clmulepi64_si128(hi, poly, 0x01);
+
+        lo = _mm_xor_si128(lo, hi_reduced_lo);
+        __m128i carry = _mm_srli_si128(hi_reduced_hi, 8);
+        lo = _mm_xor_si128(lo, _mm_slli_si128(hi_reduced_hi, 8));
+
+        // Final reduction if needed (carry from hi_reduced_hi)
+        __m128i final_reduce = _mm_clmulepi64_si128(carry, poly, 0x00);
+        lo = _mm_xor_si128(lo, final_reduce);
+
+        return lo;
+    }
+
+    // Precomputed α^(2^k) for k = 0..15 in GF(2^128)
+    // Polynomial: x^128 + x^7 + x^2 + x + 1 (IEEE Std 1619-2025, Section 5.2)
+    // Eliminates squaring iterations in TweakBlockCalculate for inc < 2^16.
+    static const __m128i alpha_powers[16] = {
+        _mm_set_epi64x(0x0000000000000000, 0x0000000000000002),  // α^(2^0)  = α^1
+        _mm_set_epi64x(0x0000000000000000, 0x0000000000000004),  // α^(2^1)  = α^2
+        _mm_set_epi64x(0x0000000000000000, 0x0000000000000010),  // α^(2^2)  = α^4
+        _mm_set_epi64x(0x0000000000000000, 0x0000000000000100),  // α^(2^3)  = α^8
+        _mm_set_epi64x(0x0000000000000000, 0x0000000000010000),  // α^(2^4)  = α^16
+        _mm_set_epi64x(0x0000000000000000, 0x0000000100000000),  // α^(2^5)  = α^32
+        _mm_set_epi64x(0x0000000000000001, 0x0000000000000000),  // α^(2^6)  = α^64
+        _mm_set_epi64x(0x0000000000000000, 0x0000000000000087),  // α^(2^7)  = α^128
+        _mm_set_epi64x(0x0000000000000000, 0x0000000000004015),  // α^(2^8)  = α^256
+        _mm_set_epi64x(0x0000000000000000, 0x0000000010000111),  // α^(2^9)  = α^512
+        _mm_set_epi64x(0x0000000000000000, 0x0100000000010101),  // α^(2^10) = α^1024
+        _mm_set_epi64x(0x0001000000000000, 0x0000000100010001),  // α^(2^11) = α^2048
+        _mm_set_epi64x(0x0000008700000001, 0x0000000100000001),  // α^(2^12) = α^4096
+        _mm_set_epi64x(0x000000000021caea, 0x0000000000000086),  // α^(2^13) = α^8192
+        _mm_set_epi64x(0x0000000000000000, 0x00021cae93f7cfc8),  // α^(2^14) = α^16384
+        _mm_set_epi64x(0x0000000401504454, 0x4105551550555040),  // α^(2^15) = α^32768
+    };
+
     ALCP_API_EXPORT void TweakBlockCalculate(Uint8* pTweakBlock, Uint64 inc)
     {
-        __m128i* pTweakBlock128 = reinterpret_cast<__m128i*>(pTweakBlock);
-        __m128i  block128       = _mm_load_si128(pTweakBlock128);
+        if (inc == 0) return;
 
-        for (Uint64 i = 0; i < inc; i++) {
-            aes::MultiplyAlphaByTwo(block128);
+        __m128i* pTweakBlock128 = reinterpret_cast<__m128i*>(pTweakBlock);
+        __m128i  tweak = _mm_load_si128(pTweakBlock128);
+
+        // Compute α^inc using precomputed α^(2^k) lookup table.
+        // Low 16 bits use the table; any remaining high bits fall back
+        // to squaring.  Most callers stay within 16 bits.
+        __m128i result = _mm_set_epi64x(0, 1);       // multiplicative identity
+
+        // Fast path: use precomputed table for the low 16 bits
+        Uint64 low = inc & 0xFFFF;
+        for (int i = 0; low != 0; i++, low >>= 1) {
+            if (low & 1) {
+                result = GfMul128(result, alpha_powers[i]);
+            }
         }
 
-        _mm_store_si128(pTweakBlock128, block128);
+        // Slow path: handle bits 16+ with binary exponentiation
+        Uint64 high = inc >> 16;
+        if (high) {
+            // Start from α^(2^16) = (α^(2^15))^2
+            __m128i alpha_power = GfMul128(alpha_powers[15], alpha_powers[15]);
+            while (high > 0) {
+                if (high & 1) {
+                    result = GfMul128(result, alpha_power);
+                }
+                alpha_power = GfMul128(alpha_power, alpha_power);
+                high >>= 1;
+            }
+        }
+
+        // tweak = tweak * α^inc
+        tweak = GfMul128(tweak, result);
+
+        _mm_store_si128(pTweakBlock128, tweak);
     }
 
     ALCP_API_EXPORT void InitializeTweakBlock(const Uint8  pIv[],
