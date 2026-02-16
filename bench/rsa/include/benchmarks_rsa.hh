@@ -36,6 +36,7 @@
 #include <benchmark/benchmark.h>
 #include <iostream>
 #include <string>
+#include <numeric>
 
 #ifdef USE_IPP
 #include "rsa/ipp_rsa.hh"
@@ -111,6 +112,10 @@ Rsa_Bench(benchmark::State&       state,
         InputSize = KeySize;
     }
     std::vector<Uint8> input_data(InputSize);
+    std::iota(
+        input_data.begin(), input_data.end(),
+        0); // NOTE: Ideally we want random input, but that makes the benchmarks
+            // unpredictably fail. Hence, filling with incrementing data.
     std::vector<Uint8> encrypted_data(KeySize);
     std::vector<Uint8> decrypted_data(KeySize);
     std::vector<Uint8> PubKeyKeyMod(KeySize);

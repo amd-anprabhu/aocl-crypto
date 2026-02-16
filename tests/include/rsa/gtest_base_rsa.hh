@@ -508,7 +508,9 @@ Rsa_Cross(std::string             RsaAlgo,
         }
         std::vector<Uint8> input_data(InputSize);
         /* fill input data with random bytes */
-        rngb.genRandomBytes(input_data.size());
+        rngb.genRandomBytes(input_data.size()); // FIXME: Not doing anything as `genRandomBytes`
+                                                // RETURNS the vector. Fix is to either initialize
+                                                // input randomly or keep it same.
 
         /* shuffle input vector after each iterations */
         /* FIXME: Not using CTR DRBG due to a known issue when
