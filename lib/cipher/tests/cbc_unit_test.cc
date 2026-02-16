@@ -2321,7 +2321,7 @@ TEST(CBC_Negative, MaxSizeOverflow)
     delete cbc;
 }
 
-// Test key length that doesn't match cipher creation
+// Test key length that does not match cipher creation
 TEST(CBC_Negative, KeyLengthMismatchWithCreation)
 {
     std::vector<Uint8> test_key(16, 0x42);
