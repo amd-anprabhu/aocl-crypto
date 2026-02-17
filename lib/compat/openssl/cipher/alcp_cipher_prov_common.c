@@ -258,7 +258,7 @@ cipher_generic_init_internal(ALCP_PROV_CIPHER_CTX* ctx,
 
     /* Store IV in provider context if provided - similar to OpenSSL's ossl_cipher_generic_initiv */
     if (iv != NULL && cipherctx->mode != EVP_CIPH_ECB_MODE) {
-        if (ivlen > 0 && ivlen <= sizeof(cipherctx->iv_buff)) {
+        if (ivlen > 0 && ivlen <= sizeof(genCipherctx->oiv_buff)) {
             memcpy(cipherctx->iv_buff, iv, ivlen);
             memcpy(genCipherctx->oiv_buff, iv, ivlen);
             cipherctx->ivState = 1;
