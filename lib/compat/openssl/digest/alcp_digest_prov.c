@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -35,9 +35,7 @@ alcp_prov_digest_freectx(void* vctx)
     alc_prov_digest_ctx_p pdctx = vctx;
     ENTER();
     alcp_digest_finish(&pdctx->handle);
-    OPENSSL_clear_free(pdctx->handle.context, alcp_digest_context_size());
-    pdctx->handle.context = NULL;
-    OPENSSL_clear_free(vctx, sizeof(*pdctx));
+    OPENSSL_clear_free(vctx, sizeof(*pdctx) + alcp_digest_context_size());
     EXIT();
 }
 
@@ -45,18 +43,17 @@ void*
 alcp_prov_digest_newctx(void* vprovctx, alc_digest_mode_t mode)
 {
     alc_prov_digest_ctx_p dig_ctx;
+    Uint64                ctx_size = alcp_digest_context_size();
 
     ENTER();
 
-    dig_ctx = OPENSSL_zalloc(sizeof(*dig_ctx));
+    dig_ctx = OPENSSL_zalloc(sizeof(*dig_ctx) + ctx_size);
     if (dig_ctx != NULL) {
-        Uint64 size             = alcp_digest_context_size();
-        dig_ctx->handle.context = OPENSSL_zalloc(size);
+        dig_ctx->handle.context = (Uint8*)dig_ctx + sizeof(*dig_ctx);
         alc_error_t err         = alcp_digest_request(mode, &(dig_ctx->handle));
         if (err != ALC_ERROR_NONE) {
             printf("Provider: Request failed %llu\n", (unsigned long long)err);
-            OPENSSL_clear_free(dig_ctx->handle.context, size);
-            OPENSSL_clear_free(dig_ctx, sizeof(*dig_ctx));
+            OPENSSL_clear_free(dig_ctx, sizeof(*dig_ctx) + ctx_size);
             return 0;
         }
         if (mode == ALC_SHAKE_128 || mode == ALC_SHAKE_256) {
@@ -78,23 +75,22 @@ void*
 alcp_prov_digest_dupctx(void* vctx)
 {
     ENTER();
-    alc_prov_digest_ctx_p src_ctx = vctx;
+    alc_prov_digest_ctx_p src_ctx    = vctx;
+    Uint64                ctx_size   = alcp_digest_context_size();
+    Uint64                total_size = sizeof(*src_ctx) + ctx_size;
 
-    alc_prov_digest_ctx_p dest_ctx = OPENSSL_memdup(src_ctx, sizeof(*src_ctx));
-    Uint64                size;
-    if (dest_ctx != NULL) {
-        size                     = alcp_digest_context_size();
-        dest_ctx->handle.context = OPENSSL_zalloc(size);
-    } else {
+    alc_prov_digest_ctx_p dest_ctx = OPENSSL_memdup(src_ctx, total_size);
+    if (dest_ctx == NULL) {
         return NULL;
     }
+
+    dest_ctx->handle.context = (Uint8*)dest_ctx + sizeof(*dest_ctx);
 
     alc_error_t err =
         alcp_digest_context_copy(&src_ctx->handle, &dest_ctx->handle);
     if (err != ALC_ERROR_NONE) {
         printf("Provider: copy failed in dupctx\n");
-        OPENSSL_clear_free(dest_ctx->handle.context, size);
-        OPENSSL_clear_free(dest_ctx, sizeof(*dest_ctx));
+        OPENSSL_clear_free(dest_ctx, total_size);
         return NULL;
     }
 
