@@ -40,14 +40,16 @@ ChaCha20::init(const Uint8* pKey,
 {
     alc_error_t err = ALC_ERROR_NONE;
 
-    if (pKey != NULL && keyLen != 0) {
+    // Validate and set key -- let setKey reject null/bad length
+    if (keyLen != 0 || pKey != nullptr) {
         err = setKey(pKey, keyLen);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
     }
 
-    if (pIv != NULL && ivLen != 0) {
+    // Validate and set IV -- let setIv reject null/bad length
+    if (pIv != nullptr) {
         err = setIv(pIv, ivLen);
     }
 

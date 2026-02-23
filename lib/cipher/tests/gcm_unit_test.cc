@@ -324,8 +324,6 @@ TEST(GCM, Instantiation)
 // Test null pointer for key in init
 TEST(GCM_Negative, NullKeyPointer)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
-
     std::vector<Uint8> iv(12, 0x00);
 
     auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
@@ -356,8 +354,6 @@ TEST(GCM_Negative, NullIVPointer)
 // Test null pointer for both key and IV in init
 TEST(GCM_Negative, NullKeyAndIVPointers)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
-
     auto aead = createCipherAead(CipherMode::eAesGCM, CipherKeyLen::eKey128Bit);
     ASSERT_NE(aead, nullptr);
 
@@ -370,8 +366,6 @@ TEST(GCM_Negative, NullKeyAndIVPointers)
 // Test null pointer for input in encrypt
 TEST(GCM_Negative, NullInputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
-
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> iv(12, 0x24);
     std::vector<Uint8> output(32);
@@ -392,8 +386,6 @@ TEST(GCM_Negative, NullInputPointerEncrypt)
 // Test null pointer for output in encrypt
 TEST(GCM_Negative, NullOutputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
-
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> iv(12, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -456,8 +448,6 @@ TEST(GCM_Negative, NullOutlenPointerDecrypt)
 // Test null pointer for tag in getTag
 TEST(GCM_Negative, NullTagPointer)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null tag pointer (could segfault)";
-
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> iv(12, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -482,8 +472,6 @@ TEST(GCM_Negative, NullTagPointer)
 // Test null pointer for AAD in setAad
 TEST(GCM_Negative, NullAADPointer)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null AAD pointer (could segfault)";
-
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> iv(12, 0x24);
 
@@ -502,8 +490,6 @@ TEST(GCM_Negative, NullAADPointer)
 // Test zero key length
 TEST(GCM_Negative, ZeroKeyLength)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate zero key length";
-
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> iv(12, 0x24);
 
@@ -612,8 +598,6 @@ TEST(GCM_Negative, ZeroLengthInputEncrypt)
 // Test invalid tag length (0, 1, 2, 3, 5, 6, 7, 9, 10, 11 bytes are invalid)
 TEST(GCM_Negative, InvalidTagLengths)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate all invalid tag lengths";
-
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> iv(12, 0x24);
     std::vector<Uint8> input(32, 0x55);

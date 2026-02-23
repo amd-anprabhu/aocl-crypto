@@ -47,8 +47,8 @@ GcmT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv,
 {
     alc_error_t err = ALC_ERROR_NONE;
 
-    // Set key via KeyManager (handles comparison and expansion internally)
-    if (pKey != NULL && keyLen != 0) {
+    // Validate and set key -- let KeyManager reject null/bad length
+    if (keyLen != 0 || pKey != nullptr) {
         err = m_keyManager.setKey(pKey, keyLen);
         if (err != ALC_ERROR_NONE) {
             return err;
@@ -57,8 +57,8 @@ GcmT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv,
         m_gcm_ctx.m_update_counter = 0; // reset counter
     }
 
-    // Set IV via IvManager
-    if (pIv != NULL && ivLen != 0) {
+    // Validate and set IV -- let IvManager reject null/bad length
+    if (pIv != nullptr) {
         err = m_ivManager.setIv(pIv, ivLen);
         if (err != ALC_ERROR_NONE) {
             return err;
@@ -140,6 +140,10 @@ GcmT<keyLenBits, arch>::setAad(const Uint8* pInput, Uint64 aadLen)
         return err;
     }
     
+    if (pInput == nullptr && aadLen > 0) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+
     // Skip processing if no AAD data provided
     if (pInput == nullptr || aadLen == 0) {
         return ALC_ERROR_NONE;
@@ -622,12 +626,17 @@ alc_error_t
 GcmT<keyLenBits, arch>::getTag(Uint8* ptag, Uint64 tagLen)
 {
     alc_error_t err = ALC_ERROR_NONE;
+    if (ptag == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (!m_ivManager.isIvSet()) {
         err = ALC_ERROR_BAD_STATE;
         return err;
-    } else if (tagLen > m_gcm_ctx.m_tagLength || tagLen == 0) {
-        // Tag length must not exceed configured length (default 16)
-        // and must be at least 1 byte
+    } else if (tagLen == 0 || tagLen > m_gcm_ctx.m_tagLength
+               || (tagLen < 4)
+               || (tagLen > 4 && tagLen < 8)
+               || (tagLen > 8 && tagLen < 12)) {
+        // Per NIST SP 800-38D, valid tag lengths are: 4, 8, 12, 13, 14, 15, 16
         return ALC_ERROR_INVALID_SIZE;
     }
 #if DEBUG_PROV_GCM_INIT

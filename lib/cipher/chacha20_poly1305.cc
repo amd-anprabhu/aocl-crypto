@@ -37,6 +37,9 @@ template<CpuArchLevel arch>
 alc_error_t
 ChaChPolyT<arch>::setIvInternal(const Uint8* iv, Uint64 ivLen)
 {
+    if (iv == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (ivLen != 12) {
         return ALC_ERROR_INVALID_SIZE;
     }
@@ -233,6 +236,9 @@ template<CpuArchLevel arch>
 alc_error_t
 ChaChPolyT<arch>::setAad(const Uint8* pInput, Uint64 len)
 {
+    if (pInput == nullptr && len > 0) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     alc_error_t err = Poly1305<utils::CpuArchLevel::eDynamic>::update(pInput, len);
     if (err != ALC_ERROR_NONE) {
         return err;
@@ -245,6 +251,9 @@ template<CpuArchLevel arch>
 alc_error_t
 ChaChPolyT<arch>::getTag(Uint8* pOutput, Uint64 len)
 {
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     alc_error_t err = Poly1305<utils::CpuArchLevel::eDynamic>::finalize(pOutput, len);
     return err;
 }

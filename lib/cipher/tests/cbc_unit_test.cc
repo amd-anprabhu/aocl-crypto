@@ -1511,8 +1511,6 @@ TEST(CBC, Determinism)
 // Test null pointer for key in init
 TEST(CBC_Negative, NullKeyPointer)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
-
     std::vector<Uint8> test_iv(16, 0x00);
     std::vector<Uint8> input(32, 0x55);
     std::vector<Uint8> output(32);
@@ -1550,8 +1548,6 @@ TEST(CBC_Negative, NullIVPointer)
 // Test null pointer for both key and IV in init
 TEST(CBC_Negative, NullKeyAndIVPointers)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
-
     auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
     ASSERT_NE(cbc, nullptr);
 
@@ -1567,8 +1563,6 @@ TEST(CBC_Negative, NullKeyAndIVPointers)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(CBC_Negative, NullInputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> output(32);
@@ -1592,8 +1586,6 @@ TEST(CBC_Negative, NullInputPointerEncrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(CBC_Negative, NullInputPointerDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> output(32);
@@ -1617,8 +1609,6 @@ TEST(CBC_Negative, NullInputPointerDecrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(CBC_Negative, NullOutputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -1642,8 +1632,6 @@ TEST(CBC_Negative, NullOutputPointerEncrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(CBC_Negative, NullOutputPointerDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -1745,8 +1733,6 @@ TEST(CBC_Negative, AllNullPointersDecrypt)
 // Test zero key length
 TEST(CBC_Negative, ZeroKeyLength)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate zero key length";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
 
@@ -1764,8 +1750,6 @@ TEST(CBC_Negative, ZeroKeyLength)
 // Note: Implementation does not validate IV length
 TEST(CBC_Negative, ZeroIVLength)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate IV length";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
 
@@ -1799,8 +1783,6 @@ TEST(CBC_Negative, InvalidKeyLength)
 // Note: Implementation does not validate IV length
 TEST(CBC_Negative, InvalidIVLength)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate IV length";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(8, 0x24); // 8-byte IV (invalid for CBC)
 
@@ -2132,8 +2114,6 @@ TEST(CBC_Negative, IVLengthBoundary)
 // Note: Implementation does not validate IV length
 TEST(CBC_Negative, SmallIVLength)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate IV length";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(4, 0x24); // 4-byte IV (invalid for CBC)
 

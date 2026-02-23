@@ -69,16 +69,22 @@ SivT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv,
     alc_error_t err       = ALC_ERROR_NONE;
     Uint64      keyLength = keyLen;
 
-    // Store synthetic IV (for decrypt, the IV is the tag from encrypt)
-    if (pIv != nullptr && ivLen != 0) {
+    // Validate and store synthetic IV (for decrypt, the IV is the tag from encrypt)
+    if (pIv != nullptr) {
         if (ivLen != 16) {
             return ALC_ERROR_INVALID_SIZE;
         }
         utils::CopyBytes(m_syntheticIv, pIv, 16);
     }
 
-    // Set keys - SIV uses double-key: first half for S2V, second half for CTR
-    if (pKey != nullptr && keyLen != 0) {
+    // Validate and set keys -- SIV uses double-key: first half for S2V, second half for CTR
+    if (keyLen != 0 || pKey != nullptr) {
+        if (pKey == nullptr) {
+            return ALC_ERROR_INVALID_ARG;
+        }
+        if (keyLen == 0) {
+            return ALC_ERROR_INVALID_SIZE;
+        }
         err = utils::SecureCopy<Uint8>(m_key1, 32, pKey, keyLength / 8);
         if (err != ALC_ERROR_NONE) {
             return err;
@@ -306,11 +312,19 @@ SivT<keyLenBits, arch>::encrypt(const Uint8* pPlainText,
                                Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
+
+    if (pPlainText == nullptr && len > 0) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pCipherText == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+
     // Mask Vector for disabling 2 bits in the counter
     Uint8 q[16] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                     0x7f, 0xff, 0xff, 0xff, 0x7f, 0xff, 0xff, 0xff };
 
-    err = s2v(pPlainText, len); // Nullptr check inside this function
+    err = s2v(pPlainText, len);
     if (err != ALC_ERROR_NONE) {
         return err;
     }
@@ -344,6 +358,13 @@ SivT<keyLenBits, arch>::decrypt(const Uint8* pCipherText,
 
 {
     alc_error_t err = ALC_ERROR_NONE;
+
+    if (pCipherText == nullptr && len > 0) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pPlainText == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
 
     // Mask Vector for disabling 2 bits in the counter
     Uint8 q[16] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,

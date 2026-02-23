@@ -64,8 +64,8 @@ Xts::init(const Uint8* pKey,
 {
     alc_error_t err = ALC_ERROR_NONE;
 
-    if (pKey != NULL && keyLen != 0) {
-        // Validate and store key via KeyManager (always expands the key)
+    // Validate and set key -- let KeyManager reject null/bad length
+    if (keyLen != 0 || pKey != nullptr) {
         err = m_keyManager.setKey(pKey, keyLen);
         if (err != ALC_ERROR_NONE) {
             return err;
@@ -77,7 +77,11 @@ Xts::init(const Uint8* pKey,
         m_stateManager.onKeySet();
     }
 
-    if (pIv != NULL && ivLen != 0) {
+    // Validate and set IV -- let IvManager reject null/bad length
+    if (pIv == nullptr && ivLen != 0) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pIv != nullptr) {
         err = Xts::setIv(pIv, ivLen);
         if (err != ALC_ERROR_NONE) {
             return err;

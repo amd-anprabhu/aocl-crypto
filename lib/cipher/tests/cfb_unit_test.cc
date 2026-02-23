@@ -792,7 +792,6 @@ TEST(CFB, ContextCopy)
 // Test null pointer for key in init
 TEST(CFB_Negative, NullKeyPointer)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
     std::vector<Uint8> test_iv(16, 0x00);
     std::vector<Uint8> input(32, 0x55);
     std::vector<Uint8> output(32);
@@ -824,8 +823,6 @@ TEST(CFB_Negative, NullKeyAndIVPointers)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(CFB_Negative, NullInputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> output(32);
@@ -849,8 +846,6 @@ TEST(CFB_Negative, NullInputPointerEncrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(CFB_Negative, NullInputPointerDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> output(32);
@@ -874,8 +869,6 @@ TEST(CFB_Negative, NullInputPointerDecrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(CFB_Negative, NullOutputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -899,8 +892,6 @@ TEST(CFB_Negative, NullOutputPointerEncrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(CFB_Negative, NullOutputPointerDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -924,8 +915,6 @@ TEST(CFB_Negative, NullOutputPointerDecrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(CFB_Negative, NullOutlenPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null outlen pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -949,8 +938,6 @@ TEST(CFB_Negative, NullOutlenPointerEncrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(CFB_Negative, NullOutlenPointerDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null outlen pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -974,8 +961,6 @@ TEST(CFB_Negative, NullOutlenPointerDecrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(CFB_Negative, AllNullPointersEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null pointers (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
 
@@ -997,8 +982,6 @@ TEST(CFB_Negative, AllNullPointersEncrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(CFB_Negative, AllNullPointersDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null pointers (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
 

@@ -2196,8 +2196,6 @@ TEST(CCM, KeyAffectsOutput)
 // Test null pointer for key in init
 TEST(CCM_Negative, NullKeyPointer)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
-
     std::vector<Uint8> nonce(12, 0x00);
 
     auto aead = createCipherAead(CipherMode::eAesCCM, CipherKeyLen::eKey128Bit);
@@ -2220,8 +2218,6 @@ TEST(CCM_Negative, NullKeyPointer)
 // Test null pointer for nonce/IV in init
 TEST(CCM_Negative, NullNoncePointer)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate null nonce pointer";
-
     std::vector<Uint8> key(16, 0x42);
 
     auto aead = createCipherAead(CipherMode::eAesCCM, CipherKeyLen::eKey128Bit);
@@ -2245,8 +2241,6 @@ TEST(CCM_Negative, NullNoncePointer)
 // Test null pointer for both key and nonce in init
 TEST(CCM_Negative, NullKeyAndNoncePointers)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
-
     auto aead = createCipherAead(CipherMode::eAesCCM, CipherKeyLen::eKey128Bit);
     ASSERT_NE(aead, nullptr);
 
@@ -2267,8 +2261,6 @@ TEST(CCM_Negative, NullKeyAndNoncePointers)
 // Test null pointer for input in encrypt
 TEST(CCM_Negative, NullInputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
-
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
     std::vector<Uint8> output(32);
@@ -2297,8 +2289,6 @@ TEST(CCM_Negative, NullInputPointerEncrypt)
 // Test null pointer for output in encrypt
 TEST(CCM_Negative, NullOutputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
-
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -2327,8 +2317,6 @@ TEST(CCM_Negative, NullOutputPointerEncrypt)
 // Test null pointer for input in decrypt
 TEST(CCM_Negative, NullInputPointerDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
-
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
     std::vector<Uint8> output(32);
@@ -2357,8 +2345,6 @@ TEST(CCM_Negative, NullInputPointerDecrypt)
 // Test null pointer for output in decrypt
 TEST(CCM_Negative, NullOutputPointerDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
-
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -2387,8 +2373,6 @@ TEST(CCM_Negative, NullOutputPointerDecrypt)
 // Test null pointer for tag in getTag
 TEST(CCM_Negative, NullTagPointer)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null tag pointer (could segfault)";
-
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -2421,8 +2405,6 @@ TEST(CCM_Negative, NullTagPointer)
 // Test null pointer for AAD in setAad
 TEST(CCM_Negative, NullAADPointer)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null AAD pointer (could segfault)";
-
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
 
@@ -2449,8 +2431,6 @@ TEST(CCM_Negative, NullAADPointer)
 // Test zero key length
 TEST(CCM_Negative, ZeroKeyLength)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate zero key length";
-
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
 
@@ -2704,8 +2684,6 @@ TEST(CCM_Negative, MismatchedKeySizeAndKeyLen)
 // Test zero nonce length
 TEST(CCM_Negative, ZeroNonceLength)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate zero nonce length";
-
     std::vector<Uint8> key(16, 0x42);
     std::vector<Uint8> nonce(12, 0x24);
 

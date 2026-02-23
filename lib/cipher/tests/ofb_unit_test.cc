@@ -885,8 +885,6 @@ TEST(OFB, SymmetricProperty)
 // Test null key pointer during initialization
 TEST(OFB_Negative, NullKeyPointer)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
-
     std::vector<Uint8> test_iv(16, 0x00);
     std::vector<Uint8> input(32, 0xAA);
     std::vector<Uint8> output(32);
@@ -910,8 +908,6 @@ TEST(OFB_Negative, NullIVPointer)
 // Test null key and IV pointers during initialization
 TEST(OFB_Negative, NullKeyAndIVPointers)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
-
     auto ofb = createCipher(CipherMode::eAesOFB, CipherKeyLen::eKey128Bit);
     ASSERT_NE(ofb, nullptr);
 
@@ -927,8 +923,6 @@ TEST(OFB_Negative, NullKeyAndIVPointers)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(OFB_Negative, NullInputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
     std::vector<Uint8> output(32);
@@ -952,8 +946,6 @@ TEST(OFB_Negative, NullInputPointerEncrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(OFB_Negative, NullInputPointerDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
     std::vector<Uint8> output(32);
@@ -977,8 +969,6 @@ TEST(OFB_Negative, NullInputPointerDecrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(OFB_Negative, NullOutputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
     std::vector<Uint8> input(32, 0xCC);
@@ -1002,8 +992,6 @@ TEST(OFB_Negative, NullOutputPointerEncrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(OFB_Negative, NullOutputPointerDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
     std::vector<Uint8> input(32, 0xCC);
@@ -1027,8 +1015,6 @@ TEST(OFB_Negative, NullOutputPointerDecrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(OFB_Negative, NullInputAndOutputPointersEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null pointers (could segfault)";
-
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
 
@@ -1051,8 +1037,6 @@ TEST(OFB_Negative, NullInputAndOutputPointersEncrypt)
 // This test is skipped as it may cause segfault in implementations without validation
 TEST(OFB_Negative, NullInputAndOutputPointersDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null pointers (could segfault)";
-
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
 
@@ -1143,8 +1127,6 @@ TEST(OFB_Negative, InvalidIVSize)
 // Test zero key size
 TEST(OFB_Negative, ZeroKeySize)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate zero key size";
-
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
 
@@ -1200,8 +1182,6 @@ TEST(OFB_Negative, ExtremelyLargeDataSize)
 // Test recovery after error
 TEST(OFB_Negative, RecoveryAfterError)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer so error recovery test is not applicable";
-
     std::vector<Uint8> test_key(16, 0xAA);
     std::vector<Uint8> test_iv(16, 0xBB);
     std::vector<Uint8> input(32, 0xCC);

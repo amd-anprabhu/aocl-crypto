@@ -58,8 +58,8 @@ CcmT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv,
     int t = m_tagLen;
     int q = 15 - ivLen;
 
-    // Set key via KeyManager (handles comparison and expansion internally)
-    if (pKey != nullptr && keyLen != 0) {
+    // Validate and set key -- let KeyManager reject null/bad length
+    if (keyLen != 0 || pKey != nullptr) {
         err = m_keyManager.setKey(pKey, keyLen);
         if (err != ALC_ERROR_NONE) {
             return err;
@@ -72,8 +72,11 @@ CcmT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv,
         m_stateManager.onKeySet();
     }
 
-    // Set IV via IvManager
-    if (pIv != nullptr && ivLen != 0) {
+    // Validate and set IV -- let IvManager reject null/bad length
+    if (pIv == nullptr && ivLen != 0) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pIv != nullptr) {
 #ifdef CCM_MULTI_UPDATE
         if (m_is_plaintext_len_set == false) {
             return ALC_ERROR_BAD_STATE;
@@ -273,6 +276,9 @@ template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 CcmT<keyLenBits, arch>::setAad(const Uint8* pInput, Uint64 aadLen)
 {
+    if (pInput == nullptr && aadLen > 0) {
+        return ALC_ERROR_INVALID_ARG;
+    }
 
     m_additionalData    = pInput;
     m_additionalDataLen = aadLen;

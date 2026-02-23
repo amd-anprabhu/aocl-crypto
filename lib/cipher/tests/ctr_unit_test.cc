@@ -1065,7 +1065,6 @@ TEST(CTR, CounterIncrement)
 // Test null pointer for key in init
 TEST(CTR_Negative, NullKeyPointer)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
     std::vector<Uint8> test_iv(16, 0x00);
 
     auto ctr = createCipher(CipherMode::eAesCTR, CipherKeyLen::eKey128Bit);
@@ -1099,15 +1098,12 @@ TEST(CTR_Negative, NullIVPointer)
 // Test null pointer for both key and IV in init
 TEST(CTR_Negative, NullKeyAndIVPointers)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
 }
 
 // Test null pointer for input in encrypt
 // Note: Implementation may not validate null input - may cause undefined behavior
 TEST(CTR_Negative, NullInputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> output(32);
@@ -1129,8 +1125,6 @@ TEST(CTR_Negative, NullInputPointerEncrypt)
 // Note: Implementation may not validate null input - may cause undefined behavior
 TEST(CTR_Negative, NullInputPointerDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> output(32);
@@ -1152,8 +1146,6 @@ TEST(CTR_Negative, NullInputPointerDecrypt)
 // Note: Implementation may not validate null output - may cause undefined behavior
 TEST(CTR_Negative, NullOutputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -1175,8 +1167,6 @@ TEST(CTR_Negative, NullOutputPointerEncrypt)
 // Note: Implementation may not validate null output - may cause undefined behavior
 TEST(CTR_Negative, NullOutputPointerDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
     std::vector<Uint8> input(32, 0x55);
@@ -1277,15 +1267,12 @@ TEST(CTR_Negative, AllNullPointersDecrypt)
 // Test zero key length
 TEST(CTR_Negative, ZeroKeyLength)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate zero key length";
 }
 
 // Test zero IV length
 // Note: Implementation may not validate IV length
 TEST(CTR_Negative, ZeroIVLength)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate IV length";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(16, 0x24);
 
@@ -1318,8 +1305,6 @@ TEST(CTR_Negative, InvalidKeyLength)
 // Note: Implementation may not validate IV length
 TEST(CTR_Negative, InvalidIVLength)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate IV length";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(8, 0x24); // 8-byte IV (invalid for CTR)
 
@@ -1560,8 +1545,6 @@ TEST(CTR_Negative, IVLengthBoundary)
 // Note: Implementation may not validate IV length
 TEST(CTR_Negative, SmallIVLength)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate IV length";
-
     std::vector<Uint8> test_key(16, 0x42);
     std::vector<Uint8> test_iv(4, 0x24); // 4-byte IV (invalid for CTR)
 

@@ -241,6 +241,10 @@ class KeyManager : public Rijndael
             return ALC_ERROR_INVALID_ARG;
         }
 
+        if (keyLenBits == 0) {
+            return ALC_ERROR_INVALID_SIZE;
+        }
+
         Uint32 keyLenBytes = static_cast<Uint32>(keyLenBits / 8);
         if (keyLenBytes > cMaxKeyBytes) {
             return ALC_ERROR_INVALID_SIZE;

@@ -107,22 +107,22 @@ AesGenericCiphersT<mode, keyLenBits, arch>::init(const Uint8* pKey,
 {
     alc_error_t err = ALC_ERROR_NONE;
 
-    // Set IV if provided (do this first so key-only init can check IV state)
-    if (pIv != nullptr && ivLen > 0) {
-        m_ivManager.setIv(pIv, static_cast<Uint32>(ivLen));
+    // Validate and set IV -- let IvManager reject null/bad length
+    if (pIv != nullptr) {
+        err = m_ivManager.setIv(pIv, static_cast<Uint32>(ivLen));
+        if (err != ALC_ERROR_NONE) {
+            return err;
+        }
         m_stateManager.onIvSet();
     }
 
-    // Set key if provided
-    if (pKey != nullptr && keyLen != 0) {
-        // Set the key using KeyManager (inherits from Rijndael)
-        // This performs key expansion - keyLen is in bits
+    // Validate and set key -- let KeyManager reject null/bad length
+    if (keyLen != 0 || pKey != nullptr) {
         err = m_keyManager.setKey(pKey, keyLen);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
 
-        // Update state manager (key pointers auto-populated by KeyManager)
         m_stateManager.onKeySet();
 
         // For non-AEAD modes: If IV was not set in this call and not previously

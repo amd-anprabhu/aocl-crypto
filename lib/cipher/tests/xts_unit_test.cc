@@ -1679,8 +1679,6 @@ TEST(XTS, EncryptDoesNotModifyInput)
 // Test null pointer for key in init
 TEST(XTS_Negative, NullKeyPointer)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate null key pointer";
-
     std::vector<Uint8> iv(16, 0x01);
 
     auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
@@ -1695,8 +1693,6 @@ TEST(XTS_Negative, NullKeyPointer)
 // Test null pointer for IV in init
 TEST(XTS_Negative, NullIVPointer)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null IV pointer";
-
     std::vector<Uint8> key(32, 0x42);
 
     auto xts = createCipher(CipherMode::eAesXTS, CipherKeyLen::eKey128Bit);
@@ -1711,8 +1707,6 @@ TEST(XTS_Negative, NullIVPointer)
 // Test null pointer for input in encrypt
 TEST(XTS_Negative, NullInputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
-
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> iv(16, 0x01);
     std::vector<Uint8> output(32);
@@ -1733,8 +1727,6 @@ TEST(XTS_Negative, NullInputPointerEncrypt)
 // Test null pointer for output in encrypt
 TEST(XTS_Negative, NullOutputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
-
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> iv(16, 0x01);
     std::vector<Uint8> input(32, 0x55);
@@ -1755,8 +1747,6 @@ TEST(XTS_Negative, NullOutputPointerEncrypt)
 // Test null pointer for both input and output in encrypt
 TEST(XTS_Negative, NullInputAndOutputPointerEncrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null pointers (could segfault)";
-
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> iv(16, 0x01);
 
@@ -1776,8 +1766,6 @@ TEST(XTS_Negative, NullInputAndOutputPointerEncrypt)
 // Test null pointer for input in decrypt
 TEST(XTS_Negative, NullInputPointerDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null input pointer (could segfault)";
-
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> iv(16, 0x01);
     std::vector<Uint8> output(32);
@@ -1798,8 +1786,6 @@ TEST(XTS_Negative, NullInputPointerDecrypt)
 // Test null pointer for output in decrypt
 TEST(XTS_Negative, NullOutputPointerDecrypt)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate null output pointer (could segfault)";
-
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> iv(16, 0x01);
     std::vector<Uint8> input(32, 0x55);
@@ -1820,8 +1806,6 @@ TEST(XTS_Negative, NullOutputPointerDecrypt)
 // Test zero key length
 TEST(XTS_Negative, ZeroKeyLength)
 {
-    GTEST_SKIP() << "Skipped: Implementation does not validate zero key length";
-
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> iv(16, 0x01);
 
@@ -1887,8 +1871,6 @@ TEST(XTS_Negative, DecryptWithoutInit)
 // Test zero IV length
 TEST(XTS_Negative, ZeroIVLength)
 {
-    GTEST_SKIP() << "Skipped: Implementation may not validate zero IV length";
-
     std::vector<Uint8> key(32, 0x42);
     std::vector<Uint8> iv(16, 0x01);
 
