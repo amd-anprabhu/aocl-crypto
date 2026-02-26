@@ -1,3 +1,2 @@
 CompileFlags:                           # Tweak the parse settings
-  Add: -Iinclude, -Ilib/include
-  CompilationDatabase: None
+  CompilationDatabase: build
