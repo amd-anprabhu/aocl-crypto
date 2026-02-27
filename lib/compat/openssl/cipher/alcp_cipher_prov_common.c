@@ -33,6 +33,7 @@
 #include "provider/alcp_names.h"
 
 #include "alcp_cipher_prov_common.h"
+#include "alcp_cipher_prov_tls.h"
 
 /*-
  * Generic cipher functions for OSSL_PARAM gettables and settables
@@ -433,20 +434,24 @@ ALCP_prov_cipher_generic_block_update(void*        vctx,
 
         /* This only fails if padding is publicly invalid */
         *outl = inl;
-        /* TODO: Implement TLS CBC unpadding for provider compatibility */
-        // if (!cipherctx->enc
-        //     && !ALCP_prov_cipher_tlsunpadblock(ctx->libctx,
-        //                                   genCipherctx->tlsversion,
-        //                                   out,
-        //                                   outl,
-        //                                   blksz,
-        //                                   &genCipherctx->tlsmac,
-        //                                   &genCipherctx->alloced,
-        //                                   genCipherctx->tlsmacsize,
-        //                                   0)) {
-        //     ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
-        //     return 0;
-        // }
+        /*
+         * For TLS CBC decryption, remove padding and extract MAC.
+         * This is done in constant time to prevent timing attacks.
+         * Reference: OpenSSL ssl/record/tls_pad.c
+         */
+        if (!cipherctx->enc
+            && !ALCP_prov_cipher_tlsunpadblock(ctx->libctx,
+                                          genCipherctx->tlsversion,
+                                          out,
+                                          outl,
+                                          blksz,
+                                          &genCipherctx->tlsmac,
+                                          &genCipherctx->alloced,
+                                          genCipherctx->tlsmacsize,
+                                          0)) {
+            ERR_raise(ERR_LIB_PROV, PROV_R_CIPHER_OPERATION_FAILED);
+            return 0;
+        }
         return 1;
     }
 
