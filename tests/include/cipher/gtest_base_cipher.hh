@@ -846,10 +846,7 @@ CipherCrossTest(int               keySize,
             data_alc.m_inl = data_ext.m_inl = pt.size() - 1;
 
             data_alc.m_outl = data_ext.m_outl = data_alc.m_inl;
-/* for CBC mode, let same buffers be used for both input and output if
- * CBC_INPLACE_BUFFER is defined
- */
-#ifdef CBC_INPLACE_BUFFER
+            /* For CBC mode, use same buffer for input and output (in-place) */
             if (modeStr.compare("CBC") == 0) {
                 data_alc.m_out = data_alc.m_in;
                 data_ext.m_out = &(out_ct_ext[0]);
@@ -857,10 +854,6 @@ CipherCrossTest(int               keySize,
                 data_alc.m_out = &(out_ct_alc[0]);
                 data_ext.m_out = &(out_ct_ext[0]);
             }
-#else
-            data_alc.m_out = &(out_ct_alc[0]);
-            data_ext.m_out = &(out_ct_ext[0]);
-#endif
 
             // ALC/Main Lib Data
             data_alc.m_iv  = &(iv[0]);

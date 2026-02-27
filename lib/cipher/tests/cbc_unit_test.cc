@@ -597,9 +597,6 @@ TEST(CBC, MultiUpdateDecryptionSmallChunks)
 
 TEST(CBC, InplaceEncryption)
 {
-#ifndef CBC_INPLACE_BUFFER
-    GTEST_SKIP() << "In-place encryption functionality disabled!";
-#endif
     std::vector<CpuArchLevel> cpu_features =
         alcp::utils::CpuId::getSupportedArchLevels();
 
@@ -646,9 +643,6 @@ TEST(CBC, InplaceEncryption)
 
 TEST(CBC, InplaceDecryption)
 {
-#ifndef CBC_INPLACE_BUFFER
-    GTEST_SKIP() << "In-place decryption functionality disabled!";
-#endif
     std::vector<CpuArchLevel> cpu_features =
         alcp::utils::CpuId::getSupportedArchLevels();
 
@@ -1868,7 +1862,6 @@ TEST(CBC_Negative, ZeroLengthInputDecrypt)
 
     auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
     ASSERT_NE(cbc, nullptr);
-
     alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
     EXPECT_EQ(err, ALC_ERROR_NONE);
 
@@ -2259,6 +2252,8 @@ TEST(CBC_Negative, DecryptCorruptedCiphertext)
 
     auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
     ASSERT_NE(cbc, nullptr);
+    std::mt19937 gen(42); // Fixed seed for reproducibility
+    std::uniform_int_distribution<> size_dist(1, 200); // 1-200 blocks
 
     // Encrypt
     cbc->init(&test_key[0], 128, &test_iv[0], 16);

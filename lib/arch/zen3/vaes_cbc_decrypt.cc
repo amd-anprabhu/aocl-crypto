@@ -28,7 +28,7 @@
 
 #include "vaes.hh"
 
-
+#include "alcp/cipher/aesni.hh"
 #include "alcp/types.hh"
 #include "avx256.hh"
 
@@ -46,198 +46,189 @@ template<void AesDec_1x128(__m256i* pBlk0, const __m128i* pKey, int nRounds),
                            const __m128i* pKey,
                            int            nRounds)>
 alc_error_t
-DecryptCbc(const Uint8* pCipherText, // ptr to ciphertext
-           Uint8*       pPlainText,  // ptr to plaintext
-           Uint64       len,         // message length in bytes
-           const Uint8* pKey,        // ptr to Key
-           int          nRounds,     // No. of rounds
-           Uint8*       pIv          // ptr to Initialization Vector
-)
+DecryptCbc(const Uint8* pCipherText,
+           Uint8*       pPlainText,
+           Uint64       len,
+           const Uint8* pKey,
+           int          nRounds,
+           Uint8*       pIv)
 {
-    alc_error_t err    = ALC_ERROR_NONE;
-    Uint64      blocks = len / Rijndael::cBlockSize;
-    Uint64      res    = len % Rijndael::cBlockSize;
-
-    auto p_in_128  = reinterpret_cast<const __m128i*>(pCipherText);
-    auto p_out_128 = reinterpret_cast<__m128i*>(pPlainText);
-    auto pkey128   = reinterpret_cast<const __m128i*>(pKey);
-
-    // Mask for loading and storing half register
-    __m256i mask_lo = _mm256_set_epi64x(0,
-                                        0,
-                                        static_cast<long long>(1UL) << 63,
-                                        static_cast<long long>(1UL) << 63);
-
-    __m256i input_128_a1;
-
-    __m256i a1, a2, a3, a4;
-    __m256i b1, b2, b3, b4;
-    b1 = _mm256_maskload_epi64((long long*)pIv, mask_lo);
-
-    // First block is an exception, it needs to be XORed with IV
-    if (blocks >= 1) {
-        a1 = input_128_a1 =
-            _mm256_maskload_epi64((long long*)p_in_128, mask_lo);
-
-        vaes::AesDecrypt(&a1, pkey128, nRounds);
-        a1 = _mm256_xor_si256(a1, b1);
-
-        // Default: track last ciphertext for multi-update IV
-        b1 = input_128_a1;
-#ifdef AES_CBC_INPLACE_BUFFER
-        // Inplace: pre-load packed IVs [block0,block1] before store overwrites
-        // Only if there's more data to process (avoids out-of-bounds read)
-        if ((blocks >= 2) || (res != 0)) {
-            b1 = _mm256_loadu_si256((__m256i*)(p_in_128));
-        }
-#endif
-        _mm256_maskstore_epi64((long long*)p_out_128, mask_lo, a1);
-        p_in_128++;
-        p_out_128++;
-        blocks--;
+    if (len == 0) {
+        return ALC_ERROR_NONE;
     }
 
-    // Process 8 blocks at a time
-    for (; blocks >= 8; blocks -= 8) {
-        // Load ciphertext blocks [c1,c2], [c3,c4], [c5,c6], [c7,c8]
-        a1 = _mm256_loadu_si256(((__m256i*)p_in_128) + 0);
-        a2 = _mm256_loadu_si256(((__m256i*)p_in_128) + 1);
-        a3 = _mm256_loadu_si256(((__m256i*)p_in_128) + 2);
-        a4 = _mm256_loadu_si256(((__m256i*)p_in_128) + 3);
+    auto pkey128 = reinterpret_cast<const __m128i*>(pKey);
 
-        // Load IV blocks [c0,c1], [c2,c3], [c4,c5], [c6,c7]
-#ifndef AES_CBC_INPLACE_BUFFER
-        // Non-inplace: reload b1 from ciphertext (not overwritten)
-        b1 = _mm256_loadu_si256((__m256i*)(p_in_128 - 1));
-#endif
-        b2 = _mm256_loadu_si256(((__m256i*)(p_in_128 - 1)) + 1);
-        b3 = _mm256_loadu_si256(((__m256i*)(p_in_128 - 1)) + 2);
-        b4 = _mm256_loadu_si256(((__m256i*)(p_in_128 - 1)) + 3);
+    // Fast path: AES-NI for single block (< 32 bytes)
+    if (len < 32) {
+        auto    p_in  = reinterpret_cast<const __m128i*>(pCipherText);
+        auto    p_out = reinterpret_cast<__m128i*>(pPlainText);
+        __m128i iv =
+            _mm_loadu_si128(reinterpret_cast<const __m128i*>(pIv));
 
-        AesDec_4x128(&a1, &a2, &a3, &a4, pkey128, nRounds);
-
-        // XOR with previous ciphertext to complete decryption
-        a1 = _mm256_xor_si256(a1, b1);
-        a2 = _mm256_xor_si256(a2, b2);
-        a3 = _mm256_xor_si256(a3, b3);
-        a4 = _mm256_xor_si256(a4, b4);
-#ifdef AES_CBC_INPLACE_BUFFER
-        // Inplace: pre-load next IV before store overwrites ciphertext
-        if ((blocks >= 9) || (res != 0)) {
-            b1 = _mm256_loadu_si256((__m256i*)(p_in_128 + 7));
+        while (len >= 16) {
+            __m128i ct    = _mm_loadu_si128(p_in);
+            __m128i block = ct;
+            aesni::AesDecrypt(&block, pkey128, nRounds);
+            block = _mm_xor_si128(block, iv);
+            _mm_storeu_si128(p_out, block);
+            iv = ct;
+            p_in++;
+            p_out++;
+            len -= 16;
         }
+
+#ifdef AES_MULTI_UPDATE
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(pIv), iv);
 #endif
-        // Store decrypted blocks
-        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128), a1);
-        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128) + 1, a2);
-        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128) + 2, a3);
-        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128) + 3, a4);
+        return ALC_ERROR_NONE;
+    }
+
+    // VAES-256 path for 2+ blocks (32+ bytes)
+    auto p_in_128  = reinterpret_cast<const __m128i*>(pCipherText);
+    auto p_out_128 = reinterpret_cast<__m128i*>(pPlainText);
+
+    __m256i cblock1, cblock2, cblock3, cblock4;
+    __m256i iv1, iv2, iv3, iv4;
+
+    // Pack IV: iv1 = [IV, c0] (analogous to Zen4's permute+blend)
+    iv1 = _mm256_inserti128_si256(
+        _mm256_castsi128_si256(
+            _mm_loadu_si128(reinterpret_cast<const __m128i*>(pIv))),
+        _mm_loadu_si128(p_in_128),
+        1);
+
+    // Hot inner loop: 8 blocks (128 bytes) per iteration.
+    // len >= 256 guarantees another batch follows, so 256-bit
+    // iv1 reload is unconditionally safe.
+    for (; len >= 256; len -= 128) {
+        cblock1 = _mm256_loadu_si256((__m256i*)(p_in_128));
+        cblock2 = _mm256_loadu_si256((__m256i*)(p_in_128 + 2));
+        cblock3 = _mm256_loadu_si256((__m256i*)(p_in_128 + 4));
+        cblock4 = _mm256_loadu_si256((__m256i*)(p_in_128 + 6));
+
+        iv2 = _mm256_loadu_si256((__m256i*)(p_in_128 + 1));
+        iv3 = _mm256_loadu_si256((__m256i*)(p_in_128 + 3));
+        iv4 = _mm256_loadu_si256((__m256i*)(p_in_128 + 5));
+
+        AesDec_4x128(&cblock1, &cblock2, &cblock3, &cblock4, pkey128,
+                      nRounds);
+
+        cblock1 = _mm256_xor_si256(cblock1, iv1);
+        cblock2 = _mm256_xor_si256(cblock2, iv2);
+        cblock3 = _mm256_xor_si256(cblock3, iv3);
+        cblock4 = _mm256_xor_si256(cblock4, iv4);
+
+        iv1 = _mm256_loadu_si256((__m256i*)(p_in_128 + 7));
+
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128), cblock1);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128 + 2),
+                            cblock2);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128 + 4),
+                            cblock3);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128 + 6),
+                            cblock4);
 
         p_in_128 += 8;
         p_out_128 += 8;
     }
 
-    // Process 4 blocks at a time
-    for (; blocks >= 4; blocks -= 4) {
-        // Load ciphertext blocks [c1,c2], [c3,c4]
-        a1 = input_128_a1 = _mm256_loadu_si256(((__m256i*)p_in_128) + 0);
-        a2                = _mm256_loadu_si256(((__m256i*)p_in_128) + 1);
+    // Last 8-block batch (128 <= len < 256): conditional iv1 reload
+    if (len >= 128) {
+        cblock1 = _mm256_loadu_si256((__m256i*)(p_in_128));
+        cblock2 = _mm256_loadu_si256((__m256i*)(p_in_128 + 2));
+        cblock3 = _mm256_loadu_si256((__m256i*)(p_in_128 + 4));
+        cblock4 = _mm256_loadu_si256((__m256i*)(p_in_128 + 6));
 
-        // Load IV blocks [c0,c1], [c2,c3]
-#ifndef AES_CBC_INPLACE_BUFFER
-        // Non-inplace: reload b1 from ciphertext (not overwritten)
-        b1 = _mm256_loadu_si256((__m256i*)(p_in_128 - 1));
-#endif
-        b2 = _mm256_loadu_si256(((__m256i*)(p_in_128 - 1)) + 1);
+        iv2 = _mm256_loadu_si256((__m256i*)(p_in_128 + 1));
+        iv3 = _mm256_loadu_si256((__m256i*)(p_in_128 + 3));
+        iv4 = _mm256_loadu_si256((__m256i*)(p_in_128 + 5));
 
-        AesDec_2x128(&a1, &a2, pkey128, nRounds);
+        AesDec_4x128(&cblock1, &cblock2, &cblock3, &cblock4, pkey128,
+                      nRounds);
 
-        // XOR with previous ciphertext to complete decryption
-        a1 = _mm256_xor_si256(a1, b1);
-        a2 = _mm256_xor_si256(a2, b2);
+        cblock1 = _mm256_xor_si256(cblock1, iv1);
+        cblock2 = _mm256_xor_si256(cblock2, iv2);
+        cblock3 = _mm256_xor_si256(cblock3, iv3);
+        cblock4 = _mm256_xor_si256(cblock4, iv4);
 
-#ifdef AES_CBC_INPLACE_BUFFER
-        // Inplace: pre-load next IV before store overwrites ciphertext
-        if ((blocks >= 5) || (res != 0)) {
-            b1 = _mm256_loadu_si256((__m256i*)(p_in_128 + 3));
+        len -= 128;
+        if (len >= 32) {
+            iv1 = _mm256_loadu_si256((__m256i*)(p_in_128 + 7));
+        } else {
+            iv1 = _mm256_castsi128_si256(_mm_loadu_si128(p_in_128 + 7));
         }
-#endif
-        // Store decrypted blocks
-        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128), a1);
-        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128) + 1, a2);
+
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128), cblock1);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128 + 2),
+                            cblock2);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128 + 4),
+                            cblock3);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128 + 6),
+                            cblock4);
+
+        p_in_128 += 8;
+        p_out_128 += 8;
+    }
+
+    // 4-block batch (64 bytes)
+    if (len >= 64) {
+        cblock1 = _mm256_loadu_si256((__m256i*)(p_in_128));
+        cblock2 = _mm256_loadu_si256((__m256i*)(p_in_128 + 2));
+        iv2     = _mm256_loadu_si256((__m256i*)(p_in_128 + 1));
+
+        AesDec_2x128(&cblock1, &cblock2, pkey128, nRounds);
+
+        cblock1 = _mm256_xor_si256(cblock1, iv1);
+        cblock2 = _mm256_xor_si256(cblock2, iv2);
+
+        len -= 64;
+        if (len >= 32) {
+            iv1 = _mm256_loadu_si256((__m256i*)(p_in_128 + 3));
+        } else {
+            iv1 = _mm256_castsi128_si256(_mm_loadu_si128(p_in_128 + 3));
+        }
+
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128), cblock1);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128 + 2),
+                            cblock2);
 
         p_in_128 += 4;
         p_out_128 += 4;
     }
 
-    // Process 2 blocks at a time
-    for (; blocks >= 2; blocks -= 2) {
-        // Load ciphertext blocks [c1,c2]
-        a1 = _mm256_loadu_si256((__m256i*)p_in_128);
+    // 2-block batch (32 bytes)
+    if (len >= 32) {
+        cblock1 = _mm256_loadu_si256((__m256i*)p_in_128);
 
-#ifndef AES_CBC_INPLACE_BUFFER
-        // Non-inplace: reload b1 from ciphertext (not overwritten)
-        b1 = _mm256_loadu_si256((__m256i*)(p_in_128 - 1));
-#endif
-        AesDec_1x128(&a1, pkey128, nRounds);
+        AesDec_1x128(&cblock1, pkey128, nRounds);
+        cblock1 = _mm256_xor_si256(cblock1, iv1);
 
-        // XOR with previous ciphertext to complete decryption
-        a1 = _mm256_xor_si256(a1, b1);
+        len -= 32;
+        iv1 = _mm256_castsi128_si256(_mm_loadu_si128(p_in_128 + 1));
 
-#ifdef AES_CBC_INPLACE_BUFFER
-        // Inplace: pre-load next IV before store overwrites ciphertext
-        if ((blocks >= 3) || (res != 0)) {
-            b1 = _mm256_loadu_si256((__m256i*)(p_in_128 + 1));
-        }
-#endif
-        // Store decrypted blocks
-        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128), a1);
+        _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out_128), cblock1);
 
         p_in_128 += 2;
         p_out_128 += 2;
     }
 
-    // Process remaining single blocks
-    for (; blocks >= 1; blocks -= 1) {
-#ifndef AES_CBC_INPLACE_BUFFER
-        // Non-inplace: load IV from previous ciphertext (not overwritten)
-        b1 = _mm256_maskload_epi64((long long*)(p_in_128 - 1), mask_lo);
-#endif
-        // Load the current block
-        a1 = input_128_a1 =
-            _mm256_maskload_epi64((long long*)p_in_128, mask_lo);
-
-        AesDec_1x128(&a1, pkey128, nRounds);
-
-        // XOR with previous ciphertext to complete decryption
-        a1 = _mm256_xor_si256(a1, b1);
-
-        // Store decrypted block
-        _mm256_maskstore_epi64((long long*)p_out_128, mask_lo, a1);
-
-        // Track last ciphertext for next iteration / multi-update IV
-        b1 = input_128_a1;
-        p_in_128++;
-        p_out_128++;
-    }
-
-    if (res) {
-        a1 = _mm256_setzero_si256();
-        std::copy((Uint8*)p_in_128, ((Uint8*)p_in_128) + res, (Uint8*)&a1);
-
-        AesDec_1x128(&a1, pkey128, nRounds);
-
-        a1 = _mm256_xor_si256(a1, b1);
-
-        std::copy((Uint8*)&a1, ((Uint8*)&a1) + res, (Uint8*)p_out_128);
+    // 1-block tail: AES-NI (same approach as Zen4 tail)
+    if (len >= 16) {
+        __m128i ct    = _mm_loadu_si128(p_in_128);
+        __m128i block = ct;
+        aesni::AesDecrypt(&block, pkey128, nRounds);
+        block = _mm_xor_si128(block, _mm256_castsi256_si128(iv1));
+        _mm_storeu_si128(p_out_128, block);
+        iv1 = _mm256_castsi128_si256(ct);
     }
 
 #ifdef AES_MULTI_UPDATE
-    // IV is no longer needed hence we can write the old ciphertext back to IV
-    alcp_storeu_128(reinterpret_cast<__m256i*>(pIv), b1);
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(pIv),
+                     _mm256_castsi256_si128(iv1));
 #endif
 
-    return err;
+    return ALC_ERROR_NONE;
 }
 
 } // namespace alcp::cipher::vaes
@@ -250,10 +241,11 @@ alc_error_t
 tDecryptCbc(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv)
 {
+    constexpr int nRounds = static_cast<int>(T) / 32 + 6;
     return alcp::cipher::vaes::DecryptCbc<alcp::cipher::vaes::AesDecrypt,
                                           alcp::cipher::vaes::AesDecrypt,
                                           alcp::cipher::vaes::AesDecrypt>(
-        pSrc, pDest, len, pKey, 10, pIv);
+        pSrc, pDest, len, pKey, nRounds, pIv);
 }
 
 template<>

@@ -249,11 +249,12 @@ alc_error_t
 tDecryptCbc(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv)
 {
+    constexpr int nRounds = static_cast<int>(T) / 32 + 6;
     return alcp::cipher::aesni::DecryptCbc<alcp::cipher::aesni::AesDecrypt,
                                            alcp::cipher::aesni::AesDecrypt,
                                            alcp::cipher::aesni::AesDecrypt,
                                            alcp::cipher::aesni::AesDecrypt>(
-        pSrc, pDest, len, pKey, 10, pIv);
+        pSrc, pDest, len, pKey, nRounds, pIv);
 }
 
 template<>

@@ -174,4 +174,3 @@ These are flags to enable/disable optional features as required.
 2. To enable multi update feature for all supported ciphers append `-DALCP_ENABLE_CIPHER_MULTI_UPDATE=ON` to build flags. 
 3. To Enable CCM multi update feature append flag `-DALCP_ENABLE_CCM_MULTI_UPDATE=ON` to build flags. 
 4. To Enable OFB multi update feature append flag `-DALCP_ENABLE_OFB_MULTI_UPDATE=ON` to build flags.
-5. To Enable CBC in-place buffer support append flag `-DALCP_ENABLE_CBC_INPLACE_BUFFER=ON` to build flags.
