@@ -49,7 +49,7 @@ main(int argc, char** argv)
 {
     try {
         ::testing::InitGoogleTest(&argc, argv);
-        parseArgs(argc, argv);
+        parseTestArgs(argc, argv);
 #ifndef USE_OSSL
         if (useossl) {
             std::cout << RED << "OpenSSL is not available, defaulting to ALCP"

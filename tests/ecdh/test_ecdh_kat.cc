@@ -67,7 +67,7 @@ main(int argc, char** argv)
 {
     try {
         ::testing::InitGoogleTest(&argc, argv);
-        parseArgs(argc, argv);
+        parseTestArgs(argc, argv);
 #ifndef USE_IPP
         if (useipp)
             std::cout << RED << "IPP is not available, defaulting to ALCP"

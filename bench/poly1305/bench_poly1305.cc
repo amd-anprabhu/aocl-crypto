@@ -33,7 +33,7 @@
 int
 main(int argc, char** argv)
 {
-    parseArgs(&argc, argv);
+    parseBenchArgs(&argc, argv);
 #ifndef USE_OSSL
     if (useossl) {
         std::cout << RED << "Error OpenSSL not found defaulting to ALCP"

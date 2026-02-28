@@ -159,14 +159,15 @@ using namespace alcp::testing::cipher::xts;
 using alcp::testing::cipher::LibrarySelect;
 using alcp::testing::utils::ArgsMap;
 using alcp::testing::utils::ParamType;
-using alcp::testing::utils::parseArgs;
+using alcp::testing::utils::parseTestArgs;
 
 #if 1
 int
 main(int argc, char** argv)
 {
+    ArgsMap argsMap = parseTestArgs(&argc, argv);
     ::testing::InitGoogleTest(&argc, argv);
-    ArgsMap argsMap = parseArgs(argc, argv);
+
     assert(argsMap["USE_OSSL"].paramType == ParamType::TYPE_BOOL);
     assert(argsMap["USE_IPP"].paramType == ParamType::TYPE_BOOL);
     assert(argsMap["OVERRIDE_ALCP"].paramType == ParamType::TYPE_BOOL);

@@ -583,8 +583,8 @@ main(int argc, char** argv)
 {
     benchmark::Initialize(&argc, argv);
 
-    std::cout << "\n=== Variable-Length Multibuffer Cipher Benchmarks ===\n";
-    std::cout << "Testing MinLen optimization for variable-length buffers\n\n";
+    std::cerr << "\n=== Variable-Length Multibuffer Cipher Benchmarks ===\n";
+    std::cerr << "Testing MinLen optimization for variable-length buffers\n\n";
 
     /* Test blocksizes, number of buffers, and variance */
     std::vector<Int64> avg_blocksizes = { 512, 1024, 4096, 8192 };
@@ -592,7 +592,7 @@ main(int argc, char** argv)
     std::vector<Int64> variances      = { 10, 30, 50 }; // Percentage variance
     std::vector<Int64> abs_variances  = { 64, 128, 256, 512 }; // Absolute byte variance
 
-    std::cout << "Variable-Length Benchmarks (Absolute Variance - ±bytes):\n";
+    std::cerr << "Variable-Length Benchmarks (Absolute Variance - ±bytes):\n";
 
     // CBC with Absolute Variance (±64, ±128, ±256 bytes)
     BENCHMARK(BENCH_AES_VARLEN_ABS_MULTIBUFFER_CBC_128)
@@ -610,7 +610,7 @@ main(int argc, char** argv)
         ->ArgsProduct({ avg_blocksizes, num_buffers, abs_variances })
         ->Unit(benchmark::kMicrosecond);
 
-    std::cout << "\nVariable-Length Benchmarks (Percentage Variance):\n";
+    std::cerr << "\nVariable-Length Benchmarks (Percentage Variance):\n";
 
     // CBC Variable-Length Benchmarks with Percentage
     BENCHMARK(BENCH_AES_VARLEN_MULTIBUFFER_CBC_128)
@@ -628,7 +628,7 @@ main(int argc, char** argv)
         ->ArgsProduct({ avg_blocksizes, num_buffers, variances })
         ->Unit(benchmark::kMicrosecond);
 
-    std::cout << "\nCustom Scenario: Uniform ±332 bytes with avg=512 (range 180-844):\n";
+    std::cerr << "\nCustom Scenario: Uniform ±332 bytes with avg=512 (range 180-844):\n";
 
     // Custom benchmark: avg=512, ±332 bytes
     BENCHMARK(BENCH_AES_CUSTOM_VARLEN_MULTIBUFFER_CBC_128)
@@ -636,7 +636,7 @@ main(int argc, char** argv)
         ->Args({ 512, 64, 332 })
         ->Unit(benchmark::kMicrosecond);
 
-    std::cout << "\nMulti-Tier Benchmarks (stress test with 30% small/40% medium/30% large):\n";
+    std::cerr << "\nMulti-Tier Benchmarks (stress test with 30% small/40% medium/30% large):\n";
 
     // Multi-Tier Benchmarks - simulates highly heterogeneous packet lengths
     BENCHMARK(BENCH_AES_MULTITIER_MULTIBUFFER_CBC_128)
@@ -668,7 +668,7 @@ main(int argc, char** argv)
         ->Args({ 64 })
         ->Unit(benchmark::kMicrosecond);
 
-    std::cout << "\nFixed-Length Benchmarks (for comparison):\n";
+    std::cerr << "\nFixed-Length Benchmarks (for comparison):\n";
 
     // Fixed-Length Benchmarks for comparison
     BENCHMARK(BENCH_AES_FIXED_MULTIBUFFER_CBC_128)

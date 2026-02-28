@@ -112,7 +112,7 @@ AddBenchmarks_Poly1305()
 {
     /* check if custom block size is provided by user */
     if (block_size != 0) {
-        std::cout << "Custom block size selected:" << block_size << std::endl;
+        std::cerr << "Custom block size selected:" << block_size << std::endl;
         poly1305_blocksizes.resize(1);
         poly1305_blocksizes[0] = block_size;
     }

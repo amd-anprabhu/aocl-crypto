@@ -232,7 +232,7 @@ AddBenchmarks()
 {
     /* check if custom block size is provided by user */
     if (block_size != 0) {
-        std::cout << "Custom block size selected:" << block_size << std::endl;
+        std::cerr << "Custom block size selected:" << block_size << std::endl;
         digest_block_sizes.resize(1);
         digest_block_sizes[0] = block_size;
     }

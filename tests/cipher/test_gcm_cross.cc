@@ -101,7 +101,7 @@ main(int argc, char** argv)
 {
     try {
         ::testing::InitGoogleTest(&argc, argv);
-        parseArgs(argc, argv);
+        parseTestArgs(argc, argv);
         return RUN_ALL_TESTS();
     } catch (const std::exception& e) {
         std::cerr << "Unhandled exception: " << e.what() << std::endl;

@@ -913,7 +913,7 @@ AddBenchmarks()
 {
     /* check if custom block size is provided by user */
     if (block_size != 0) {
-        std::cout << "Custom block size selected:" << block_size << std::endl;
+        std::cerr << "Custom block size selected:" << block_size << std::endl;
         blocksizes.resize(1);
         blocksizes[0] = block_size;
     }
@@ -1023,7 +1023,7 @@ AddBenchmarks()
 int
 main(int argc, char** argv)
 {
-    parseArgs(&argc, argv);
+    parseBenchArgs(&argc, argv);
 #ifndef USE_IPP
     if (useipp) {
         alcp::testing::utils::printErrors(

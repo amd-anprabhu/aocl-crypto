@@ -61,7 +61,7 @@ main(int argc, char** argv)
 {
     try {
         ::testing::InitGoogleTest(&argc, argv);
-        parseArgs(argc, argv);
+        parseTestArgs(argc, argv);
 #ifndef USE_IPP
         if (useipp)
             printErrors("IPP is not available");
