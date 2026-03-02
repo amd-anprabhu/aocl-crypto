@@ -2,10 +2,19 @@
 
 ### Building ALCP with Testing framework
 
-1. `$ git clone [alcp-crypto git url here]`
-2. `$ cd alcp-crypto`
-3. `$ cmake -B build -DALCP_ENABLE_EXAMPLES=ON -DALCP_ENABLE_TESTS=ON -DCMAKE_BUILD_TYPE=Release`
-4. `$ cmake --build build`
+KAT (Known Answer Test) test data is stored in git-lfs. Install git-lfs before
+cloning so the CSV datasets are downloaded automatically:
+
+1. Install git-lfs: https://git-lfs.github.com (e.g. `$ sudo apt install git-lfs`)
+2. `$ git lfs install`
+3. `$ git clone [alcp-crypto git url here]`
+4. `$ cd alcp-crypto`
+
+> **Already cloned without git-lfs?** Run `git lfs install && git lfs pull` from
+> inside the repository to fetch the missing test data files.
+
+5. `$ cmake -B build -DALCP_ENABLE_EXAMPLES=ON -DALCP_ENABLE_TESTS=ON -DCMAKE_BUILD_TYPE=Release`
+6. `$ cmake --build build`
 
 <span style="color:red"> __Note__: </span> To include IPP, please define `-DENABLE_TESTS_IPP_API=ON -DIPP_INSTALL_DIR=/path/to/ipp_prefix` in step 3.<br>
 <span style="color:red"> __Note__: </span> To include OpenSSL, please define `-DENABLE_TESTS_OPENSSL_API=ON -DOPENSSL_INSTALL_DIR=/path/to/openssl_prefix` in step 3.
