@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
+# Copyright (C) 2024-2026, Advanced Micro Devices. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,10 +24,9 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 #################### Reasons for disabling some providers ##############################
-# 1. AES-CBC Disabled due to failures in copy                                         ##
-# 2. AES-CCM Disabled due to performance limitations                                  ##
-# 3. HMAC Provider disabled due to digests performance limitations                    ##
-# 4. Digest Provider is disabled by default as there is currently a provider overhead ##
+# 1. AES-CCM Disabled due to performance limitations                                  ##
+# 2. HMAC Provider disabled due to digests performance limitations                    ##
+# 3. Digest Provider is disabled by default as there is currently a provider overhead ##
 ########################################################################################
 
 # generic option to enable debug print in provider
@@ -49,7 +48,7 @@ IF(NOT ALCP_COMPAT_ENABLE_OPENSSL_DIGEST)
 ENDIF(NOT ALCP_COMPAT_ENABLE_OPENSSL_DIGEST)
 
 # SUb options for CIPHER
-OPTION(ALCP_COMPAT_ENABLE_OPENSSL_CIPHER_CBC "ENABLE SUPPORT FOR OPENSSL CIPHER-AES-CBC PROVIDER" OFF)
+OPTION(ALCP_COMPAT_ENABLE_OPENSSL_CIPHER_CBC "ENABLE SUPPORT FOR OPENSSL CIPHER-AES-CBC PROVIDER" ON)
 OPTION(ALCP_COMPAT_ENABLE_OPENSSL_CIPHER_OFB "ENABLE SUPPORT FOR OPENSSL CIPHER-AES-OFB PROVIDER" ON)
 OPTION(ALCP_COMPAT_ENABLE_OPENSSL_CIPHER_CFB "ENABLE SUPPORT FOR OPENSSL CIPHER-AES-CFB PROVIDER" ON)
 OPTION(ALCP_COMPAT_ENABLE_OPENSSL_CIPHER_CTR "ENABLE SUPPORT FOR OPENSSL CIPHER-AES-CTR PROVIDER" ON)
