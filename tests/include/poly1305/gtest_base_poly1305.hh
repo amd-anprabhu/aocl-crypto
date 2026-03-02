@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -170,7 +170,106 @@ Poly_Cross()
             PrintmacTestData(key_full, data_ext, LibStrExt);
 
         /* now check if the macs match */
-        EXPECT_TRUE(ArraysMatch(MacMainLib, MacExtLib, macSize));
+        EXPECT_TRUE(ArraysMatch(MacMainLib, MacExtLib, data_main.m_msg_len));
+    }
+    return;
+}
+
+/* cross test for non-multiple-of-16 lengths (partial block coverage) */
+void
+Poly_Cross_Partial()
+{
+    const int   macSize    = 16;
+    std::string LibStrMain = "ALCP", LibStrExt = "";
+
+    AlcpPoly1305Base apb;
+    RngBase          rb;
+    Poly1305Base *   pb_main, *pb_ext = nullptr;
+
+    pb_main = &apb;
+
+#ifdef USE_OSSL
+    OpenSSLPoly1305Base opb;
+    if ((useossl == true) || (pb_ext == nullptr)) {
+        pb_ext    = &opb;
+        LibStrExt = "OpenSSL";
+    }
+#endif
+
+    if (pb_ext == nullptr) {
+        std::cout << "No external lib selected!" << std::endl;
+        exit(-1);
+    }
+
+    const std::vector<int> lengths = { 1, 15, 17, 129, 255, 1025, 15999 };
+
+    std::vector<Uint8> msg_full = rb.genRandomBytes(MAX_LOOP);
+    std::vector<Uint8> key_full = rb.genRandomBytes(KEY_LEN);
+    auto               rng      = std::default_random_engine{};
+
+    for (const auto len : lengths) {
+        alcp_poly1305_data_t data_main = {}, data_ext = {};
+        std::vector<Uint8>   MacMainLib(macSize, 0);
+        std::vector<Uint8>   MacExtLib(macSize, 0);
+
+        msg_full = ShuffleVector(msg_full, rng);
+        std::vector<Uint8> msg(msg_full.end() - len - 1, msg_full.end());
+
+        key_full = ShuffleVector(key_full, rng);
+
+        /* misalign if buffers are aligned */
+        if (is_aligned(&(msg[0]))) {
+            data_main.m_msg = &(msg[1]);
+            data_ext.m_msg  = &(msg[1]);
+        } else {
+            data_main.m_msg = &(msg[0]);
+            data_ext.m_msg  = &(msg[0]);
+        }
+
+        /* load test data */
+        data_main.m_mac     = &(MacMainLib[0]);
+        data_main.m_mac_len = MacMainLib.size();
+        data_main.m_key     = &(key_full[0]);
+
+        /* load ext test data */
+        data_ext.m_mac     = &(MacExtLib[0]);
+        data_ext.m_mac_len = MacExtLib.size();
+        data_ext.m_key     = &(key_full[0]);
+
+        data_main.m_key_len = data_ext.m_key_len = key_full.size();
+        data_main.m_msg_len = data_ext.m_msg_len = msg.size() - 1;
+
+        if (!pb_main->Init(key_full)) {
+            printf("Error in mac init\n");
+            FAIL();
+        }
+        if (!pb_main->MacUpdate(data_main)) {
+            std::cout << "Error in mac_update" << std::endl;
+            FAIL();
+        }
+        if (!pb_main->MacFinalize(data_main)) {
+            std::cout << "Error in mac_finalize" << std::endl;
+            FAIL();
+        }
+        if (verbose > 1)
+            PrintmacTestData(key_full, data_main, LibStrMain);
+
+        if (!pb_ext->Init(key_full)) {
+            printf("Error in mac ext init function\n");
+            FAIL();
+        }
+        if (!pb_ext->MacUpdate(data_ext)) {
+            std::cout << "Error in mac_update (ext lib)" << std::endl;
+            FAIL();
+        }
+        if (!pb_ext->MacFinalize(data_ext)) {
+            std::cout << "Error in mac_finalize (ext lib)" << std::endl;
+            FAIL();
+        }
+        if (verbose > 1)
+            PrintmacTestData(key_full, data_ext, LibStrExt);
+
+        EXPECT_TRUE(ArraysMatch(MacMainLib, MacExtLib, data_main.m_msg_len));
     }
     return;
 }

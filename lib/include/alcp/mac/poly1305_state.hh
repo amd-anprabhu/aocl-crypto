@@ -93,7 +93,7 @@ struct Poly1305State44
 
   public:
     alignas(64) Uint64 r[cLimbs], r2[cLimbs], r3[cLimbs], r4[cLimbs],
-        r5[cLimbs], r6[cLimbs], r7[cLimbs], r8[cLimbs];
+        r5[cLimbs], r6[cLimbs], r7[cLimbs], r8[cLimbs], r16[cLimbs];
     alignas(64) Uint64 s[cLimbs];
     alignas(64) Uint64 acc0[cSize512], acc1[cSize512], acc2[cSize512];
     alignas(64) Uint64 key[m_cKeySize_bytes / sizeof(Uint64)] = {};

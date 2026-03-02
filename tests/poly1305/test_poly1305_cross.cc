@@ -44,6 +44,13 @@ TEST(POLY1305, CROSS)
     Poly_Cross();
 }
 
+TEST(POLY1305, CROSS_PARTIAL)
+{
+    if (useipp || oa_override)
+        GTEST_SKIP() << "IPP doesnt have Poly1305 Mac implemented yet";
+    Poly_Cross_Partial();
+}
+
 int
 main(int argc, char** argv)
 {
