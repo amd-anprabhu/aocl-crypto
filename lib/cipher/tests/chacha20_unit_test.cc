@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -29,12 +29,60 @@
 #include "../chacha20_inplace.cc.inc"
 #include "alcp/cipher/chacha20.hh"
 #include "alcp/types.h"
+#include "alcp/utils/cpuid.hh"
 #include "gtest/gtest.h"
 #include <openssl/bio.h>
+#include <algorithm>
 
 #include "alcp/utils/benchmark.hh"
 #if 1
 using namespace alcp::cipher;
+using alcp::utils::CpuArchLevel;
+using alcp::utils::CpuId;
+
+static std::string
+archLevelName(CpuArchLevel arch)
+{
+    switch (arch) {
+        case CpuArchLevel::eZen4:
+            return "Zen4";
+        case CpuArchLevel::eZen3:
+            return "Zen3";
+        case CpuArchLevel::eZen:
+            return "Zen";
+        case CpuArchLevel::eReference:
+            return "Reference";
+        default:
+            return "Unknown";
+    }
+}
+
+static std::unique_ptr<iCipher>
+createChaCha20ForArch(CpuArchLevel arch)
+{
+    switch (arch) {
+        case CpuArchLevel::eZen4:
+            return std::make_unique<vaes512::ChaCha256>();
+        case CpuArchLevel::eZen3:
+        case CpuArchLevel::eZen:
+            return std::make_unique<avx2::ChaCha256>();
+        case CpuArchLevel::eReference:
+        default:
+            return std::make_unique<ref::ChaCha256>();
+    }
+}
+
+static std::vector<CpuArchLevel>
+getTestArchLevels()
+{
+    auto levels = CpuId::getSupportedArchLevels();
+    if (std::find(levels.begin(), levels.end(), CpuArchLevel::eReference)
+        == levels.end()) {
+        levels.push_back(CpuArchLevel::eReference);
+    }
+    return levels;
+}
+
 
 // Test fixture class for ChaCha20 tests with common key/IV setup
 class ChaCha20Test : public ::testing::Test
@@ -61,8 +109,12 @@ class ChaCha20Test : public ::testing::Test
     };
 
     // Helper function for encrypt/decrypt roundtrip test
-    static bool encryptDecryptRoundtrip(size_t dataSize, const Uint8* key, size_t keyBits,
-                                        const Uint8* iv, size_t ivLen)
+    static bool encryptDecryptRoundtrip(size_t       dataSize,
+                                        const Uint8* key,
+                                        size_t       keyBits,
+                                        const Uint8* iv,
+                                        size_t       ivLen,
+                                        CpuArchLevel arch = CpuArchLevel::eReference)
     {
         std::vector<Uint8> plaintext(dataSize);
         for (size_t i = 0; i < dataSize; i++) {
@@ -70,15 +122,14 @@ class ChaCha20Test : public ::testing::Test
         }
         std::vector<Uint8> ciphertext(dataSize), decrypted(dataSize);
 
-        ref::ChaCha256 enc, dec;
-        enc.setKey(key, keyBits);
-        enc.setIv(iv, ivLen);
-        dec.setKey(key, keyBits);
-        dec.setIv(iv, ivLen);
+        auto enc = createChaCha20ForArch(arch);
+        auto dec = createChaCha20ForArch(arch);
+        enc->init(key, keyBits, iv, ivLen);
+        dec->init(key, keyBits, iv, ivLen);
 
         Uint64 outlen1 = 0, outlen2 = 0;
-        enc.encrypt(plaintext.data(), ciphertext.data(), dataSize, &outlen1);
-        dec.decrypt(ciphertext.data(), decrypted.data(), dataSize, &outlen2);
+        enc->encrypt(plaintext.data(), ciphertext.data(), dataSize, &outlen1);
+        dec->decrypt(ciphertext.data(), decrypted.data(), dataSize, &outlen2);
 
         return (decrypted == plaintext);
     }
@@ -115,23 +166,26 @@ TEST_P(ChaCha20DataSizeTest, EncryptDecryptRoundTrip)
 {
     size_t dataSize = GetParam();
 
-    std::vector<Uint8> plaintext(dataSize);
-    for (size_t i = 0; i < dataSize; i++) {
-        plaintext[i] = static_cast<Uint8>(i % 256);
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
+
+        std::vector<Uint8> plaintext(dataSize);
+        for (size_t i = 0; i < dataSize; i++) {
+            plaintext[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> ciphertext(dataSize), decrypted(dataSize);
+
+        auto enc = createChaCha20ForArch(arch);
+        auto dec = createChaCha20ForArch(arch);
+        enc->init(testKey, sizeof(testKey) * 8, testIv, sizeof(testIv));
+        dec->init(testKey, sizeof(testKey) * 8, testIv, sizeof(testIv));
+
+        Uint64 outlen1 = 0, outlen2 = 0;
+        enc->encrypt(plaintext.data(), ciphertext.data(), dataSize, &outlen1);
+        dec->decrypt(ciphertext.data(), decrypted.data(), dataSize, &outlen2);
+
+        EXPECT_EQ(decrypted, plaintext) << "Mismatch for data size: " << dataSize;
     }
-    std::vector<Uint8> ciphertext(dataSize), decrypted(dataSize);
-
-    ref::ChaCha256 enc, dec;
-    enc.setKey(testKey, sizeof(testKey) * 8);
-    enc.setIv(testIv, sizeof(testIv));
-    dec.setKey(testKey, sizeof(testKey) * 8);
-    dec.setIv(testIv, sizeof(testIv));
-
-    Uint64 outlen1 = 0, outlen2 = 0;
-    enc.encrypt(plaintext.data(), ciphertext.data(), dataSize, &outlen1);
-    dec.decrypt(ciphertext.data(), decrypted.data(), dataSize, &outlen2);
-
-    EXPECT_EQ(decrypted, plaintext) << "Mismatch for data size: " << dataSize;
 }
 
 // Instantiate parameterized tests for various data sizes
@@ -410,440 +464,497 @@ TEST(Chacha20, PerformanceTest)
 // Test determinism (same inputs always produce same output)
 TEST(Chacha20, Determinism)
 {
-    Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-                    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-    Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                   0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
-    std::vector<Uint8> plaintext(64, 0x42);
-    std::vector<Uint8> ciphertext1(64), ciphertext2(64), ciphertext3(64);
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
 
-    for (int round = 0; round < 3; round++) {
-        ref::ChaCha256 chacha20_obj;
-        chacha20_obj.setKey(key, sizeof(key) * 8);
-        chacha20_obj.setIv(iv, sizeof(iv));
+        Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+        Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                       0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
+        std::vector<Uint8> plaintext(64, 0x42);
+        std::vector<Uint8> ciphertext1(64), ciphertext2(64), ciphertext3(64);
 
-        std::vector<Uint8>* ct = (round == 0) ? &ciphertext1 : (round == 1) ? &ciphertext2 : &ciphertext3;
-        Uint64 outlen = 0;
-        chacha20_obj.encrypt(plaintext.data(), ct->data(), plaintext.size(), &outlen);
+        for (int round = 0; round < 3; round++) {
+            auto chacha20_obj = createChaCha20ForArch(arch);
+            chacha20_obj->init(key, sizeof(key) * 8, iv, sizeof(iv));
+
+            std::vector<Uint8>* ct = (round == 0) ? &ciphertext1 : (round == 1) ? &ciphertext2 : &ciphertext3;
+            Uint64 outlen = 0;
+            chacha20_obj->encrypt(plaintext.data(), ct->data(), plaintext.size(), &outlen);
+        }
+
+        EXPECT_EQ(ciphertext1, ciphertext2) << "Round 1 and 2 should produce same output";
+        EXPECT_EQ(ciphertext2, ciphertext3) << "Round 2 and 3 should produce same output";
+
     }
-
-    EXPECT_EQ(ciphertext1, ciphertext2) << "Round 1 and 2 should produce same output";
-    EXPECT_EQ(ciphertext2, ciphertext3) << "Round 2 and 3 should produce same output";
 }
 
 // Test key affects output (different keys should produce different outputs)
 TEST(Chacha20, KeyAffectsOutput)
 {
-    Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                   0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
-    std::vector<Uint8> plaintext(64, 0x55);
-    std::vector<std::vector<Uint8>> outputs;
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
 
-    for (int i = 0; i < 5; i++) {
-        Uint8 key[32];
-        for (int j = 0; j < 32; j++) {
-            key[j] = static_cast<Uint8>((i + j) % 256);
+        Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                       0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
+        std::vector<Uint8> plaintext(64, 0x55);
+        std::vector<std::vector<Uint8>> outputs;
+
+        for (int i = 0; i < 5; i++) {
+            Uint8 key[32];
+            for (int j = 0; j < 32; j++) {
+                key[j] = static_cast<Uint8>((i + j) % 256);
+            }
+            std::vector<Uint8> ciphertext(64);
+
+            auto chacha20_obj = createChaCha20ForArch(arch);
+            chacha20_obj->init(key, sizeof(key) * 8, iv, sizeof(iv));
+
+            Uint64 outlen = 0;
+            chacha20_obj->encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen);
+            outputs.push_back(ciphertext);
         }
-        std::vector<Uint8> ciphertext(64);
 
-        ref::ChaCha256 chacha20_obj;
-        chacha20_obj.setKey(key, sizeof(key) * 8);
-        chacha20_obj.setIv(iv, sizeof(iv));
-
-        Uint64 outlen = 0;
-        chacha20_obj.encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen);
-        outputs.push_back(ciphertext);
-    }
-
-    // Verify all outputs are different
-    for (size_t i = 0; i < outputs.size(); i++) {
-        for (size_t j = i + 1; j < outputs.size(); j++) {
-            EXPECT_NE(outputs[i], outputs[j]) 
-                << "Key " << i << " and " << j << " produced same output";
+        // Verify all outputs are different
+        for (size_t i = 0; i < outputs.size(); i++) {
+            for (size_t j = i + 1; j < outputs.size(); j++) {
+                EXPECT_NE(outputs[i], outputs[j]) 
+                    << "Key " << i << " and " << j << " produced same output";
+            }
         }
+
     }
 }
 
 // Test IV/nonce affects output (different IVs should produce different outputs)
 TEST(Chacha20, IVAffectsOutput)
 {
-    Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-                    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-    std::vector<Uint8> plaintext(64, 0x66);
-    std::vector<std::vector<Uint8>> outputs;
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
 
-    for (int i = 0; i < 5; i++) {
-        // Use 16-byte IV format (counter + nonce) like existing tests
-        Uint8 iv[16];
-        for (int j = 0; j < 16; j++) {
-            iv[j] = static_cast<Uint8>((i + j) % 256);
+        Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+        std::vector<Uint8> plaintext(64, 0x66);
+        std::vector<std::vector<Uint8>> outputs;
+
+        for (int i = 0; i < 5; i++) {
+            // Use 16-byte IV format (counter + nonce) like existing tests
+            Uint8 iv[16];
+            for (int j = 0; j < 16; j++) {
+                iv[j] = static_cast<Uint8>((i + j) % 256);
+            }
+            std::vector<Uint8> ciphertext(64);
+
+            auto chacha20_obj = createChaCha20ForArch(arch);
+            chacha20_obj->init(key, sizeof(key) * 8, iv, sizeof(iv));
+
+            Uint64 outlen = 0;
+            chacha20_obj->encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen);
+            outputs.push_back(ciphertext);
         }
-        std::vector<Uint8> ciphertext(64);
 
-        ref::ChaCha256 chacha20_obj;
-        chacha20_obj.setKey(key, sizeof(key) * 8);
-        chacha20_obj.setIv(iv, sizeof(iv));
-
-        Uint64 outlen = 0;
-        chacha20_obj.encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen);
-        outputs.push_back(ciphertext);
-    }
-
-    // Verify all outputs are different
-    for (size_t i = 0; i < outputs.size(); i++) {
-        for (size_t j = i + 1; j < outputs.size(); j++) {
-            EXPECT_NE(outputs[i], outputs[j]) 
-                << "IV " << i << " and " << j << " produced same output";
+        // Verify all outputs are different
+        for (size_t i = 0; i < outputs.size(); i++) {
+            for (size_t j = i + 1; j < outputs.size(); j++) {
+                EXPECT_NE(outputs[i], outputs[j]) 
+                    << "IV " << i << " and " << j << " produced same output";
+            }
         }
+
     }
 }
 
 // Test all zeros input
 TEST(Chacha20, AllZerosInput)
 {
-    Uint8 key[32] = { 0 };
-    Uint8 iv[12] = { 0 };
-    std::vector<Uint8> plaintext(64, 0x00);
-    std::vector<Uint8> ciphertext(64), decrypted(64);
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
 
-    ref::ChaCha256 chacha20_enc, chacha20_dec;
-    chacha20_enc.setKey(key, sizeof(key) * 8);
-    chacha20_enc.setIv(iv, sizeof(iv));
-    chacha20_dec.setKey(key, sizeof(key) * 8);
-    chacha20_dec.setIv(iv, sizeof(iv));
+        Uint8 key[32] = { 0 };
+        Uint8 iv[12] = { 0 };
+        std::vector<Uint8> plaintext(64, 0x00);
+        std::vector<Uint8> ciphertext(64), decrypted(64);
 
-    Uint64 outlen1 = 0, outlen2 = 0;
-    chacha20_enc.encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen1);
-    chacha20_dec.decrypt(ciphertext.data(), decrypted.data(), ciphertext.size(), &outlen2);
+        auto chacha20_enc = createChaCha20ForArch(arch);
+            auto chacha20_dec = createChaCha20ForArch(arch);
+        chacha20_enc->init(key, sizeof(key) * 8, iv, sizeof(iv));
+        chacha20_dec->init(key, sizeof(key) * 8, iv, sizeof(iv));
 
-    EXPECT_EQ(decrypted, plaintext);
+        Uint64 outlen1 = 0, outlen2 = 0;
+        chacha20_enc->encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen1);
+        chacha20_dec->decrypt(ciphertext.data(), decrypted.data(), ciphertext.size(), &outlen2);
+
+        EXPECT_EQ(decrypted, plaintext);
+
+    }
 }
 
 // Test various data sizes (including non-block-aligned)
 TEST(Chacha20, VariousDataSizes)
 {
-    Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-                    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-    Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                   0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
 
-    std::vector<size_t> sizes = { 1, 7, 15, 16, 17, 31, 32, 33, 63, 64, 65, 100, 127, 128, 255, 256, 1000 };
+        Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+        Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                       0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
 
-    for (size_t size : sizes) {
-        std::vector<Uint8> plaintext(size);
-        for (size_t i = 0; i < size; i++) {
-            plaintext[i] = static_cast<Uint8>(i % 256);
+        std::vector<size_t> sizes = { 1, 7, 15, 16, 17, 31, 32, 33, 63, 64, 65, 100, 127, 128, 255, 256, 1000 };
+
+        for (size_t size : sizes) {
+            std::vector<Uint8> plaintext(size);
+            for (size_t i = 0; i < size; i++) {
+                plaintext[i] = static_cast<Uint8>(i % 256);
+            }
+            std::vector<Uint8> ciphertext(size), decrypted(size);
+
+            auto chacha20_enc = createChaCha20ForArch(arch);
+            auto chacha20_dec = createChaCha20ForArch(arch);
+            chacha20_enc->init(key, sizeof(key) * 8, iv, sizeof(iv));
+            chacha20_dec->init(key, sizeof(key) * 8, iv, sizeof(iv));
+
+            Uint64 outlen1 = 0, outlen2 = 0;
+            chacha20_enc->encrypt(plaintext.data(), ciphertext.data(), size, &outlen1);
+            chacha20_dec->decrypt(ciphertext.data(), decrypted.data(), size, &outlen2);
+
+            EXPECT_EQ(decrypted, plaintext) << "Mismatch for size: " << size;
         }
-        std::vector<Uint8> ciphertext(size), decrypted(size);
 
-        ref::ChaCha256 chacha20_enc, chacha20_dec;
-        chacha20_enc.setKey(key, sizeof(key) * 8);
-        chacha20_enc.setIv(iv, sizeof(iv));
-        chacha20_dec.setKey(key, sizeof(key) * 8);
-        chacha20_dec.setIv(iv, sizeof(iv));
-
-        Uint64 outlen1 = 0, outlen2 = 0;
-        chacha20_enc.encrypt(plaintext.data(), ciphertext.data(), size, &outlen1);
-        chacha20_dec.decrypt(ciphertext.data(), decrypted.data(), size, &outlen2);
-
-        EXPECT_EQ(decrypted, plaintext) << "Mismatch for size: " << size;
     }
 }
 
 // Test separate cipher objects produce identical results
 TEST(Chacha20, SeparateCipherObjects)
 {
-    Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-                    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-    Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                   0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
-    std::vector<Uint8> plaintext(64, 0x77);
-    std::vector<Uint8> ciphertext1(64), ciphertext2(64);
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
 
-    // Encrypt with first object
-    ref::ChaCha256 chacha1;
-    chacha1.setKey(key, sizeof(key) * 8);
-    chacha1.setIv(iv, sizeof(iv));
-    Uint64 outlen1 = 0;
-    chacha1.encrypt(plaintext.data(), ciphertext1.data(), plaintext.size(), &outlen1);
+        Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+        Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                       0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
+        std::vector<Uint8> plaintext(64, 0x77);
+        std::vector<Uint8> ciphertext1(64), ciphertext2(64);
 
-    // Encrypt with second object
-    ref::ChaCha256 chacha2;
-    chacha2.setKey(key, sizeof(key) * 8);
-    chacha2.setIv(iv, sizeof(iv));
-    Uint64 outlen2 = 0;
-    chacha2.encrypt(plaintext.data(), ciphertext2.data(), plaintext.size(), &outlen2);
+        // Encrypt with first object
+        auto chacha1 = createChaCha20ForArch(arch);
+        chacha1->init(key, sizeof(key) * 8, iv, sizeof(iv));
+        Uint64 outlen1 = 0;
+        chacha1->encrypt(plaintext.data(), ciphertext1.data(), plaintext.size(), &outlen1);
 
-    EXPECT_EQ(ciphertext1, ciphertext2);
+        // Encrypt with second object
+        auto chacha2 = createChaCha20ForArch(arch);
+        chacha2->init(key, sizeof(key) * 8, iv, sizeof(iv));
+        Uint64 outlen2 = 0;
+        chacha2->encrypt(plaintext.data(), ciphertext2.data(), plaintext.size(), &outlen2);
+
+        EXPECT_EQ(ciphertext1, ciphertext2);
+
+    }
 }
 
 // Test cipher object reuse with different keys
 TEST(Chacha20, ReuseWithDifferentKeys)
 {
-    Uint8 key1[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-                     0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-    Uint8 key2[] = { 0x1f, 0x1e, 0x1d, 0x1c, 0x1b, 0x1a, 0x19, 0x18,
-                     0x17, 0x16, 0x15, 0x14, 0x13, 0x12, 0x11, 0x10,
-                     0x0f, 0x0e, 0x0d, 0x0c, 0x0b, 0x0a, 0x09, 0x08,
-                     0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00 };
-    Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                   0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
-    std::vector<Uint8> plaintext(64, 0x88);
-    std::vector<Uint8> ciphertext1(64), ciphertext2(64);
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
 
-    ref::ChaCha256 chacha20_obj;
+        Uint8 key1[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                         0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                         0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                         0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+        Uint8 key2[] = { 0x1f, 0x1e, 0x1d, 0x1c, 0x1b, 0x1a, 0x19, 0x18,
+                         0x17, 0x16, 0x15, 0x14, 0x13, 0x12, 0x11, 0x10,
+                         0x0f, 0x0e, 0x0d, 0x0c, 0x0b, 0x0a, 0x09, 0x08,
+                         0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00 };
+        Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                       0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
+        std::vector<Uint8> plaintext(64, 0x88);
+        std::vector<Uint8> ciphertext1(64), ciphertext2(64);
 
-    // First encryption with key1
-    chacha20_obj.setKey(key1, sizeof(key1) * 8);
-    chacha20_obj.setIv(iv, sizeof(iv));
-    Uint64 outlen1 = 0;
-    chacha20_obj.encrypt(plaintext.data(), ciphertext1.data(), plaintext.size(), &outlen1);
+        auto chacha20_obj = createChaCha20ForArch(arch);
 
-    // Second encryption with key2 (reusing same object)
-    chacha20_obj.setKey(key2, sizeof(key2) * 8);
-    chacha20_obj.setIv(iv, sizeof(iv));
-    Uint64 outlen2 = 0;
-    chacha20_obj.encrypt(plaintext.data(), ciphertext2.data(), plaintext.size(), &outlen2);
+        // First encryption with key1
+        chacha20_obj->init(key1, sizeof(key1) * 8, iv, sizeof(iv));
+        Uint64 outlen1 = 0;
+        chacha20_obj->encrypt(plaintext.data(), ciphertext1.data(), plaintext.size(), &outlen1);
 
-    // Different keys should produce different outputs
-    EXPECT_NE(ciphertext1, ciphertext2);
+        // Second encryption with key2 (reusing same object)
+        chacha20_obj->init(key2, sizeof(key2) * 8, iv, sizeof(iv));
+        Uint64 outlen2 = 0;
+        chacha20_obj->encrypt(plaintext.data(), ciphertext2.data(), plaintext.size(), &outlen2);
+
+        // Different keys should produce different outputs
+        EXPECT_NE(ciphertext1, ciphertext2);
+
+    }
 }
 
 // Test cipher object reuse with different IVs
 TEST(Chacha20, ReuseWithDifferentIVs)
 {
-    Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-                    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-    // Use 16-byte IV format (counter + nonce) like existing tests
-    Uint8 iv1[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-                    0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10 };
-    Uint8 iv2[] = { 0x10, 0x0f, 0x0e, 0x0d, 0x0c, 0x0b, 0x0a, 0x09,
-                    0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01 };
-    std::vector<Uint8> plaintext(64, 0x99);
-    std::vector<Uint8> ciphertext1(64), ciphertext2(64);
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
 
-    ref::ChaCha256 chacha20_obj;
+        Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+        // Use 16-byte IV format (counter + nonce) like existing tests
+        Uint8 iv1[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                        0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10 };
+        Uint8 iv2[] = { 0x10, 0x0f, 0x0e, 0x0d, 0x0c, 0x0b, 0x0a, 0x09,
+                        0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01 };
+        std::vector<Uint8> plaintext(64, 0x99);
+        std::vector<Uint8> ciphertext1(64), ciphertext2(64);
 
-    // First encryption with iv1
-    chacha20_obj.setKey(key, sizeof(key) * 8);
-    chacha20_obj.setIv(iv1, sizeof(iv1));
-    Uint64 outlen1 = 0;
-    chacha20_obj.encrypt(plaintext.data(), ciphertext1.data(), plaintext.size(), &outlen1);
+        auto chacha20_obj = createChaCha20ForArch(arch);
 
-    // Second encryption with iv2 (reusing same object)
-    chacha20_obj.setKey(key, sizeof(key) * 8);
-    chacha20_obj.setIv(iv2, sizeof(iv2));
-    Uint64 outlen2 = 0;
-    chacha20_obj.encrypt(plaintext.data(), ciphertext2.data(), plaintext.size(), &outlen2);
+        // First encryption with iv1
+        chacha20_obj->init(key, sizeof(key) * 8, iv1, sizeof(iv1));
+        Uint64 outlen1 = 0;
+        chacha20_obj->encrypt(plaintext.data(), ciphertext1.data(), plaintext.size(), &outlen1);
 
-    // Different IVs should produce different outputs
-    EXPECT_NE(ciphertext1, ciphertext2);
+        // Second encryption with iv2 (reusing same object)
+        chacha20_obj->init(key, sizeof(key) * 8, iv2, sizeof(iv2));
+        Uint64 outlen2 = 0;
+        chacha20_obj->encrypt(plaintext.data(), ciphertext2.data(), plaintext.size(), &outlen2);
+
+        // Different IVs should produce different outputs
+        EXPECT_NE(ciphertext1, ciphertext2);
+
+    }
 }
 
 // Test plaintext affects output
 TEST(Chacha20, PlaintextAffectsOutput)
 {
-    Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-                    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-    Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                   0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
-    std::vector<std::vector<Uint8>> outputs;
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
 
-    for (int i = 0; i < 5; i++) {
-        std::vector<Uint8> plaintext(64, static_cast<Uint8>(i));
-        std::vector<Uint8> ciphertext(64);
+        Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+        Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                       0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
+        std::vector<std::vector<Uint8>> outputs;
 
-        ref::ChaCha256 chacha20_obj;
-        chacha20_obj.setKey(key, sizeof(key) * 8);
-        chacha20_obj.setIv(iv, sizeof(iv));
+        for (int i = 0; i < 5; i++) {
+            std::vector<Uint8> plaintext(64, static_cast<Uint8>(i));
+            std::vector<Uint8> ciphertext(64);
 
-        Uint64 outlen = 0;
-        chacha20_obj.encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen);
-        outputs.push_back(ciphertext);
-    }
+            auto chacha20_obj = createChaCha20ForArch(arch);
+            chacha20_obj->init(key, sizeof(key) * 8, iv, sizeof(iv));
 
-    // Verify all outputs are different
-    for (size_t i = 0; i < outputs.size(); i++) {
-        for (size_t j = i + 1; j < outputs.size(); j++) {
-            EXPECT_NE(outputs[i], outputs[j]) 
-                << "Plaintext " << i << " and " << j << " produced same output";
+            Uint64 outlen = 0;
+            chacha20_obj->encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen);
+            outputs.push_back(ciphertext);
         }
+
+        // Verify all outputs are different
+        for (size_t i = 0; i < outputs.size(); i++) {
+            for (size_t j = i + 1; j < outputs.size(); j++) {
+                EXPECT_NE(outputs[i], outputs[j]) 
+                    << "Plaintext " << i << " and " << j << " produced same output";
+            }
+        }
+
     }
 }
 
 // Test large data (1 MB)
 TEST(Chacha20, LargeData)
 {
-    const size_t data_size = 1024 * 1024; // 1 MB
-    Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-                    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-    Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                   0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
-    std::vector<Uint8> plaintext(data_size);
-    std::vector<Uint8> ciphertext(data_size), decrypted(data_size);
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
 
-    for (size_t i = 0; i < data_size; i++) {
-        plaintext[i] = static_cast<Uint8>((i * 17) % 256);
+        const size_t data_size = 1024 * 1024; // 1 MB
+        Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+        Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                       0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
+        std::vector<Uint8> plaintext(data_size);
+        std::vector<Uint8> ciphertext(data_size), decrypted(data_size);
+
+        for (size_t i = 0; i < data_size; i++) {
+            plaintext[i] = static_cast<Uint8>((i * 17) % 256);
+        }
+
+        auto chacha20_enc = createChaCha20ForArch(arch);
+            auto chacha20_dec = createChaCha20ForArch(arch);
+        chacha20_enc->init(key, sizeof(key) * 8, iv, sizeof(iv));
+        chacha20_dec->init(key, sizeof(key) * 8, iv, sizeof(iv));
+
+        Uint64 outlen1 = 0, outlen2 = 0;
+        chacha20_enc->encrypt(plaintext.data(), ciphertext.data(), data_size, &outlen1);
+        chacha20_dec->decrypt(ciphertext.data(), decrypted.data(), data_size, &outlen2);
+
+        EXPECT_EQ(decrypted, plaintext);
+
     }
-
-    ref::ChaCha256 chacha20_enc, chacha20_dec;
-    chacha20_enc.setKey(key, sizeof(key) * 8);
-    chacha20_enc.setIv(iv, sizeof(iv));
-    chacha20_dec.setKey(key, sizeof(key) * 8);
-    chacha20_dec.setIv(iv, sizeof(iv));
-
-    Uint64 outlen1 = 0, outlen2 = 0;
-    chacha20_enc.encrypt(plaintext.data(), ciphertext.data(), data_size, &outlen1);
-    chacha20_dec.decrypt(ciphertext.data(), decrypted.data(), data_size, &outlen2);
-
-    EXPECT_EQ(decrypted, plaintext);
 }
 
 // Test single byte
 TEST(Chacha20, SingleByte)
 {
-    Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-                    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-    Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                   0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
-    std::vector<Uint8> plaintext(1, 0xAA);
-    std::vector<Uint8> ciphertext(1), decrypted(1);
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
 
-    ref::ChaCha256 chacha20_enc, chacha20_dec;
-    chacha20_enc.setKey(key, sizeof(key) * 8);
-    chacha20_enc.setIv(iv, sizeof(iv));
-    chacha20_dec.setKey(key, sizeof(key) * 8);
-    chacha20_dec.setIv(iv, sizeof(iv));
+        Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+        Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                       0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
+        std::vector<Uint8> plaintext(1, 0xAA);
+        std::vector<Uint8> ciphertext(1), decrypted(1);
 
-    Uint64 outlen1 = 0, outlen2 = 0;
-    chacha20_enc.encrypt(plaintext.data(), ciphertext.data(), 1, &outlen1);
-    chacha20_dec.decrypt(ciphertext.data(), decrypted.data(), 1, &outlen2);
+        auto chacha20_enc = createChaCha20ForArch(arch);
+            auto chacha20_dec = createChaCha20ForArch(arch);
+        chacha20_enc->init(key, sizeof(key) * 8, iv, sizeof(iv));
+        chacha20_dec->init(key, sizeof(key) * 8, iv, sizeof(iv));
 
-    EXPECT_EQ(decrypted, plaintext);
+        Uint64 outlen1 = 0, outlen2 = 0;
+        chacha20_enc->encrypt(plaintext.data(), ciphertext.data(), 1, &outlen1);
+        chacha20_dec->decrypt(ciphertext.data(), decrypted.data(), 1, &outlen2);
+
+        EXPECT_EQ(decrypted, plaintext);
+
+    }
 }
 
 // Test encrypt doesn't modify input
 TEST(Chacha20, EncryptDoesNotModifyInput)
 {
-    Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-                    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-    Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                   0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
-    std::vector<Uint8> plaintext(64);
-    for (size_t i = 0; i < 64; i++) {
-        plaintext[i] = static_cast<Uint8>(i);
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
+
+        Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+        Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                       0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
+        std::vector<Uint8> plaintext(64);
+        for (size_t i = 0; i < 64; i++) {
+            plaintext[i] = static_cast<Uint8>(i);
+        }
+        std::vector<Uint8> original_plaintext = plaintext;
+        std::vector<Uint8> ciphertext(64);
+
+        auto chacha20_obj = createChaCha20ForArch(arch);
+        chacha20_obj->init(key, sizeof(key) * 8, iv, sizeof(iv));
+
+        Uint64 outlen = 0;
+        chacha20_obj->encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen);
+
+        // Verify input was not modified
+        EXPECT_EQ(plaintext, original_plaintext);
+
     }
-    std::vector<Uint8> original_plaintext = plaintext;
-    std::vector<Uint8> ciphertext(64);
-
-    ref::ChaCha256 chacha20_obj;
-    chacha20_obj.setKey(key, sizeof(key) * 8);
-    chacha20_obj.setIv(iv, sizeof(iv));
-
-    Uint64 outlen = 0;
-    chacha20_obj.encrypt(plaintext.data(), ciphertext.data(), plaintext.size(), &outlen);
-
-    // Verify input was not modified
-    EXPECT_EQ(plaintext, original_plaintext);
 }
 
 // Test 64-byte block (one ChaCha20 block)
 TEST(Chacha20, OneBlock)
 {
-    Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-                    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-    Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                   0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
-    std::vector<Uint8> plaintext(64, 0xBB);
-    std::vector<Uint8> ciphertext(64), decrypted(64);
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
 
-    ref::ChaCha256 chacha20_enc, chacha20_dec;
-    chacha20_enc.setKey(key, sizeof(key) * 8);
-    chacha20_enc.setIv(iv, sizeof(iv));
-    chacha20_dec.setKey(key, sizeof(key) * 8);
-    chacha20_dec.setIv(iv, sizeof(iv));
+        Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+        Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                       0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
+        std::vector<Uint8> plaintext(64, 0xBB);
+        std::vector<Uint8> ciphertext(64), decrypted(64);
 
-    Uint64 outlen1 = 0, outlen2 = 0;
-    chacha20_enc.encrypt(plaintext.data(), ciphertext.data(), 64, &outlen1);
-    chacha20_dec.decrypt(ciphertext.data(), decrypted.data(), 64, &outlen2);
+        auto chacha20_enc = createChaCha20ForArch(arch);
+            auto chacha20_dec = createChaCha20ForArch(arch);
+        chacha20_enc->init(key, sizeof(key) * 8, iv, sizeof(iv));
+        chacha20_dec->init(key, sizeof(key) * 8, iv, sizeof(iv));
 
-    EXPECT_EQ(decrypted, plaintext);
+        Uint64 outlen1 = 0, outlen2 = 0;
+        chacha20_enc->encrypt(plaintext.data(), ciphertext.data(), 64, &outlen1);
+        chacha20_dec->decrypt(ciphertext.data(), decrypted.data(), 64, &outlen2);
+
+        EXPECT_EQ(decrypted, plaintext);
+
+    }
 }
 
 // Test multiple blocks (2 ChaCha20 blocks = 128 bytes)
 TEST(Chacha20, TwoBlocks)
 {
-    Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-                    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-    Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                   0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
-    std::vector<Uint8> plaintext(128, 0xCC);
-    std::vector<Uint8> ciphertext(128), decrypted(128);
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
 
-    ref::ChaCha256 chacha20_enc, chacha20_dec;
-    chacha20_enc.setKey(key, sizeof(key) * 8);
-    chacha20_enc.setIv(iv, sizeof(iv));
-    chacha20_dec.setKey(key, sizeof(key) * 8);
-    chacha20_dec.setIv(iv, sizeof(iv));
+        Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+        Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                       0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
+        std::vector<Uint8> plaintext(128, 0xCC);
+        std::vector<Uint8> ciphertext(128), decrypted(128);
 
-    Uint64 outlen1 = 0, outlen2 = 0;
-    chacha20_enc.encrypt(plaintext.data(), ciphertext.data(), 128, &outlen1);
-    chacha20_dec.decrypt(ciphertext.data(), decrypted.data(), 128, &outlen2);
+        auto chacha20_enc = createChaCha20ForArch(arch);
+            auto chacha20_dec = createChaCha20ForArch(arch);
+        chacha20_enc->init(key, sizeof(key) * 8, iv, sizeof(iv));
+        chacha20_dec->init(key, sizeof(key) * 8, iv, sizeof(iv));
 
-    EXPECT_EQ(decrypted, plaintext);
+        Uint64 outlen1 = 0, outlen2 = 0;
+        chacha20_enc->encrypt(plaintext.data(), ciphertext.data(), 128, &outlen1);
+        chacha20_dec->decrypt(ciphertext.data(), decrypted.data(), 128, &outlen2);
+
+        EXPECT_EQ(decrypted, plaintext);
+
+    }
 }
 
 // Test block boundary sizes (around 64-byte boundaries)
 TEST(Chacha20, BlockBoundarySizes)
 {
-    Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
-                    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-    Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-                   0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
+    for (auto arch : getTestArchLevels()) {
+        SCOPED_TRACE("Arch: " + archLevelName(arch));
 
-    std::vector<size_t> sizes = { 63, 64, 65, 127, 128, 129, 191, 192, 193, 255, 256, 257 };
+        Uint8 key[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+                        0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
+        Uint8 iv[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+                       0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c };
 
-    for (size_t size : sizes) {
-        std::vector<Uint8> plaintext(size, 0xDD);
-        std::vector<Uint8> ciphertext(size), decrypted(size);
+        std::vector<size_t> sizes = { 63, 64, 65, 127, 128, 129, 191, 192, 193, 255, 256, 257 };
 
-        ref::ChaCha256 chacha20_enc, chacha20_dec;
-        chacha20_enc.setKey(key, sizeof(key) * 8);
-        chacha20_enc.setIv(iv, sizeof(iv));
-        chacha20_dec.setKey(key, sizeof(key) * 8);
-        chacha20_dec.setIv(iv, sizeof(iv));
+        for (size_t size : sizes) {
+            std::vector<Uint8> plaintext(size, 0xDD);
+            std::vector<Uint8> ciphertext(size), decrypted(size);
 
-        Uint64 outlen1 = 0, outlen2 = 0;
-        chacha20_enc.encrypt(plaintext.data(), ciphertext.data(), size, &outlen1);
-        chacha20_dec.decrypt(ciphertext.data(), decrypted.data(), size, &outlen2);
+            auto chacha20_enc = createChaCha20ForArch(arch);
+            auto chacha20_dec = createChaCha20ForArch(arch);
+            chacha20_enc->init(key, sizeof(key) * 8, iv, sizeof(iv));
+            chacha20_dec->init(key, sizeof(key) * 8, iv, sizeof(iv));
 
-        EXPECT_EQ(decrypted, plaintext) << "Mismatch for size: " << size;
+            Uint64 outlen1 = 0, outlen2 = 0;
+            chacha20_enc->encrypt(plaintext.data(), ciphertext.data(), size, &outlen1);
+            chacha20_dec->decrypt(ciphertext.data(), decrypted.data(), size, &outlen2);
+
+            EXPECT_EQ(decrypted, plaintext) << "Mismatch for size: " << size;
+        }
+
     }
 }
 

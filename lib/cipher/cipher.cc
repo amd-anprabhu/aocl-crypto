@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2021-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -485,6 +485,9 @@ createCipher(const CipherMode mode, const CipherKeyLen keyLen)
             }
             if (arch >= CpuArchLevel::eZen4) {
                 return new vaes512::ChaCha256();
+            }
+            if (arch >= CpuArchLevel::eZen) {
+                return new avx2::ChaCha256();
             }
             return new ref::ChaCha256();
 

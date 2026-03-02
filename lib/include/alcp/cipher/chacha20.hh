@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -133,6 +133,10 @@ class ALCP_API_EXPORT ChaCha256T
 namespace vaes512 {
     using ChaCha256 = ChaCha256T<CpuArchLevel::eZen4>;
 } // namespace vaes512
+
+namespace avx2 {
+    using ChaCha256 = ChaCha256T<CpuArchLevel::eZen>;
+} // namespace avx2
 
 namespace ref {
     using ChaCha256 = ChaCha256T<CpuArchLevel::eReference>;

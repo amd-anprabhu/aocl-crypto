@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,6 +28,7 @@
 
 #include "alcp/cipher/chacha20.hh"
 #include "alcp/cipher/chacha20_zen4.hh"
+#include "alcp/cipher/chacha20_avx2.hh"
 #include "chacha20_inplace.cc.inc"
 
 namespace alcp::cipher {
@@ -125,9 +126,7 @@ ChaCha256T<CpuArchLevel::eZen4>::encrypt(const Uint8* pInput,
     Uint64 blocks   = len / cMBlockSize;
     int    remBytes = len - (blocks * cMBlockSize);
     err             = zen4::ProcessInput(getKey(),
-                             cMKeylen,
                              getIv(),
-                             cMIvlen,
                              pInput,
                              pOutput,
                              blocks,
@@ -142,6 +141,52 @@ ChaCha256T<CpuArchLevel::eZen4>::encrypt(const Uint8* pInput,
 template<>
 alc_error_t
 ChaCha256T<CpuArchLevel::eZen4>::decrypt(const Uint8* pInput,
+                                                  Uint8*       pOutput,
+                                                  Uint64       len,
+                                                  Uint64*      outlen)
+{
+    // ChaCha20 encryption and decryption are identical operations
+    return encrypt(pInput, pOutput, len, outlen);
+}
+
+template<>
+alc_error_t
+ChaCha256T<CpuArchLevel::eZen>::encrypt(const Uint8* pInput,
+                                                  Uint8*       pOutput,
+                                                  Uint64       len,
+                                                  Uint64*      outlen)
+{
+    alc_error_t err = ALC_ERROR_NONE;
+
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen = 0;
+
+    Uint64 blocks   = len / cMBlockSize;
+    int    remBytes = len - (blocks * cMBlockSize);
+    err             = avx2::ProcessInput(getKey(),
+                             getIv(),
+                             pInput,
+                             pOutput,
+                             blocks,
+                             remBytes);
+
+    if (err == ALC_ERROR_NONE) {
+        *outlen = len;
+    }
+    return err;
+}
+
+template<>
+alc_error_t
+ChaCha256T<CpuArchLevel::eZen>::decrypt(const Uint8* pInput,
                                                   Uint8*       pOutput,
                                                   Uint64       len,
                                                   Uint64*      outlen)
