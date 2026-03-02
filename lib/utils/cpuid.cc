@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -65,9 +65,10 @@ class CpuId::Impl
 #endif
 
   public:
-    bool AlcpEnableInstructionSet = false;
-    bool cpuid_disable_avx512     = false;
-    bool cpuid_disable_vaes       = false;
+    bool AlcpEnableInstructionSet         = false;
+    bool cpuid_disable_avx512             = false;
+    bool cpuid_disable_vaes               = false;
+    bool cpuid_disable_avx512_vpintersect = false;
 
     /* cached CPU architecture detection results */
     bool        zen1_flag          = false;
@@ -78,8 +79,19 @@ class CpuId::Impl
     const char* actual_cpu_arch    = "Unknown";
     bool        cpu_detection_done = false;
 
-    void get_alcp_enabled_instr();
+    bool get_alcp_enabled_instr();
     void detect_cpu_architecture();
+
+    // Per-algorithm arch level computation (uses this-> instead of pImpl)
+    CpuArchLevel computeArchLevelCipher();
+    CpuArchLevel computeArchLevelRsa();
+    CpuArchLevel computeArchLevelPoly1305();
+    CpuArchLevel computeArchLevelX25519();
+    CpuArchLevel computeArchLevelSha2_256();
+    CpuArchLevel computeArchLevelSha2_512();
+    CpuArchLevel computeArchLevelSha3();
+    CpuArchLevel computeArchLevelDefault();
+    CpuArchLevel computeArchLevel(AlgorithmType algo);
 
     // Low-level CPU feature detection
     bool cpuHasAvx512f();
@@ -87,6 +99,7 @@ class CpuId::Impl
     bool cpuHasAvx512bw();
     bool cpuHasAvx512ifma();
     bool cpuHasAvx512vl();
+    bool cpuHasAvx512VP2Intersect();
     bool cpuHasAvx512(Avx512Flags flag);
     bool cpuHasVaes();
     bool cpuHasAesni();
@@ -104,6 +117,8 @@ class CpuId::Impl
     bool cpuIsZen3();
     bool cpuIsZen4();
     bool cpuIsZen5();
+
+    // Vendor detection
     bool cpuIsAmd();
 };
 
@@ -155,16 +170,33 @@ CpuId::Impl::Impl()
     detect_cpu_architecture();
 
     /* read environment variable to force cpu arch */
-    get_alcp_enabled_instr();
+    bool env_var_was_set = get_alcp_enabled_instr();
 
 #ifndef ALCP_ENABLE_AOCL_UTILS
     std::fprintf(stderr,
-                 "AOCL-Utils is unavailable at compile time! Defaulting to "
-                 "ZEN2 dispatch!\n");
+                 "AOCL-Utils is unavailable at compile time! "
+                 "Vendor/micro-arch detection disabled, defaulting to "
+                 "AVX2 (eZen) ISA level.\n");
     std::fprintf(stderr,
-                 "Check ALCP_ENABLE_AOCL_UTILS param at configure stage!"
-                 "\n");
+                 "Check ALCP_ENABLE_AOCL_UTILS param at configure stage!\n");
 #endif
+
+    // Print per-algorithm kernel levels when AOCL_ENABLE_INSTRUCTION is set.
+    // Safe to call computeArchLevel*() here since they use this-> (not pImpl).
+    if (env_var_was_set) {
+        std::fprintf(
+            stderr,
+            "Detected CPU=%s, Kernel levels: Cipher=%s, RSA=%s, Poly1305=%s, "
+            "X25519=%s, SHA256=%s, SHA512=%s, SHA3=%s\n",
+            actual_cpu_arch,
+            CpuArchLevelToString(computeArchLevelCipher()),
+            CpuArchLevelToString(computeArchLevelRsa()),
+            CpuArchLevelToString(computeArchLevelPoly1305()),
+            CpuArchLevelToString(computeArchLevelX25519()),
+            CpuArchLevelToString(computeArchLevelSha2_256()),
+            CpuArchLevelToString(computeArchLevelSha2_512()),
+            CpuArchLevelToString(computeArchLevelSha3()));
+    }
 }
 
 /**
@@ -172,37 +204,56 @@ CpuId::Impl::Impl()
  * the enabled CPU instructions.
  *
  * Supported values: ZEN, ZEN1, ZEN2, ZEN3, ZEN4, ZEN5
- * - ZEN/ZEN1/ZEN2: Disables AVX512 and VAES (forces Zen1/Zen2 code paths)
- * - ZEN3: Disables AVX512 (forces Zen3 code paths with 256-bit VAES)
- * - ZEN4/ZEN5: No effect (native CPU detection used)
+ * - ZEN/ZEN1/ZEN2: Disables AVX512 and VAES (forces max Zen1/Zen2 level)
+ * - ZEN3: Disables AVX512 (forces max Zen3 level with 256-bit VAES)
+ * - ZEN4: Disables VP2INTERSECT (forces max Zen4 level)
+ * - ZEN5: No effect (native CPU detection used)
+ *
+ * Note: Setting a higher level on a lower CPU has no effect - the actual
+ * kernel level is determined by ISA feature detection, not this env var.
+ * This env var can only DOWNGRADE.
  */
-void
+bool
 CpuId::Impl::get_alcp_enabled_instr()
 {
     const char* AOCL_Enable_Inst = std::getenv("AOCL_ENABLE_INSTRUCTION");
 
     if (AOCL_Enable_Inst == NULL) {
         AlcpEnableInstructionSet = true;
-        return;
+        return false;
     }
 
     if (strcmp(AOCL_Enable_Inst, "ZEN5") == 0) {
         std::fprintf(stderr,
-                     "AOCL_ENABLE_INSTRUCTION=ZEN5 has no effect "
-                     "(native CPU detection used)\n");
+                     "AOCL_ENABLE_INSTRUCTION=ZEN5: "
+                     "Max kernel level set to ZEN5 (no features disabled)\n");
     } else if (strcmp(AOCL_Enable_Inst, "ZEN4") == 0) {
+        cpuid_disable_avx512_vpintersect = true;
         std::fprintf(stderr,
-                     "AOCL_ENABLE_INSTRUCTION=ZEN4 has no effect "
-                     "(native CPU detection used)\n");
+                     "AOCL_ENABLE_INSTRUCTION=ZEN4: "
+                     "Max kernel level set to ZEN4 (VP2INTERSECT disabled)\n");
     } else if (strcmp(AOCL_Enable_Inst, "ZEN3") == 0) {
-        cpuid_disable_avx512 = true;
+        cpuid_disable_avx512_vpintersect = true;
+        cpuid_disable_avx512             = true;
+        std::fprintf(stderr,
+                     "AOCL_ENABLE_INSTRUCTION=ZEN3: "
+                     "Max kernel level set to ZEN3 (AVX512 disabled)\n");
     } else if (strcmp(AOCL_Enable_Inst, "ZEN2") == 0) {
-        cpuid_disable_avx512 = true;
-        cpuid_disable_vaes   = true;
+        cpuid_disable_avx512_vpintersect = true;
+        cpuid_disable_avx512             = true;
+        cpuid_disable_vaes               = true;
+        std::fprintf(stderr,
+                     "AOCL_ENABLE_INSTRUCTION=ZEN2: "
+                     "Max kernel level set to ZEN2 (AVX512, VAES disabled)\n");
     } else if ((strcmp(AOCL_Enable_Inst, "ZEN") == 0)
                || (strcmp(AOCL_Enable_Inst, "ZEN1") == 0)) {
-        cpuid_disable_avx512 = true;
-        cpuid_disable_vaes   = true;
+        cpuid_disable_avx512_vpintersect = true;
+        cpuid_disable_avx512             = true;
+        cpuid_disable_vaes               = true;
+        std::fprintf(stderr,
+                     "AOCL_ENABLE_INSTRUCTION=%s: "
+                     "Max kernel level set to ZEN1 (AVX512, VAES disabled)\n",
+                     AOCL_Enable_Inst);
     } else {
         std::cerr << "Invalid option passed to environment variable "
                      "AOCL_ENABLE_INSTRUCTION "
@@ -211,13 +262,17 @@ CpuId::Impl::get_alcp_enabled_instr()
         std::exit(-1);
     }
     AlcpEnableInstructionSet = true;
+    return true;
 }
 
 /**
  * @brief Detects and caches the CPU architecture once during initialization
  *
- * This function performs the actual CPU detection and stores the results
- * in member variables to avoid repeated detection calls.
+ * Identifies the CPU vendor (AMD / Intel / other) and, for AMD parts,
+ * determines the specific Zen micro-architecture.  Intel and other
+ * vendors are reported as "Unknown" because the library does not yet
+ * map Intel micro-architectures to named levels; ISA-based dispatch
+ * (computeArchLevel*) still works correctly for any x86-64 CPU.
  */
 void
 CpuId::Impl::detect_cpu_architecture()
@@ -227,35 +282,34 @@ CpuId::Impl::detect_cpu_architecture()
     }
 
 #ifdef ALCP_ENABLE_AOCL_UTILS
-    zen1_flag = Impl::m_cpu->isUarch(EUarch::Zen);
-    zen2_flag = Impl::m_cpu->isUarch(EUarch::Zen2);
-    zen3_flag = Impl::m_cpu->isUarch(EUarch::Zen3);
-    zen4_flag = Impl::m_cpu->isUarch(EUarch::Zen4);
-    zen5_flag = Impl::m_cpu->isUarch(EUarch::Zen5);
-#else
-    // Default dispatch is to Zen2
-    // If this condition is setup, you can never force it to zen3 or zen4
-    // We need cpuid to verify it can actually run on the machine
-    zen1_flag = false;
-    zen2_flag = true;
-    zen3_flag = false;
-    zen4_flag = false;
-    zen5_flag = false;
-#endif
+    if (Impl::m_cpu->isAMD()) {
+        zen1_flag = Impl::m_cpu->isUarch(EUarch::Zen);
+        zen2_flag = Impl::m_cpu->isUarch(EUarch::Zen2);
+        zen3_flag = Impl::m_cpu->isUarch(EUarch::Zen3);
+        zen4_flag = Impl::m_cpu->isUarch(EUarch::Zen4);
+        zen5_flag = Impl::m_cpu->isUarch(EUarch::Zen5);
 
-    // Determine actual CPU architecture for logging
-    if (zen5_flag)
-        actual_cpu_arch = "ZEN5";
-    else if (zen4_flag)
-        actual_cpu_arch = "ZEN4";
-    else if (zen3_flag)
-        actual_cpu_arch = "ZEN3";
-    else if (zen2_flag)
-        actual_cpu_arch = "ZEN2";
-    else if (zen1_flag)
-        actual_cpu_arch = "ZEN1";
-    else
+        if (zen5_flag)
+            actual_cpu_arch = "ZEN5";
+        else if (zen4_flag)
+            actual_cpu_arch = "ZEN4";
+        else if (zen3_flag)
+            actual_cpu_arch = "ZEN3";
+        else if (zen2_flag)
+            actual_cpu_arch = "ZEN2";
+        else if (zen1_flag)
+            actual_cpu_arch = "ZEN1";
+        else
+            actual_cpu_arch = "Unknown AMD";
+    } else {
         actual_cpu_arch = "Unknown";
+    }
+#else
+    // Without AOCL-Utils we cannot identify the vendor or micro-arch.
+    // Default to Zen2 ISA level so basic AVX2 paths are selected.
+    zen2_flag       = true;
+    actual_cpu_arch = "Unknown";
+#endif
 
     cpu_detection_done = true;
 }
@@ -325,6 +379,20 @@ CpuId::Impl::cpuHasAvx512vl()
     }
 #ifdef ALCP_ENABLE_AOCL_UTILS
     static bool state = Impl::m_cpu->hasFlag(ECpuidFlag::avx512vl);
+#else
+    static bool state = false;
+#endif
+    return state;
+}
+
+bool
+CpuId::Impl::cpuHasAvx512VP2Intersect()
+{
+    if (cpuid_disable_avx512 || cpuid_disable_avx512_vpintersect) {
+        return false;
+    }
+#ifdef ALCP_ENABLE_AOCL_UTILS
+    static bool state = Impl::m_cpu->hasFlag(ECpuidFlag::avx512_vpintersect);
 #else
     static bool state = false;
 #endif
@@ -485,13 +553,6 @@ CpuId::Impl::cpuIsZen5()
     return zen5_flag;
 }
 
-/**
- * @brief Validates requested CPU arch against actual CPU capabilities
- *
- * When AOCL_ENABLE_INSTRUCTION is set, this function checks if the requested
- * architecture level is compatible with the actual CPU. It returns true if
- * the requested cpuZenVer is at or below the forced architecture level.
- */
 bool
 CpuId::Impl::cpuIsAmd()
 {
@@ -502,6 +563,212 @@ CpuId::Impl::cpuIsAmd()
     static bool state = true;
 #endif
     return state;
+}
+
+// Per-algorithm arch level computation (member functions using this->)
+
+// Cipher (AES modes, ChaCha20): AESNI -> VAES -> VAES+AVX512
+CpuArchLevel
+CpuId::Impl::computeArchLevelCipher()
+{
+    // eZen4: AVX512 full + VAES (512-bit vectorized)
+    if (cpuHasAvx512(Avx512Flags::AVX512_F)
+        && cpuHasAvx512(Avx512Flags::AVX512_DQ)
+        && cpuHasAvx512(Avx512Flags::AVX512_BW)
+        && cpuHasAvx512(Avx512Flags::AVX512_VL) && cpuHasVaes()) {
+        return CpuArchLevel::eZen4;
+    }
+    // eZen3: VAES (256-bit vectorized) + AVX2
+    if (cpuHasVaes() && cpuHasAvx2()) {
+        return CpuArchLevel::eZen3;
+    }
+    // eZen: AESNI (128-bit) + AVX2
+    if (cpuHasAesni() && cpuHasAvx2()) {
+        return CpuArchLevel::eZen;
+    }
+    return CpuArchLevel::eReference;
+}
+
+// RSA: ADX+BMI2 -> ADX+BMI2 -> ADX+BMI2+IFMA
+// RSA does NOT require VAES, only IFMA for Zen4 optimization
+CpuArchLevel
+CpuId::Impl::computeArchLevelRsa()
+{
+    // eZen4: ADX + AVX2 + BMI2 + IFMA (optimized modular multiplication)
+    if (cpuHasAdx() && cpuHasAvx2() && cpuHasBmi2() && cpuHasAvx512ifma()) {
+        return CpuArchLevel::eZen4;
+    }
+    // eZen3: ADX + AVX2 + BMI2 (same as eZen for RSA, but keeps hierarchy)
+    if (cpuHasAdx() && cpuHasAvx2() && cpuHasBmi2()) {
+        return CpuArchLevel::eZen3;
+    }
+    // eZen: ADX + AVX2 + BMI2
+    if (cpuHasAdx() && cpuHasAvx2() && cpuHasBmi2()) {
+        return CpuArchLevel::eZen;
+    }
+    return CpuArchLevel::eReference;
+}
+
+// Poly1305: Reference -> Reference -> AVX512Base + IFMA
+// Uses AVX512 intrinsics, NOT ADX/BMI2.
+// Only eZen4 has optimized kernel, requires AVX512 F+DQ+BW+IFMA.
+CpuArchLevel
+CpuId::Impl::computeArchLevelPoly1305()
+{
+    // eZen4: AVX512 F+DQ+BW+IFMA
+    if (cpuHasAvx512(Avx512Flags::AVX512_F)
+        && cpuHasAvx512(Avx512Flags::AVX512_DQ)
+        && cpuHasAvx512(Avx512Flags::AVX512_BW)
+        && cpuHasAvx512(Avx512Flags::AVX512_IFMA)) {
+        return CpuArchLevel::eZen4;
+    }
+    // eZen/eZen3: reference implementation (only need AVX2 as baseline)
+    if (cpuHasAvx2()) {
+        return CpuArchLevel::eZen;
+    }
+    return CpuArchLevel::eReference;
+}
+
+// X25519 implementations:
+//   eZen4: radix51bit (AVX512 F+DQ+BW+IFMA+VL) - NO ADX/BMI2
+//   eZen3: radix64bit via x25519.cc.inc - requires ADX+BMI2
+//   eZen:  radix64bit via x25519.cc.inc - requires ADX+BMI2
+CpuArchLevel
+CpuId::Impl::computeArchLevelX25519()
+{
+    // eZen4: AVX512 radix51bit implementation
+    if (cpuHasAvx512(Avx512Flags::AVX512_F)
+        && cpuHasAvx512(Avx512Flags::AVX512_DQ)
+        && cpuHasAvx512(Avx512Flags::AVX512_BW)
+        && cpuHasAvx512(Avx512Flags::AVX512_IFMA)
+        && cpuHasAvx512(Avx512Flags::AVX512_VL)) {
+        return CpuArchLevel::eZen4;
+    }
+    // eZen3: radix64bit, requires ADX+BMI2+VAES
+    if (cpuHasAdx() && cpuHasAvx2() && cpuHasBmi2() && cpuHasVaes()) {
+        return CpuArchLevel::eZen3;
+    }
+    // eZen: radix64bit, requires ADX+BMI2
+    if (cpuHasAdx() && cpuHasAvx2() && cpuHasBmi2()) {
+        return CpuArchLevel::eZen;
+    }
+    return CpuArchLevel::eReference;
+}
+
+// SHA256: dispatch is orthogonal to architecture level.
+// Primary path: SHA-NI (hardware acceleration).
+// Fallback: Reference implementation (AVX2 fallback is disabled).
+CpuArchLevel
+CpuId::Impl::computeArchLevelSha2_256()
+{
+    if (cpuHasShani()) {
+        return CpuArchLevel::eZen;
+    }
+    return CpuArchLevel::eReference;
+}
+
+// SHA512: AVX2+SSE3 -> AVX256 -> AVX512
+// Uses AVX2/AVX512 intrinsics, NOT ADX/BMI2.
+CpuArchLevel
+CpuId::Impl::computeArchLevelSha2_512()
+{
+    // eZen4: AVX512 (F+DQ+BW+IFMA+VL)
+    if (cpuHasAvx512(Avx512Flags::AVX512_F)
+        && cpuHasAvx512(Avx512Flags::AVX512_DQ)
+        && cpuHasAvx512(Avx512Flags::AVX512_BW)
+        && cpuHasAvx512(Avx512Flags::AVX512_IFMA)
+        && cpuHasAvx512(Avx512Flags::AVX512_VL)) {
+        return CpuArchLevel::eZen4;
+    }
+    // eZen3: AVX256 (zen3 kernel, VAES as differentiator)
+    if (cpuHasVaes() && cpuHasAvx2()) {
+        return CpuArchLevel::eZen3;
+    }
+    // eZen: AVX2 + SSE3
+    if (cpuHasAvx2() && cpuHasSse3()) {
+        return CpuArchLevel::eZen;
+    }
+    return CpuArchLevel::eReference;
+}
+
+// SHA3: AVX2 -> AVX2+VAES -> AVX512 -> AVX512+VP2INTERSECT
+// Uses AVX2/AVX512 intrinsics, NOT ADX/BMI2.
+CpuArchLevel
+CpuId::Impl::computeArchLevelSha3()
+{
+    // eZen5: AVX512 + VP2INTERSECT (used for compiler-specific dispatch)
+    if (cpuHasAvx512(Avx512Flags::AVX512_F)
+        && cpuHasAvx512(Avx512Flags::AVX512_DQ)
+        && cpuHasAvx512(Avx512Flags::AVX512_BW)
+        && cpuHasAvx512(Avx512Flags::AVX512_IFMA)
+        && cpuHasAvx512(Avx512Flags::AVX512_VL)
+        && cpuHasAvx512VP2Intersect()) {
+        return CpuArchLevel::eZen5;
+    }
+    // eZen4: AVX512 (F+DQ+BW+IFMA+VL) without VP2INTERSECT
+    if (cpuHasAvx512(Avx512Flags::AVX512_F)
+        && cpuHasAvx512(Avx512Flags::AVX512_DQ)
+        && cpuHasAvx512(Avx512Flags::AVX512_BW)
+        && cpuHasAvx512(Avx512Flags::AVX512_IFMA)
+        && cpuHasAvx512(Avx512Flags::AVX512_VL)) {
+        return CpuArchLevel::eZen4;
+    }
+    // eZen3: AVX2 + VAES (VAES as differentiator for eZen3 vs eZen)
+    if (cpuHasVaes() && cpuHasAvx2()) {
+        return CpuArchLevel::eZen3;
+    }
+    // eZen: AVX2
+    if (cpuHasAvx2()) {
+        return CpuArchLevel::eZen;
+    }
+    return CpuArchLevel::eReference;
+}
+
+// Default: original blanket check for backward compatibility
+CpuArchLevel
+CpuId::Impl::computeArchLevelDefault()
+{
+    // eZen4/eZen5: AVX512 full + VAES
+    if (cpuHasAvx512(Avx512Flags::AVX512_F)
+        && cpuHasAvx512(Avx512Flags::AVX512_DQ)
+        && cpuHasAvx512(Avx512Flags::AVX512_BW)
+        && cpuHasAvx512(Avx512Flags::AVX512_IFMA)
+        && cpuHasAvx512(Avx512Flags::AVX512_VL) && cpuHasVaes()) {
+        return CpuArchLevel::eZen4;
+    }
+    // eZen3: VAES (256-bit) + ADX + AVX2 + BMI2
+    if (cpuHasVaes() && cpuHasAdx() && cpuHasAvx2() && cpuHasBmi2()) {
+        return CpuArchLevel::eZen3;
+    }
+    // eZen: ADX + AVX2 + BMI2 + AESNI
+    if (cpuHasAdx() && cpuHasAvx2() && cpuHasBmi2() && cpuHasAesni()) {
+        return CpuArchLevel::eZen;
+    }
+    return CpuArchLevel::eReference;
+}
+
+CpuArchLevel
+CpuId::Impl::computeArchLevel(AlgorithmType algo)
+{
+    switch (algo) {
+        case AlgorithmType::eCipher:
+            return computeArchLevelCipher();
+        case AlgorithmType::eRsa:
+            return computeArchLevelRsa();
+        case AlgorithmType::ePoly1305:
+            return computeArchLevelPoly1305();
+        case AlgorithmType::eX25519:
+            return computeArchLevelX25519();
+        case AlgorithmType::eSha2_256:
+            return computeArchLevelSha2_256();
+        case AlgorithmType::eSha2_512:
+            return computeArchLevelSha2_512();
+        case AlgorithmType::eSha3:
+            return computeArchLevelSha3();
+        case AlgorithmType::eDefault:
+        default:
+            return computeArchLevelDefault();
+    }
 }
 
 bool
@@ -556,6 +823,12 @@ bool
 CpuId::cpuHasAvx512vl()
 {
     return pImpl.get()->cpuHasAvx512vl();
+}
+
+bool
+CpuId::cpuHasAvx512VP2Intersect()
+{
+    return pImpl.get()->cpuHasAvx512VP2Intersect();
 }
 
 bool
@@ -639,7 +912,6 @@ CpuId::cpuHasAvx512Base()
     return s_avx512Base;
 }
 
-
 bool
 CpuId::cpuHasAvx512VL()
 {
@@ -650,213 +922,18 @@ CpuId::cpuHasAvx512VL()
 }
 
 // Per-algorithm architecture level detection
-// Each algorithm has different CPU feature requirements
-
-static CpuArchLevel
-getArchLevelCipher()
-{
-    // Cipher (AES modes, ChaCha20): AESNI → VAES → VAES+AVX512
-    // Zen4: AVX512 full + VAES (512-bit vectorized)
-    if (CpuId::cpuHasAvx512(Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_DQ)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_BW)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_VL)
-        && CpuId::cpuHasVaes()) {
-        return CpuArchLevel::eZen4;
-    }
-    // Zen3: VAES (256-bit vectorized) + AVX2
-    if (CpuId::cpuHasVaes() && CpuId::cpuHasAvx2()) {
-        return CpuArchLevel::eZen3;
-    }
-    // Zen: AESNI (128-bit) + AVX2
-    if (CpuId::cpuHasAesni() && CpuId::cpuHasAvx2()) {
-        return CpuArchLevel::eZen;
-    }
-    return CpuArchLevel::eReference;
-}
-
-static CpuArchLevel
-getArchLevelRsa()
-{
-    // RSA: ADX+BMI2 → ADX+BMI2 → ADX+BMI2+IFMA
-    // RSA does NOT require VAES, only IFMA for Zen4 optimization
-    // Zen4: ADX + AVX2 + BMI2 + IFMA (for optimized modular multiplication)
-    if (CpuId::cpuHasAdx() && CpuId::cpuHasAvx2() && CpuId::cpuHasBmi2()
-        && CpuId::cpuHasAvx512ifma()) {
-        return CpuArchLevel::eZen4;
-    }
-    // Zen3: ADX + AVX2 + BMI2 (same as Zen for RSA, but keep hierarchy)
-    if (CpuId::cpuHasAdx() && CpuId::cpuHasAvx2() && CpuId::cpuHasBmi2()) {
-        return CpuArchLevel::eZen3;
-    }
-    // Zen: ADX + AVX2 + BMI2
-    if (CpuId::cpuHasAdx() && CpuId::cpuHasAvx2() && CpuId::cpuHasBmi2()) {
-        return CpuArchLevel::eZen;
-    }
-    return CpuArchLevel::eReference;
-}
-
-static CpuArchLevel
-getArchLevelPoly1305()
-{
-    // Poly1305: Reference → Reference → AVX512Base + IFMA
-    // Poly1305 uses AVX512 intrinsics, NOT ADX/BMI2
-    // Only Zen4 has optimized kernel, requires AVX512 F+DQ+BW+IFMA
-    if (CpuId::cpuHasAvx512(Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_DQ)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_BW)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_IFMA)) {
-        return CpuArchLevel::eZen4;
-    }
-    // Zen/Zen3 use reference implementation (only need AVX2 as baseline)
-    if (CpuId::cpuHasAvx2()) {
-        return CpuArchLevel::eZen;
-    }
-    return CpuArchLevel::eReference;
-}
-
-static CpuArchLevel
-getArchLevelX25519()
-{
-    // X25519 implementations:
-    // - Zen4: radix51bit (AVX512 F+DQ+BW+IFMA+VL) - NO ADX/BMI2
-    // - Zen3: radix64bit via x25519.cc.inc - requires ADX+BMI2
-    // - AVX2/Zen: radix64bit via x25519.cc.inc - requires ADX+BMI2
-    // Zen4: Uses AVX512 radix51bit implementation
-    if (CpuId::cpuHasAvx512(Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_DQ)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_BW)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_IFMA)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_VL)) {
-        return CpuArchLevel::eZen4;
-    }
-    // Zen3: Uses radix64bit which requires ADX+BMI2
-    if (CpuId::cpuHasAdx() && CpuId::cpuHasAvx2() && CpuId::cpuHasBmi2()
-        && CpuId::cpuHasVaes()) {
-        return CpuArchLevel::eZen3;
-    }
-    // Zen: Uses radix64bit which requires ADX+BMI2
-    if (CpuId::cpuHasAdx() && CpuId::cpuHasAvx2() && CpuId::cpuHasBmi2()) {
-        return CpuArchLevel::eZen;
-    }
-    return CpuArchLevel::eReference;
-}
-
-static CpuArchLevel
-getArchLevelSha2_256()
-{
-    // SHA256 dispatch is orthogonal to architecture level
-    // Primary path: SHA-NI (hardware acceleration) - available on all Zen CPUs
-    // Fallback: Reference implementation (AVX2 fallback is disabled)
-    if (CpuId::cpuHasShani()) {
-        return CpuArchLevel::eZen; // All Zen CPUs have SHA-NI
-    }
-    return CpuArchLevel::eReference;
-}
-
-static CpuArchLevel
-getArchLevelSha2_512()
-{
-    // SHA512: AVX2+SSE3 → AVX256 → AVX512
-    // SHA512 uses AVX2/AVX512 intrinsics, NOT ADX/BMI2
-    // Zen4: AVX512 (F, DQ, BW, IFMA, VL)
-    if (CpuId::cpuHasAvx512(Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_DQ)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_BW)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_IFMA)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_VL)) {
-        return CpuArchLevel::eZen4;
-    }
-    // Zen3: AVX256 (uses zen3 kernel with VAES as differentiator)
-    if (CpuId::cpuHasVaes() && CpuId::cpuHasAvx2()) {
-        return CpuArchLevel::eZen3;
-    }
-    // Zen: AVX2 + SSE3
-    if (CpuId::cpuHasAvx2() && CpuId::cpuHasSse3()) {
-        return CpuArchLevel::eZen;
-    }
-    return CpuArchLevel::eReference;
-}
-
-static CpuArchLevel
-getArchLevelSha3()
-{
-    // SHA3: AVX2 → AVX2+VAES → AVX512
-    // SHA3 uses AVX2/AVX512 intrinsics, NOT ADX/BMI2
-    // Zen4: AVX512 (F, DQ, BW, IFMA, VL)
-    if (CpuId::cpuHasAvx512(Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_DQ)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_BW)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_IFMA)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_VL)) {
-        return CpuArchLevel::eZen4;
-    }
-    // Zen3: AVX2 + VAES (VAES as differentiator for Zen3 vs Zen)
-    if (CpuId::cpuHasVaes() && CpuId::cpuHasAvx2()) {
-        return CpuArchLevel::eZen3;
-    }
-    // Zen: AVX2
-    if (CpuId::cpuHasAvx2()) {
-        return CpuArchLevel::eZen;
-    }
-    return CpuArchLevel::eReference;
-}
-
-static CpuArchLevel
-getArchLevelDefault()
-{
-    // Default: Original blanket check for backward compatibility
-    // Zen4/Zen5: AVX512 full + VAES
-    if (CpuId::cpuHasAvx512(Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_DQ)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_BW)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_IFMA)
-        && CpuId::cpuHasAvx512(Avx512Flags::AVX512_VL)
-        && CpuId::cpuHasVaes()) {
-        return CpuArchLevel::eZen4;
-    }
-    // Zen3: VAES (256-bit) + ADX + AVX2 + BMI2
-    if (CpuId::cpuHasVaes() && CpuId::cpuHasAdx() && CpuId::cpuHasAvx2()
-        && CpuId::cpuHasBmi2()) {
-        return CpuArchLevel::eZen3;
-    }
-    // Zen1/Zen2: ADX, AVX2, BMI2, AESNI
-    if (CpuId::cpuHasAdx() && CpuId::cpuHasAvx2() && CpuId::cpuHasBmi2()
-        && CpuId::cpuHasAesni()) {
-        return CpuArchLevel::eZen;
-    }
-    // Fallback
-    return CpuArchLevel::eReference;
-}
+// Delegates to Impl member functions (which use this-> instead of pImpl)
 
 CpuArchLevel
 CpuId::getArchLevel(AlgorithmType algo)
 {
-    switch (algo) {
-        case AlgorithmType::eCipher:
-            return getArchLevelCipher();
-        case AlgorithmType::eRsa:
-            return getArchLevelRsa();
-        case AlgorithmType::ePoly1305:
-            return getArchLevelPoly1305();
-        case AlgorithmType::eX25519:
-            return getArchLevelX25519();
-        case AlgorithmType::eSha2_256:
-            return getArchLevelSha2_256();
-        case AlgorithmType::eSha2_512:
-            return getArchLevelSha2_512();
-        case AlgorithmType::eSha3:
-            return getArchLevelSha3();
-        case AlgorithmType::eDefault:
-        default:
-            return getArchLevelDefault();
-    }
+    return pImpl->computeArchLevel(algo);
 }
 
 // Per-algorithm cached architecture levels
 constexpr int kCacheSize = static_cast<int>(AlgorithmType::eDefault) + 1;
-static std::array<CpuArchLevel, kCacheSize> s_cachedArchLevels = {};
-static std::array<std::once_flag, kCacheSize> s_initFlags = {};
+static std::array<CpuArchLevel, kCacheSize>   s_cachedArchLevels = {};
+static std::array<std::once_flag, kCacheSize> s_initFlags        = {};
 
 CpuArchLevel
 CpuId::getCachedArchLevel(AlgorithmType algo)
@@ -867,12 +944,12 @@ CpuId::getCachedArchLevel(AlgorithmType algo)
         idx = kCacheSize - 1; // Use default (index 7)
     }
     // This line guarantees that the initialization for s_cachedArchLevels[idx]
-    // will only happen once for each algorithm, even if multiple threads or the same process
-    // call this function multiple times.
-    // If the same process calls this code repeatedly, only the first call will execute
-    // getArchLevel(algo) and set s_cachedArchLevels[idx].
-    // All subsequent calls for the same index will skip the lambda, immediately returning
-    // the cached result, ensuring both thread safety and cached efficiency.
+    // will only happen once for each algorithm, even if multiple threads or the
+    // same process call this function multiple times. If the same process calls
+    // this code repeatedly, only the first call will execute getArchLevel(algo)
+    // and set s_cachedArchLevels[idx]. All subsequent calls for the same index
+    // will skip the lambda, immediately returning the cached result, ensuring
+    // both thread safety and cached efficiency.
     std::call_once(s_initFlags[idx], [idx, algo]() {
         s_cachedArchLevels[idx] = getArchLevel(algo);
     });
@@ -918,6 +995,9 @@ CpuId::getSupportedArchLevels()
     CpuArchLevel              maxLevel = getCachedArchLevel();
 
     switch (maxLevel) {
+        case CpuArchLevel::eZen5:
+            levels.push_back(CpuArchLevel::eZen5);
+            [[fallthrough]];
         case CpuArchLevel::eZen4:
             levels.push_back(CpuArchLevel::eZen4);
             [[fallthrough]];

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -60,6 +60,10 @@ checkAVX512Support()
     printBoolMsg("AVX512F", CpuId::cpuHasAvx512f());
     printBoolMsg("AVX512BW", CpuId::cpuHasAvx512bw());
     printBoolMsg("AVX512DQ", CpuId::cpuHasAvx512dq());
+    printBoolMsg("AVX512IFMA", CpuId::cpuHasAvx512ifma());
+    printBoolMsg("AVX512VL", CpuId::cpuHasAvx512vl());
+    printBoolMsg("AVX512_VP2INTERSECT",
+                 CpuId::cpuHasAvx512VP2Intersect());
 }
 
 void
@@ -107,14 +111,20 @@ checkBmi2Support()
 }
 
 void
-checkAMDSupport()
+checkVendorAndMicroarch()
 {
-    std::cout << "======AMD FLAGS SUPPORT=======" << std::endl;
-    printBoolMsg("AMD",  CpuId::cpuIsAmd());
+    std::cout << "======CPU VENDOR=======" << std::endl;
+    printBoolMsg("AMD", CpuId::cpuIsAmd());
+
+    std::cout << "======MICRO-ARCHITECTURE (AMD)=======" << std::endl;
+    printBoolMsg("ZEN1", CpuId::cpuIsZen1());
+    printBoolMsg("ZEN2", CpuId::cpuIsZen2());
     printBoolMsg("ZEN3", CpuId::cpuIsZen3());
     printBoolMsg("ZEN4", CpuId::cpuIsZen4());
     printBoolMsg("ZEN5", CpuId::cpuIsZen5());
-    printBoolMsg("ZEN_BASELINE (ADX+AVX2+BMI2)",
+
+    std::cout << "======ISA FEATURE GROUPS=======" << std::endl;
+    printBoolMsg("BASELINE (ADX+AVX2+BMI2)",
                  CpuId::cpuHasAdx() && CpuId::cpuHasAvx2()
                      && CpuId::cpuHasBmi2());
     printBoolMsg("AVX512_BASE (F+DQ+BW)", CpuId::cpuHasAvx512Base());
@@ -124,24 +134,6 @@ checkAMDSupport()
                      && CpuId::cpuHasAvx512(Avx512Flags::AVX512_BW)
                      && CpuId::cpuHasAvx512(Avx512Flags::AVX512_IFMA)
                      && CpuId::cpuHasAvx512(Avx512Flags::AVX512_VL));
-}
-
-std::string
-archLevelToString(alcp::utils::CpuArchLevel archLevel)
-{
-    using alcp::utils::CpuArchLevel;
-    switch (archLevel) {
-        case CpuArchLevel::eReference:
-            return "Reference";
-        case CpuArchLevel::eZen:
-            return "Zen/Zen2";
-        case CpuArchLevel::eZen3:
-            return "Zen3";
-        case CpuArchLevel::eZen4:
-            return "Zen4/Zen5";
-        default:
-            return "Unknown";
-    }
 }
 
 void
@@ -154,35 +146,35 @@ checkArchLevel()
     std::cout << "======DEFAULT ARCH LEVEL (Backward Compatible)======="
               << std::endl;
     CpuArchLevel defaultArch = CpuId::getCachedArchLevel();
-    std::cout << "\tDefault: " << archLevelToString(defaultArch) << std::endl;
+    std::cout << "\tDefault: " << alcp::utils::CpuArchLevelToString(defaultArch) << std::endl;
 
     std::cout << "======PER-ALGORITHM ARCH LEVELS=======" << std::endl;
     std::cout << "\tCipher:   "
-              << archLevelToString(
+              << alcp::utils::CpuArchLevelToString(
                      CpuId::getCachedArchLevel(AlgorithmType::eCipher))
               << std::endl;
     std::cout << "\tRSA:      "
-              << archLevelToString(
+              << alcp::utils::CpuArchLevelToString(
                      CpuId::getCachedArchLevel(AlgorithmType::eRsa))
               << std::endl;
     std::cout << "\tPoly1305: "
-              << archLevelToString(
+              << alcp::utils::CpuArchLevelToString(
                      CpuId::getCachedArchLevel(AlgorithmType::ePoly1305))
               << std::endl;
     std::cout << "\tX25519:   "
-              << archLevelToString(
+              << alcp::utils::CpuArchLevelToString(
                      CpuId::getCachedArchLevel(AlgorithmType::eX25519))
               << std::endl;
     std::cout << "\tSHA2-256: "
-              << archLevelToString(
+              << alcp::utils::CpuArchLevelToString(
                      CpuId::getCachedArchLevel(AlgorithmType::eSha2_256))
               << std::endl;
     std::cout << "\tSHA2-512: "
-              << archLevelToString(
+              << alcp::utils::CpuArchLevelToString(
                      CpuId::getCachedArchLevel(AlgorithmType::eSha2_512))
               << std::endl;
     std::cout << "\tSHA3:     "
-              << archLevelToString(
+              << alcp::utils::CpuArchLevelToString(
                      CpuId::getCachedArchLevel(AlgorithmType::eSha3))
               << std::endl;
 
@@ -196,7 +188,7 @@ int
 main()
 {
     checkArchLevel();
-    checkAMDSupport();
+    checkVendorAndMicroarch();
     checkAESSupport();
     checkSHASupport();
     checkRandSupport();

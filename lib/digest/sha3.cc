@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -134,16 +134,23 @@ Sha3<digest_len>::squeezeChunk(Uint8* pBuf, Uint64 size)
         CpuId::getCachedArchLevel(AlgorithmType::eSha3);
 
     switch (archLevel) {
-        case CpuArchLevel::eZen4:
+        case CpuArchLevel::eZen5:
 #ifdef COMPILER_IS_CLANG
-            // Only Zen5 + Clang uses zen3 kernel for better performance
-            // This is an unusual exception. Using CpuId based zen detection. 
-            // Must update this if any other usecase arise that cant' be handled like this.
-            if (CpuId::cpuIsZen5()) {
-                return zen3::Sha3Finalize(
-                    (Uint8*)m_state_flat, pBuf, size, m_block_len, m_shake_index);
-            }
+            // Zen5 + Clang uses zen3 kernel for better performance
+            return zen3::Sha3Finalize(
+                (Uint8*)m_state_flat, pBuf, size, m_block_len, m_shake_index);
+#else
+            // Non-Clang Zen5 uses zen4 kernel
+            return zen4::Sha3Finalize((Uint8*)m_state_flat,
+                                      pBuf,
+                                      size,
+                                      m_block_len,
+                                      m_shake_index,
+                                      cRoundConstantsIota,
+                                      cRotationConstants,
+                                      cRotationConstantsHarmonize);
 #endif
+        case CpuArchLevel::eZen4:
             return zen4::Sha3Finalize((Uint8*)m_state_flat,
                                       pBuf,
                                       size,
@@ -200,16 +207,22 @@ Sha3<digest_len>::processChunk(const Uint8* pSrc, Uint64 len)
         CpuId::getCachedArchLevel(AlgorithmType::eSha3);
 
     switch (archLevel) {
-        case CpuArchLevel::eZen4:
+        case CpuArchLevel::eZen5:
 #ifdef COMPILER_IS_CLANG
-            // Only Zen5 + Clang uses zen3 kernel for better performance
-            // This is an unusual exception. Using CpuId based zen detection. 
-            // Must update this if any other usecase arise that cant' be handled like this.
-            if (CpuId::cpuIsZen5()) {
-                return zen3::Sha3Update(
-                    m_state_flat, p_msg_buffer64, msg_size, m_block_len);
-            }
+            // Zen5 + Clang uses zen3 kernel for better performance
+            return zen3::Sha3Update(
+                m_state_flat, p_msg_buffer64, msg_size, m_block_len);
+#else
+            // Non-Clang Zen5 uses zen4 kernel
+            return zen4::Sha3Update(m_state_flat,
+                                    p_msg_buffer64,
+                                    msg_size,
+                                    m_block_len,
+                                    cRoundConstantsIota,
+                                    cRotationConstants,
+                                    cRotationConstantsHarmonize);
 #endif
+        case CpuArchLevel::eZen4:
             return zen4::Sha3Update(m_state_flat,
                                     p_msg_buffer64,
                                     msg_size,

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -144,6 +144,8 @@ Poly1305Builder::build(Context* ctx)
     CpuArchLevel archLevel = getCpuArchLevel();
     /* In the interst of Preventing VTable overheads, Interface is not used. */
     switch (archLevel) {
+        case CpuArchLevel::eZen5:
+            [[fallthrough]];
         case CpuArchLevel::eZen4:
             return __build_poly1305_arch<CpuArchLevel::eZen4>(ctx);
         case CpuArchLevel::eZen3:

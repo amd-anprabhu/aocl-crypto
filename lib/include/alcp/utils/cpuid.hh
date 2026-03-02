@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -38,10 +38,12 @@
 namespace alcp::utils {
 
 /**
- * @brief Unified CPU architecture level for dispatch
+ * @brief Unified CPU architecture level for ISA-based dispatch
  *
- * Maps to AMD Zen generations with increasing capability levels.
- * Used as template parameter for all algorithm dispatching.
+ * Levels are defined by ISA feature sets and apply to any x86-64 CPU
+ * (AMD or Intel) that supports the required instructions.  The names
+ * use AMD Zen generations as shorthand because the library was first
+ * optimized for those parts, but dispatch is purely ISA-driven.
  *
  * For cipher dispatch:
  *   - eReference: No SIMD optimizations
@@ -52,11 +54,33 @@ namespace alcp::utils {
 enum class CpuArchLevel
 {
     eReference = 0, // Fallback, no SIMD optimizations
-    eZen       = 1, // Zen1/Zen2: ADX, AVX2, BMI2, AESNI, SSE3
-    eZen3      = 2, // Zen3: adds VAES (256-bit)
-    eZen4      = 3, // Zen4/Zen5: adds AVX512, VAES512, IFMA
-    eDynamic   = 4, // Runtime dispatch (default)
+    eZen       = 1, // ISA: ADX, AVX2, BMI2, AESNI, SSE3
+    eZen3      = 2, // ISA: adds VAES (256-bit)
+    eZen4      = 3, // ISA: adds AVX512 (F/DQ/BW/IFMA/VL), VAES512
+    eZen5      = 4, // ISA: adds AVX512_VP2INTERSECT
+    eDynamic   = 5, // Runtime dispatch (default)
 };
+
+inline const char*
+CpuArchLevelToString(CpuArchLevel level)
+{
+    switch (level) {
+        case CpuArchLevel::eZen5:
+            return "Zen5";
+        case CpuArchLevel::eZen4:
+            return "Zen4";
+        case CpuArchLevel::eZen3:
+            return "Zen3";
+        case CpuArchLevel::eZen:
+            return "Zen/Zen2";
+        case CpuArchLevel::eReference:
+            return "Reference";
+        case CpuArchLevel::eDynamic:
+            return "Dynamic";
+        default:
+            return "Unknown";
+    }
+}
 
 /**
  * @brief CPU capabilities that are orthogonal to architecture level
@@ -211,6 +235,7 @@ class ALCP_API_EXPORT CpuId
     static bool cpuHasAvx512bw();
     static bool cpuHasAvx512ifma();
     static bool cpuHasAvx512vl();
+    static bool cpuHasAvx512VP2Intersect();
     static bool cpuHasAvx512(Avx512Flags flag);
 
     // VAES/AESNI
@@ -268,10 +293,7 @@ class ALCP_API_EXPORT CpuId
      */
     static bool cpuIsZen5();
     /**
-     * @brief Returns true if currently executing cpu is an AMD CPU
-     *
-     * @return true
-     * @return false
+     * @brief Returns true if the CPU vendor is AMD
      */
     static bool cpuIsAmd();
 
