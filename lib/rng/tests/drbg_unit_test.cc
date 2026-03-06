@@ -50,6 +50,8 @@ using namespace alcp;
 void
 DebugPrintPretty(std::vector<Uint8>& output)
 {
+    std::ios old_state(nullptr);
+    old_state.copyfmt(std::cout);
     std::cout << "{";
     for (size_t i = 0; i < output.size(); i++) {
         std::cout << "0x" << std::hex << std::setfill('0') << std::setw(2)
@@ -62,6 +64,7 @@ DebugPrintPretty(std::vector<Uint8>& output)
         }
     }
     std::cout << "}" << std::endl;
+    std::cout.copyfmt(old_state);
 }
 #else
 void

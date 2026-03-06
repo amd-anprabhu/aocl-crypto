@@ -239,6 +239,9 @@ ChaChPolyT<arch>::setAad(const Uint8* pInput, Uint64 len)
     if (pInput == nullptr && len > 0) {
         return ALC_ERROR_INVALID_ARG;
     }
+    if (pInput == nullptr) {
+        return ALC_ERROR_NONE;
+    }
     alc_error_t err = Poly1305<utils::CpuArchLevel::eDynamic>::update(pInput, len);
     if (err != ALC_ERROR_NONE) {
         return err;
