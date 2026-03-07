@@ -224,9 +224,10 @@ DecryptCfbKernel(const Uint8* pSrc,
     }
 
 #ifdef AES_MULTI_UPDATE
-    // Store nth ciphertext to iv
-    alcp_storeu_128(reinterpret_cast<__m512i*>(pIv),
-                    alcp_loadu_128(((const __m512i*)(pa_128 - 1))));
+    if (len >= Rijndael::cBlockSize) {
+        alcp_storeu_128(reinterpret_cast<__m512i*>(pIv),
+                        alcp_loadu_128(((const __m512i*)(pa_128 - 1))));
+    }
 #endif
 
     // clear all keys in registers.

@@ -193,9 +193,10 @@ alc_error_t inline DecryptCfbKernel(
     }
 
 #ifdef AES_MULTI_UPDATE
-    // Load last CT from cache
-    alcp_storeu_128(reinterpret_cast<__m256i*>(pIv),
-                    alcp_loadu_128(reinterpret_cast<__m256i*>(p_ct128 - 1)));
+    if (len >= Rijndael::cBlockSize) {
+        alcp_storeu_128(reinterpret_cast<__m256i*>(pIv),
+                        alcp_loadu_128(reinterpret_cast<__m256i*>(p_ct128 - 1)));
+    }
 #endif
 
     return err;

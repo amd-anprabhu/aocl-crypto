@@ -133,10 +133,10 @@ namespace aesni {
         }
 
 #ifdef AES_MULTI_UPDATE
-        // IV is no longer needed hence we can write the old ciphertext back to
-        // IV
-        alcp_storeu_128(reinterpret_cast<__m128i*>(pIv),
-                        alcp_loadu_128(p_src128 - 1));
+        if (len >= Rijndael::cBlockSize) {
+            alcp_storeu_128(reinterpret_cast<__m128i*>(pIv),
+                            alcp_loadu_128(p_src128 - 1));
+        }
 #endif
 
         assert(blocks == 0);
