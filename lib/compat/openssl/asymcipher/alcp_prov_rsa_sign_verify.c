@@ -94,6 +94,9 @@ typedef struct
     Rsa*          rsa;
     int           operation;
 
+#if OPENSSL_VERSION_MAJOR >= 3 && OPENSSL_VERSION_MINOR >= 5
+    unsigned int flag_sigalg : 1;
+#endif
     /*
      * Flag to determine if the hash function can be changed (1) or not (0)
      * Because it's dangerous to change during a DigestSign or DigestVerify
@@ -102,6 +105,11 @@ typedef struct
      */
     unsigned int flag_allow_md : 1;
     unsigned int mgf1_md_set   : 1;
+#if OPENSSL_VERSION_MAJOR >= 3 && OPENSSL_VERSION_MINOR >= 5
+    unsigned int flag_allow_update : 1;
+    unsigned int flag_allow_final : 1;
+    unsigned int flag_allow_oneshot : 1;
+#endif
 
     /* main digest */
     EVP_MD*     md;
@@ -119,6 +127,12 @@ typedef struct
     int saltlen;
     /* Minimum salt length or -1 if no PSS parameter restriction */
     int min_saltlen;
+
+#if OPENSSL_VERSION_MAJOR >= 3 && OPENSSL_VERSION_MINOR >= 5
+    /* Signature, for verification */
+    unsigned char* sig;
+    size_t         siglen;
+#endif
 
     /* Temp buffer */
     unsigned char* tbuf;
@@ -251,7 +265,7 @@ alcp_rsa_signverify_init(void*            vprsactx,
     if ((EVP_PKEY_OP_SIGN == operation)
         && (rsa->dmp1 == NULL || rsa->dmq1 == NULL || rsa->iqmp == NULL)) {
         prsactx->crt_disabled = 1;
-        return 0;
+        return ret;
     } else {
         prsactx->crt_disabled = 0;
     }    
@@ -533,7 +547,7 @@ alcp_prov_rsa_verify(void*                vprsactx,
     size_t rsasize = prsactx->rsa_size;
     ENTER();
     if (rsasize != 256 || prsactx->crt_disabled
-        || prsactx->ossl_rsa_ctx->pad_mode == RSA_X931_PADDING || prsactx->ossl_rsa_ctx->pad_mode == RSA_PKCS1_PSS_PADDING) {
+        || prsactx->ossl_rsa_ctx->pad_mode == RSA_X931_PADDING) {
         typedef int (*fun_ptr)(void*                vprsactx,
                                const unsigned char* sig,
                                size_t               siglen,
@@ -650,8 +664,6 @@ alcp_prov_rsa_digest_sign_init(void*            vprsactx,
                                const OSSL_PARAM params[])
 {
     alc_prov_rsa_ctx* prsactx = (alc_prov_rsa_ctx*)vprsactx;
-    int rsasize = prsactx->rsa_size;
-    if (rsasize != 256) {
     typedef int (*fun_ptr)(void*            vprsactx,
                            const char*      mdname,
                            void*            vrsa,
@@ -662,15 +674,20 @@ alcp_prov_rsa_digest_sign_init(void*            vprsactx,
         return 0;
 
     int ret = fun(prsactx->ossl_rsa_ctx, mdname, vrsa, params);
-    EXIT();
-    return ret;
-    }
+    if (ret <= 0)
+        return ret;
+
     Rsa* rsa          = prsactx->ossl_rsa_ctx->rsa;
     prsactx->rsa_size = alcp_rsa_size(rsa);
 
+    if (prsactx->rsa_size != 256) {
+        EXIT();
+        return ret;   /* fall through to default for other key sizes */
+    }
+
     if (rsa->dmp1 == NULL || rsa->dmq1 == NULL || rsa->iqmp == NULL) {
         prsactx->crt_disabled = 1;
-        return 0;
+        return ret;
     } else {
         prsactx->crt_disabled = 0;
     }
@@ -717,7 +734,8 @@ alcp_prov_rsa_digest_sign_final(void*          vprsactx,
     if (prsactx == NULL)
         return 0;
     int rsasize = prsactx->rsa_size;
-    if (rsasize != 256) {
+    if (rsasize != 256 || prsactx->crt_disabled || sig == NULL
+        || prsactx->ossl_rsa_ctx->pad_mode == RSA_X931_PADDING) {
         typedef int (*fun_ptr)(
             void* vprsactx, unsigned char* sig, size_t* siglen, size_t sigsize);
         fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL);
@@ -735,15 +753,13 @@ alcp_prov_rsa_digest_sign_final(void*          vprsactx,
     if (prsactx->ossl_rsa_ctx->mdctx == NULL)
         return 0;
 
-    if (sig != NULL) {
-        /*
-         * The digests used here are all known (see rsa_get_md_nid()), so
-         * they should not exceed the internal buffer size of
-         * EVP_MAX_MD_SIZE.
-         */
-        if (!EVP_DigestFinal_ex(prsactx->ossl_rsa_ctx->mdctx, digest, &dlen))
-            return 0;
-    }
+    /*
+     * The digests used here are all known (see rsa_get_md_nid()), so
+     * they should not exceed the internal buffer size of
+     * EVP_MAX_MD_SIZE.
+     */
+    if (!EVP_DigestFinal_ex(prsactx->ossl_rsa_ctx->mdctx, digest, &dlen))
+        return 0;
 
     int ret = alcp_prov_rsa_sign(
         vprsactx, sig, siglen, sigsize, digest, (size_t)dlen);
@@ -815,7 +831,7 @@ alcp_prov_rsa_digest_verify_final(void*                vprsactx,
         return 0;
 
     size_t rsasize = prsactx->rsa_size;
-    if (rsasize != 256 || prsactx->ossl_rsa_ctx->pad_mode == RSA_X931_PADDING || prsactx->ossl_rsa_ctx->pad_mode == RSA_PKCS1_PSS_PADDING) {
+    if (rsasize != 256 || prsactx->ossl_rsa_ctx->pad_mode == RSA_X931_PADDING) {
         typedef int (*fun_ptr)(
             void* vprsactx, const unsigned char* sig, size_t siglen);
         fun_ptr fun = (fun_ptr)get_dispatch_function(OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_FINAL);
