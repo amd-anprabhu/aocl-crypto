@@ -47,8 +47,8 @@ ADD_LIBRARY(arch_zen3
 	${ZEN3_SRCS})
 
 # FIXME: temporarily suppressing this. Known issue with gcc14
-if(CMAKE_COMPILER_IS_GCC AND CMAKE_COMPILER_GCC_VERSION MATCHES "14")
-	MESSAGE(WARNING "GCC14: Disabling array out of bounds checks (-Wno-array-bounds) for zen3 sources")
+if(CMAKE_COMPILER_IS_GCC AND CMAKE_COMPILER_GCC_VERSION VERSION_GREATER_EQUAL "14")
+	MESSAGE(WARNING "GCC${CMAKE_COMPILER_GCC_VERSION}: Disabling array out of bounds checks (-Wno-array-bounds) for zen3 sources")
 	TARGET_COMPILE_OPTIONS(arch_zen3 PRIVATE "-Wno-array-bounds")
 endif()
 
