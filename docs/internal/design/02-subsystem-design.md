@@ -292,6 +292,15 @@ non-blocking `/dev/urandom` which returns immediately, providing
 cryptographical randomness. In theory `/dev/random` should produce
 data that is statistically close to pure entropy,
 
+On Windows, the library uses the BCrypt (CNG) API via `BCryptGenRandom` with
+`ProcessPrng` from `bcryptprimitives.dll` as the primary entropy source when
+available (Windows 10 20H1+). `ProcessPrng` is the lowest-level user-mode RNG
+entry point and avoids the dispatch overhead of higher-level APIs. The function
+pointer is resolved once at runtime via `GetModuleHandleW`/`GetProcAddress`
+(the DLL is always loaded by the OS). When `ProcessPrng` is not available, the
+library falls back to `BCryptGenRandom` with `BCRYPT_USE_SYSTEM_PREFERRED_RNG`,
+a stateless single-call CNG API available since Windows Vista.
+
 Also the traditional `rand()` and `random()` standard library calls does not
 output high-entropy data.
 

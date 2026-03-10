@@ -29,64 +29,61 @@
 #include <cstdlib>
 
 #include "system_rng.hh"
-// Enable debug for debugging the code
-// #define DEBUG
 
 namespace alcp::rng {
 
 #if defined(__linux__)
-#include <fcntl.h>
-#include <unistd.h>
-#define ALCP_CONFIG_OS_HAS_DEVRANDOM 1
+#include <sys/random.h>
+#define ALCP_CONFIG_OS_HAS_GETRANDOM 1
 #elif defined(_WIN32)
-// Keep it above other headers
 #include <windows.h>
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <wincrypt.h>
-#define ALCP_CONFIG_OS_HAS_GETRANDOM 1
+#include <bcrypt.h>
+#define ALCP_CONFIG_OS_HAS_BCRYPT_RNG 1
+
 #else
 #include <sys/random.h>
 #define ALCP_CONFIG_OS_HAS_GETRANDOM 1
 #endif
 
-#if defined(ALCP_CONFIG_OS_HAS_DEVRANDOM)
+#if defined(ALCP_CONFIG_OS_HAS_BCRYPT_RNG)
 
 class SystemRngImpl
 {
   private:
+    using ProcessPrngFn = BOOL(WINAPI*)(PBYTE, SIZE_T);
+
+    static ProcessPrngFn resolveProcessPrng()
+    {
+        HMODULE       hMod         = GetModuleHandleW(L"bcryptprimitives.dll");
+        ProcessPrngFn pProcessPrng = nullptr;
+        if (hMod) {
+            pProcessPrng = reinterpret_cast<ProcessPrngFn>(
+                reinterpret_cast<void*>(GetProcAddress(hMod, "ProcessPrng")));
+        }
+#ifdef ALCP_ENABLE_DEBUG_LOGGING
+    ALCP_DEBUG_LOG(LOG_DBG, "ProcessPrng check: %d", !!pProcessPrng);
+#endif
+        return pProcessPrng;
+    }
+
   public:
-    SystemRngImpl() {}
-
-    ~SystemRngImpl() {}
-
     static alc_error_t randomize(Uint8 output[], size_t length)
     {
-#ifdef DEBUG
-        printf("Engine system_randomize_devrandom\n");
-#endif
-        static int m_fd = -1;
-        size_t     out  = 0;
+        static const ProcessPrngFn pProcessPrng = resolveProcessPrng();
 
-        if (m_fd < 0) {
-            m_fd = open("/dev/urandom", O_RDONLY | O_NOCTTY);
-            if (m_fd < 0) {
-                // Not Permitted
-                return ALC_ERROR_NOT_PERMITTED;
+        if (pProcessPrng) {
+            if (pProcessPrng(reinterpret_cast<PBYTE>(output),
+                             static_cast<SIZE_T>(length))) {
+                return ALC_ERROR_NONE;
             }
         }
 
-        for (int i = 0; i < 10; i++) {
-            if (out < length) {
-                auto delta = length - out;
-                out += read(m_fd, &output[out], delta);
-            } else {
-                break;
-            }
-        }
-        if (out != length) { // not enough entropy , throw here,
+        NTSTATUS status = BCryptGenRandom(NULL,
+                                          reinterpret_cast<PUCHAR>(output),
+                                          static_cast<ULONG>(length),
+                                          BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+        if (!BCRYPT_SUCCESS(status)) {
             return ALC_ERROR_NO_ENTROPY;
         }
         return ALC_ERROR_NONE;
@@ -101,10 +98,6 @@ class SystemRngImpl
     static alc_error_t randomize(Uint8 output[], size_t length)
     {
         alc_error_t err = ALC_ERROR_NONE;
-#ifdef DEBUG
-        printf("Engine system_randomize_getrandom\n");
-#endif
-#ifndef WIN32
         const int flag = 0;
         size_t    out  = getrandom(&output[0], length, flag);
 
@@ -117,40 +110,15 @@ class SystemRngImpl
             }
         }
 
-        if (out != length) { // not enough entropy , throw here,
+        if (out != length) {
             return ALC_ERROR_NO_ENTROPY;
         }
-#else
-        /*
-        CryptGenRandom function in windows generate cryptographically secure RNG
-        using Software & hardware based sources of entropy(Cpu's hardware
-        RNG,disk activity, input timing, system clock, process ID etc). This
-        type of entropies used to seed the Cryptographic RNG, to generate secure
-        random buffer of bytes.
-        */
-
-        HCRYPTPROV hCryptSProv;
-        if (!CryptAcquireContext(
-                &hCryptSProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
-            printf("CSP context not acquired. \n");
-            return ALC_ERROR_GENERIC;
-        }
-        if (CryptGenRandom(
-                hCryptSProv, length, reinterpret_cast<BYTE*>(output))) {
-        } else {
-            // No Entropy Source
-            return ALC_ERROR_NO_ENTROPY;
-        }
-
-        if (hCryptSProv)
-            CryptReleaseContext(hCryptSProv, 0);
-
-#endif
         return err;
     }
 };
 
 #endif
+
 class ISeeder;
 
 SystemRng::SystemRng()

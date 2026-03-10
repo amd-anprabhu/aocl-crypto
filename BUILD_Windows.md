@@ -178,6 +178,10 @@ These are flags to enable/disable optional features as required.
 3. To Enable CCM multi update feature append flag `-DALCP_ENABLE_CCM_MULTI_UPDATE=ON` to build flags. 
 4. To Enable OFB multi update feature append flag `-DALCP_ENABLE_OFB_MULTI_UPDATE=ON` to build flags.
 
+### System RNG
+
+On Windows, AOCL-Cryptography uses `ProcessPrng` (from `bcryptprimitives.dll`) for system random number generation when available (Windows 10 20H1+). On older Windows versions, it automatically falls back to `BCryptGenRandom` (CNG API, available since Windows Vista). The fallback is resolved once at runtime with no per-call overhead. Linking against `bcrypt.lib` is handled automatically by CMake.
+
 ### Enabling compat libs
 
 1. [Enable OpenSSL - To compare performance .](#building-openssl-compatibility-libs)
