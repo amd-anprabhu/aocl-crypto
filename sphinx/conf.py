@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2025, Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2023-2026, Advanced Micro Devices, Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -33,7 +33,7 @@ expected_rocm_version = "1.0.0"
 
 # Project information 
 project = 'AOCL-Cryptography'
-copyright = ' 2025, Advanced Micro Devices, Inc'
+copyright = ' 2026, Advanced Micro Devices, Inc'
 author = 'Advanced Micro Devices, Inc'
 version = 'Version @AOCL_RELEASE_VERSION@'
 
@@ -57,6 +57,7 @@ master_doc = 'index'
 # They can be extensions coming with Sphinx (named 'sphinx.ext.*') or
 # your custom ones.
 extensions = ['breathe', 'myst_parser', 'sphinx.ext.mathjax']
+breathe_show_include = False
 myst_enable_extensions = ["html_admonition", 
                         "linkify", 
                         "attrs_inline"

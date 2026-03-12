@@ -1,6 +1,6 @@
 Digest
 **********
-A digest is a one way cryptographic function by which a message of any length can be mapped into a fixed-length output. It can be used for verifying integrity or passwords.
+A digest is a one-way cryptographic function by which a message of any length can be mapped into a fixed-length output. It can be used for verifying integrity or passwords.
 
 ----
 
@@ -29,16 +29,25 @@ Functions
    :project: crypto
 .. doxygenfunction:: alcp_digest_shake_squeeze
    :project: crypto
+.. doxygenfunction:: alcp_digest_flush
+   :project: crypto
+.. doxygenfunction:: alcp_digest_dequeue
+   :project: crypto
    
 ----
 
-Variables
----------
-.. doxygenvariable:: alc_digest_len_t
+Enumerations
+------------
+.. doxygenenum:: alc_digest_len
    :project: crypto
-.. doxygenvariable:: alc_digest_mode_t
+.. doxygenenum:: alc_digest_mode
    :project: crypto
+.. doxygenenum:: alc_digest_block_size
+   :project: crypto
+
+----
+
+Type Definitions
+----------------
 .. doxygenvariable:: alc_digest_context_t
-   :project: crypto
-.. doxygenvariable:: alc_digest_block_size_t
    :project: crypto

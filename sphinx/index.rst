@@ -32,6 +32,8 @@ Encrypt/Decrypt routines for the following cipher schemes:
 
 3. Chacha20-Poly1305 AEAD
 
+- Multibuffer support for CBC and CFB with variable-length buffer sizes
+
 **Digest**
 
 
@@ -39,6 +41,8 @@ Encrypt/Decrypt routines for the following cipher schemes:
 
 - SHA2_224, SHA2_256, SHA2_384, SHA2_512
 - SHA2_512_224, SHA2_512_256
+
+- Multibuffer support for SHA2_224 and SHA2_256
 
 2. SHA3
 
@@ -53,6 +57,8 @@ Encrypt/Decrypt routines for the following cipher schemes:
 - HMAC_SHA2_224, HMAC_SHA2_256, HMAC_SHA2_384, HMAC_SHA2_512
 - HMAC_SHA3_224, HMAC_SHA3_256, HMAC_SHA3_384, HMAC_SHA3_512
 - HMAC_SHA2_512_224, HMAC_SHA2_512_256
+
+- Multibuffer support for HMAC_SHA2_224 and HMAC_SHA2_256
 
 2. CMAC
 

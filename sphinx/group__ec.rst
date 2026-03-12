@@ -32,13 +32,18 @@ Functions
    
 ----
 
-Variables
----------
-.. doxygenvariable:: alc_ec_curve_id
+Enumerations
+------------
+.. doxygenenum:: alc_ec_curve_id
    :project: crypto
-.. doxygenvariable:: alc_ec_curve_type
+.. doxygenenum:: alc_ec_curve_type
    :project: crypto
-.. doxygenvariable:: alc_ec_point_format_id
+.. doxygenenum:: alc_ec_point_format_id
    :project: crypto
+
+----
+
+Type Definitions
+----------------
 .. doxygenvariable:: alc_ec_context_t
    :project: crypto

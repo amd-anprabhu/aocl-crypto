@@ -1,6 +1,6 @@
 Cipher
 **********
-Cipher is a cryptographic technique used to secure information by transforming message into a cryptic form that can only be read by those with the key to decipher it.
+Cipher is a cryptographic technique used to secure information by transforming a message into a cryptic form that can only be read by those with the key to decipher it.
 
 ----
 
@@ -13,25 +13,29 @@ Data Structures
 
 Functions
 ---------
+
+Core Cipher
+^^^^^^^^^^^
 .. doxygenfunction:: alcp_cipher_context_size
    :project: crypto
 .. doxygenfunction:: alcp_cipher_request
    :project: crypto
 .. doxygenfunction:: alcp_cipher_init
    :project: crypto
-.. doxygenfunction:: alcp_multibuffer_init
-   :project: crypto
 .. doxygenfunction:: alcp_cipher_encrypt
    :project: crypto
 .. doxygenfunction:: alcp_cipher_decrypt
    :project: crypto
-.. doxygenfunction:: alcp_cipher_finish
-   :project: crypto
 .. doxygenfunction:: alcp_cipher_context_copy
    :project: crypto
-.. doxygenfunction:: alcp_cipher_segment_init
+.. doxygenfunction:: alcp_cipher_finish
    :project: crypto
+
+Segment Cipher (XTS)
+^^^^^^^^^^^^^^^^^^^^
 .. doxygenfunction:: alcp_cipher_segment_request
+   :project: crypto
+.. doxygenfunction:: alcp_cipher_segment_init
    :project: crypto
 .. doxygenfunction:: alcp_cipher_segment_encrypt_xts
    :project: crypto
@@ -39,6 +43,9 @@ Functions
    :project: crypto
 .. doxygenfunction:: alcp_cipher_segment_finish
    :project: crypto
+
+AEAD Cipher
+^^^^^^^^^^^
 .. doxygenfunction:: alcp_cipher_aead_context_size
    :project: crypto
 .. doxygenfunction:: alcp_cipher_aead_request
@@ -47,11 +54,11 @@ Functions
    :project: crypto
 .. doxygenfunction:: alcp_cipher_aead_init
    :project: crypto
+.. doxygenfunction:: alcp_cipher_aead_set_aad
+   :project: crypto
 .. doxygenfunction:: alcp_cipher_aead_encrypt
    :project: crypto
 .. doxygenfunction:: alcp_cipher_aead_decrypt
-   :project: crypto
-.. doxygenfunction:: alcp_cipher_aead_set_aad
    :project: crypto
 .. doxygenfunction:: alcp_cipher_aead_get_tag
    :project: crypto
@@ -61,6 +68,11 @@ Functions
    :project: crypto
 .. doxygenfunction:: alcp_cipher_aead_finish
    :project: crypto
+
+Multi-buffer
+^^^^^^^^^^^^
+.. doxygenfunction:: alcp_multibuffer_init
+   :project: crypto
 .. doxygenfunction:: alcp_flush
    :project: crypto
 .. doxygenfunction:: alcp_dequeue
@@ -68,11 +80,16 @@ Functions
 
 ----
 
-Variables
----------
-.. doxygenvariable:: alc_cipher_mode_t
+Enumerations
+------------
+.. doxygenenum:: alc_cipher_mode
    :project: crypto
-.. doxygenvariable:: alc_key_len_t
+.. doxygenenum:: alc_key_len
    :project: crypto
+
+----
+
+Type Definitions
+----------------
 .. doxygenvariable:: alc_cipher_context_t
    :project: crypto

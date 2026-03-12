@@ -215,8 +215,8 @@ AesGenericCiphersT<mode, keyLenBits, arch>::flush(const Uint8**  pPlainText,
  *                          lengths from prior flush() call)
  * @return ALC_ERROR_NONE on success, error code otherwise
  *
- * @note This function requires AVX512 VAES support. Falls back with ALC_ERROR_NO_FALLBACK
- *       on systems without this capability.
+ * @note This function requires AVX512 VAES support. Falls back to AESNI
+ *       single-buffer path on systems without AVX512.
  * @note Only CBC and CFB modes are currently supported for variable-length multi-buffer.
  */
 template<alcp::cipher::CipherMode       mode,
