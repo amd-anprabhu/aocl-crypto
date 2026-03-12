@@ -9,7 +9,8 @@ This document describes the CPU feature requirements and kernel dispatch logic f
 | **eReference** | 0 | No SIMD optimizations | Fallback only |
 | **eZen** | 1 | AVX2, SSE3, AESNI (+ ADX/BMI2 for some algorithms) | Zen1, Zen2 |
 | **eZen3** | 2 | + VAES (256-bit) | Zen3 |
-| **eZen4** | 3 | + AVX512 (F, DQ, BW, IFMA, VL), VAES512 | Zen4, Zen5 |
+| **eZen4** | 3 | + AVX512 (F, DQ, BW, IFMA, VL), VAES512 | Zen4 |
+| **eZen5** | 4 | + AVX512 VP2INTERSECT | Zen5 |
 
 **Note:** Not all algorithms require all features. See per-algorithm requirements below.
 
@@ -17,15 +18,11 @@ This document describes the CPU feature requirements and kernel dispatch logic f
 
 ### 🔐 AES Cipher (CBC, CTR, GCM, XTS, CFB, OFB, CCM, SIV, ChaCha20)
 
-```
-┌─────────────┬────────────────────────┬─────────────────────────────┐
-│ Arch Level  │ CPU Features           │ Kernel / Implementation     │
-├─────────────┼────────────────────────┼─────────────────────────────┤
-│ eZen        │ AESNI + AVX2           │ aesni::* (128-bit ops)      │
-│ eZen3       │ VAES + AVX2            │ vaes::* (256-bit vectorized)│
-│ eZen4       │ VAES + AVX512(F,DQ,BW,VL)│ vaes512::* (512-bit vector) │
-└─────────────┴────────────────────────┴─────────────────────────────┘
-```
+| Arch Level | CPU Features | Kernel / Implementation |
+|------------|--------------|-------------------------|
+| eZen | AESNI + AVX2 | aesni::* (128-bit ops) |
+| eZen3 | VAES + AVX2 | vaes::* (256-bit vectorized) |
+| eZen4 | VAES + AVX512(F,DQ,BW,VL) | vaes512::* (512-bit vector) |
 
 
 **Dispatch Location:** `lib/cipher/cipher.cc`
@@ -39,15 +36,11 @@ CpuArchLevel arch = CpuId::getCachedArchLevel(AlgorithmType::eCipher);
 
 ### #️⃣ SHA256 / SHA224
 
-```
-┌─────────────┬────────────────────────┬─────────────────────────────┐
-│ Priority    │ CPU Features           │ Kernel / Implementation     │
-├─────────────┼────────────────────────┼─────────────────────────────┤
-│ PRIMARY     │ SHA-NI                 │ shani::ShaUpdate256()       │
-│ FALLBACK    │ AVX2 (disabled)        │ avx2::ShaUpdate256()        │
-│ REFERENCE   │ None                   │ Software implementation     │
-└─────────────┴────────────────────────┴─────────────────────────────┘
-```
+| Priority | CPU Features | Kernel / Implementation |
+|----------|--------------|-------------------------|
+| PRIMARY | SHA-NI | shani::ShaUpdate256() |
+| FALLBACK | AVX2 (disabled) | avx2::ShaUpdate256() |
+| REFERENCE | None | Software implementation |
 
 **Note:** AVX2 fallback is deliberately disabled due to poor performance compared to SHA-NI.
 
@@ -63,16 +56,12 @@ if (shani_available) {
 
 ### #️⃣ SHA512 / SHA384
 
-```
-┌─────────────┬────────────────────────┬─────────────────────────────┐
-│ Arch Level  │ CPU Features           │ Kernel / Implementation     │
-├─────────────┼────────────────────────┼─────────────────────────────┤
-│ eZen        │ AVX2 + SSE3            │ avx2::ShaUpdate512()        │
-│ eZen3       │ AVX2 + VAES            │ zen3::ShaUpdate512()        │
-│ eZen4       │ AVX512(F,DQ,BW,IFMA,VL)│ zen4::ShaUpdate512()        │
-│ Reference   │ None                   │ Software implementation     │
-└─────────────┴────────────────────────┴─────────────────────────────┘
-```
+| Arch Level | CPU Features | Kernel / Implementation |
+|------------|--------------|-------------------------|
+| eZen | AVX2 + SSE3 | avx2::ShaUpdate512() |
+| eZen3 | AVX2 + VAES | zen3::ShaUpdate512() |
+| eZen4 | AVX512(F,DQ,BW,IFMA,VL) | zen4::ShaUpdate512() |
+| Reference | None | Software implementation |
 
 **Note:** For AOCC compiler, Zen4 uses zen3 kernel due to better performance.
 
@@ -91,15 +80,11 @@ switch (archLevel) {
 
 ### 🔑 RSA (1024/2048-bit)
 
-```
-┌─────────────┬────────────────────────┬─────────────────────────────┐
-│ Arch Level  │ CPU Features           │ Kernel / Implementation     │
-├─────────────┼────────────────────────┼─────────────────────────────┤
-│ eZen        │ ADX + BMI2             │ zen::archEncryptPublic<>()  │
-│ eZen3       │ ADX + BMI2             │ zen3::archEncryptPublic<>() │
-│ eZen4       │ ADX + BMI2 + AVX512-IFMA│ zen4::archEncryptPublic<>() │
-└─────────────┴────────────────────────┴─────────────────────────────┘
-```
+| Arch Level | CPU Features | Kernel / Implementation |
+|------------|--------------|-------------------------|
+| eZen | ADX + BMI2 | zen::archEncryptPublic<>() |
+| eZen3 | ADX + BMI2 | zen3::archEncryptPublic<>() |
+| eZen4 | ADX + BMI2 + AVX512-IFMA | zen4::archEncryptPublic<>() |
 
 **Key Sizes:** 1024-bit (KEY_SIZE_1024), 2048-bit (KEY_SIZE_2048)
 
@@ -118,23 +103,29 @@ switch (archLevel) {
 
 ### 🌀 SHA3 / SHAKE (SHA3-224/256/384/512, SHAKE128/256)
 
-```
-┌─────────────┬────────────────────────┬─────────────────────────────┐
-│ Arch Level  │ CPU Features           │ Kernel / Implementation     │
-├─────────────┼────────────────────────┼─────────────────────────────┤
-│ eZen        │ AVX2                   │ zen::Sha3Update()           │
-│ eZen3       │ AVX2 + VAES            │ zen3::Sha3Update()          │
-│ eZen4       │ AVX512(F,DQ,BW,IFMA,VL)│ zen4::Sha3Update()          │
-│ Reference   │ None                   │ Software implementation     │
-└─────────────┴────────────────────────┴─────────────────────────────┘
-```
+| Arch Level | CPU Features | Kernel / Implementation |
+|------------|--------------|-------------------------|
+| eZen | AVX2 | zen::Sha3Update() |
+| eZen3 | AVX2 + VAES | zen3::Sha3Update() |
+| eZen4 | AVX512(F,DQ,BW,IFMA,VL) | zen4::Sha3Update() |
+| eZen5 | AVX512Full + VP2INTERSECT | zen3 (Clang) / zen4 (other) |
+| Reference | None | Software implementation |
 
+**Note:** For Zen5, the kernel selection is compiler-dependent:
+- **Clang**: Uses `zen3::Sha3Update()` for better performance
+- **Other compilers** (GCC, AOCC): Uses `zen4::Sha3Update()`
 
 **Dispatch Location:** `lib/digest/sha3.cc`
 ```cpp
 // Recommended: Use SHA3-specific arch level
 static CpuArchLevel archLevel = CpuId::getCachedArchLevel(AlgorithmType::eSha3);
 switch (archLevel) {
+    case CpuArchLevel::eZen5:
+#ifdef COMPILER_IS_CLANG
+        return zen3::Sha3Update(...);  // Clang: zen3 kernel
+#else
+        return zen4::Sha3Update(...);  // Other: zen4 kernel
+#endif
     case CpuArchLevel::eZen4: return zen4::Sha3Update(...);
     case CpuArchLevel::eZen3: return zen3::Sha3Update(...);
     case CpuArchLevel::eZen:  return zen::Sha3Update(...);
@@ -145,15 +136,11 @@ switch (archLevel) {
 
 ### 🔏 Poly1305 (MAC)
 
-```
-┌─────────────┬────────────────────────┬─────────────────────────────┐
-│ Arch Level  │ CPU Features           │ Kernel / Implementation     │
-├─────────────┼────────────────────────┼─────────────────────────────┤
-│ eZen        │ AVX2                   │ reference::Poly1305Ref()    │
-│ eZen3       │ AVX2                   │ reference::Poly1305Ref()    │
-│ eZen4       │ AVX512(F,DQ,BW,IFMA)   │ zen4::poly1305_*_radix44()  │
-└─────────────┴────────────────────────┴─────────────────────────────┘
-```
+| Arch Level | CPU Features | Kernel / Implementation |
+|------------|--------------|-------------------------|
+| eZen | AVX2 | reference::Poly1305Ref() |
+| eZen3 | AVX2 | reference::Poly1305Ref() |
+| eZen4 | AVX512(F,DQ,BW,IFMA) | zen4::poly1305_*_radix44() |
 
 **Dispatch Condition:** `CpuId::cpuHasAvx512(F,DQ,BW,IFMA)` for Zen4 path
 
@@ -173,15 +160,11 @@ if (archLevel >= CpuArchLevel::eZen4) {
 
 ### 🔐 X25519 (ECDH)
 
-```
-┌─────────────┬────────────────────────┬─────────────────────────────┐
-│ Arch Level  │ CPU Features           │ Kernel / Implementation     │
-├─────────────┼────────────────────────┼─────────────────────────────┤
-│ eZen        │ ADX + BMI2 + AVX2      │ avx2::alcpScalarMulX25519() │
-│ eZen3       │ ADX + BMI2 + AVX2 + VAES│ zen3::alcpScalarMulX25519() │
-│ eZen4       │ AVX512(F,DQ,BW,IFMA,VL)│ zen4::alcpScalarMulX25519() │
-└─────────────┴────────────────────────┴─────────────────────────────┘
-```
+| Arch Level | CPU Features | Kernel / Implementation |
+|------------|--------------|-------------------------|
+| eZen | ADX + BMI2 + AVX2 | avx2::alcpScalarMulX25519() |
+| eZen3 | ADX + BMI2 + AVX2 + VAES | zen3::alcpScalarMulX25519() |
+| eZen4 | AVX512(F,DQ,BW,IFMA,VL) | zen4::alcpScalarMulX25519() |
 
 **Note:** X25519 has different implementations:
 - **Zen4**: Uses `radix51bit` (AVX512)
@@ -236,16 +219,16 @@ CpuArchLevel defaultArch = CpuId::getCachedArchLevel();
 
 ### Per-Algorithm Feature Requirements
 
-| AlgorithmType | eZen Requirements | eZen3 Requirements | eZen4 Requirements |
-|---------------|-------------------|-------------------|-------------------|
-| **eCipher** | AESNI + AVX2 | VAES + AVX2 | AVX512(F,DQ,BW,VL) + VAES |
-| **eRsa** | ADX + BMI2 + AVX2 | ADX + BMI2 + AVX2 | ADX + BMI2 + IFMA |
-| **ePoly1305** | AVX2 | AVX2 | AVX512(F,DQ,BW,IFMA) |
-| **eX25519** | ADX + BMI2 + AVX2 | ADX + BMI2 + AVX2 + VAES | AVX512Full |
-| **eSha2_256** | SHA-NI | SHA-NI | SHA-NI |
-| **eSha2_512** | AVX2 + SSE3 | VAES + AVX2 | AVX512Full |
-| **eSha3** | AVX2 | VAES + AVX2 | AVX512Full |
-| **eDefault** | ADX + BMI2 + AVX2 + AESNI | VAES + ADX + BMI2 + AVX2 | AVX512Full + VAES |
+| AlgorithmType | eZen Requirements | eZen3 Requirements | eZen4 Requirements | eZen5 Requirements |
+|---------------|-------------------|-------------------|-------------------|-------------------|
+| **eCipher** | AESNI + AVX2 | VAES + AVX2 | AVX512(F,DQ,BW,VL) + VAES | AVX512(F,DQ,BW,VL) + VAES |
+| **eRsa** | ADX + BMI2 + AVX2 | ADX + BMI2 + AVX2 | ADX + BMI2 + IFMA | ADX + BMI2 + IFMA |
+| **ePoly1305** | AVX2 | AVX2 | AVX512(F,DQ,BW,IFMA) | AVX512(F,DQ,BW,IFMA) |
+| **eX25519** | ADX + BMI2 + AVX2 | ADX + BMI2 + AVX2 + VAES | AVX512Full | AVX512Full |
+| **eSha2_256** | SHA-NI | SHA-NI | SHA-NI | SHA-NI |
+| **eSha2_512** | AVX2 + SSE3 | VAES + AVX2 | AVX512Full | AVX512Full |
+| **eSha3** | AVX2 | VAES + AVX2 | AVX512Full | AVX512Full + VP2INTERSECT |
+| **eDefault** | ADX + BMI2 + AVX2 + AESNI | VAES + ADX + BMI2 + AVX2 | AVX512Full + VAES | AVX512Full + VAES |
 
 **Key Differences from Blanket Check:**
 - **RSA** requires ADX/BMI2 for big integer arithmetic
@@ -295,16 +278,24 @@ The following flow applies to `AlgorithmType::eDefault` (backward compatible mod
 
 ## Environment Override
 
-Force a specific architecture level at runtime:
+Force a specific architecture level at runtime. This can only **downgrade** the kernel level — setting a higher level on hardware that doesn't support it has no effect (the actual kernel level is still determined by ISA feature detection).
 
 ```bash
-# Force Zen4 kernels
+# Force max Zen4 kernels (disables VP2INTERSECT)
 export AOCL_ENABLE_INSTRUCTION=ZEN4
 
-# Available values: ZEN, ZEN2, ZEN3, ZEN4, ZEN5
+# Available values: ZEN, ZEN1, ZEN2, ZEN3, ZEN4, ZEN5
 ```
 
-**Note:** This can disable higher-level optimizations when running on newer hardware (e.g., force ZEN3 on a Zen4 CPU).
+| Value | Effect |
+|-------|--------|
+| `ZEN` / `ZEN1` | Disables AVX512 and VAES — forces max eZen (Zen1/Zen2) kernel level |
+| `ZEN2` | Same as ZEN/ZEN1 (Zen2 shares the eZen kernel level) |
+| `ZEN3` | Disables AVX512 — forces max eZen3 kernel level (256-bit VAES) |
+| `ZEN4` | Disables VP2INTERSECT — forces max eZen4 kernel level |
+| `ZEN5` | No features disabled — native CPU detection is used (no-op) |
+
+> **Note:** Passing an invalid value will cause the process to exit with an error.
 
 ---
 
@@ -326,4 +317,3 @@ export AOCL_ENABLE_INSTRUCTION=ZEN4
 ## Visual Diagram
 
 See `cpu_feature_kernel_map.svg` for a graphical representation of this mapping.
-

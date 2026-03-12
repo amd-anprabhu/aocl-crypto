@@ -61,7 +61,7 @@ OSSL_provider_init(const OSSL_CORE_HANDLE* core,
 ```
 For more information [click here](https://www.openssl.org/docs/manmaster/man7/provider.html#:~:text=A%20provider%20offers,have%20any%20name.)
 
-<font color=red>Be mindfull about how to terminate each table, if table is not terminalted with proper `NULL`, it can lead to a segfault.</font>
+> **Warning:** Be mindful about how to terminate each table. If the table is not terminated with proper `NULL`, it can lead to a segfault.
 
 Example dispatch table for whole provider
 ```c
@@ -96,7 +96,7 @@ ALCP_query_operation(void* vctx, int operation_id, const int* no_cache)
 }
 ```
 
-This `query_operation` should return another algorithm dispatch table, where we have to specify what dispatch table handles a perticular algorithm.
+This `query_operation` should return another algorithm dispatch table, where we have to specify what dispatch table handles a particular algorithm.
 
 ```c
 #define ALCP_PROV_NAMES_SHA2_224 \

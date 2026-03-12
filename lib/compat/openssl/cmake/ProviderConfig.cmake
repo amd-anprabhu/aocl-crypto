@@ -24,9 +24,9 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 #################### Reasons for disabling some providers ##############################
-# 1. AES-CCM Disabled due to performance limitations                                  ##
-# 2. HMAC Provider disabled due to digests performance limitations                    ##
-# 3. Digest Provider is disabled by default as there is currently a provider overhead ##
+# 1. AES-CCM: Disabled by default due to performance limitations                      ##
+# 2. HMAC: Disabled by default due to digest performance limitations                  ##
+# 3. SHA2 Digest: Disabled by default as there is currently a provider overhead       ##
 ########################################################################################
 
 # generic option to enable debug print in provider

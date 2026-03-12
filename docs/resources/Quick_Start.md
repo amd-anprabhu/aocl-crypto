@@ -155,7 +155,7 @@ quit_if_status_not_zero(){
     fi
 }
 
-# Function to install all packages, OS indipendant (eventually)
+# Function to install all packages, OS independent (eventually)
 ensure_packages(){
     detect_ubuntu 24.04
     if [ $? -eq 0 ]; then
@@ -179,8 +179,8 @@ ensure_packages(){
         echo "Running \"sudo apt install p7zip-full\""
         sudo apt install p7zip-full          # Re-archive static libs
         quit_if_status_not_zero $?
-        echo "Running \"sudo apt install gcc-12 g++-12\""
-        sudo apt install gcc-12 g++-12       # Compiler
+        echo "Running \"sudo apt install gcc-13 g++-13\""
+        sudo apt install gcc-13 g++-13       # Compiler
         quit_if_status_not_zero $?
         return 0
     fi

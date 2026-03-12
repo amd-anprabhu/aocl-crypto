@@ -2,6 +2,18 @@
 
 AOCL-Cryptography uses CMake as a build system generator and supports make and Ninja build systems. This document explains the different build flags which can be used to disable/enable specific features for the project. For a quick start into AOCL-Cryptography, please refer to [AOCL-Cryptography Linux Quick Starter](./docs/resources/Quick_Start.md).
 
+### Prerequisites
+
+The following tools and libraries are required to build AOCL-Cryptography:
+
+- **CMake** 3.26 or later
+- **GCC** 11.3 or later, **or Clang/AOCC** 14.0 or later
+- **OpenSSL** 3.1.3 or later (tested through 3.5.x)
+- **Git** with git-lfs (for KAT test data)
+- **7zip** (`p7zip-full` on Ubuntu) — required for static library creation on Linux
+- **Make** or **Ninja** build system
+- **AOCL-Utils** (recommended, for CPU feature-based dispatch)
+
 #### Build
 `Run from build directory`
 
@@ -51,6 +63,8 @@ To enable AOCL utils checks, append `-DAOCL_UTILS_INSTALL_DIR=path/to/aocl/utils
 $ cmake -DENABLE_AOCL_UTILS=ON -DAOCL_UTILS_INSTALL_DIR=path/to/aocl/utils/source ../
 ```
 ENABLE_AOCL_UTILS is ON by default
+
+For details on per-algorithm CPU feature requirements and kernel dispatch, see [CPU Feature Kernel Map](./docs/cpu_feature_kernel_map.md).
 
 #### Build Debug Configuration
 
@@ -106,7 +120,7 @@ $ ./bench/{algorithm_type}/bench_{algorithm_type}
 #### Arguments can be provided in above bench as
 ```
 $ ./bench/digest/bench_digest --benchmark_filter=SHA2_<SHA SCHEME>_<Block Size>
-$ ./bench/digest/bench_digest --benchmark_filter=SHA2_512_16 (runs SHA256 schemes for 16 block size)
+$ ./bench/digest/bench_digest --benchmark_filter=SHA2_512_16 (runs SHA512 schemes for 16 byte block size)
 $ ./bench/digest/bench_digest --benchmark_filter=SHA2 (runs for all SHA2 schemes and block sizes)
 ```
 

@@ -22,7 +22,7 @@ colorlinks: true
 
 # Introduction
 
-  AOCL-Cryptograpy is an alternative to many cryptographic libraries like openssl, intel's IPP-CP, wolfssl etc. Integrating a new library into an already exisiting application can be difficult. Understanding this difficulty for the developers to switch from already existing libraries, we developed wrappers and providers which will help you integrate your application with AOCL-Cryptograpy in a matter of minutes. If your application is already using ether one of (OpenSSL, IPP-CP), you can use our provider or wrapper to test out the performance delivered by AOCL-Cryptography or even integrate it permanently.
+  AOCL-Cryptography is an alternative to many cryptographic libraries like openssl, intel's IPP-CP, wolfssl etc. Integrating a new library into an already existing application can be difficult. Understanding this difficulty for the developers to switch from already existing libraries, we developed wrappers and providers which will help you integrate your application with AOCL-Cryptography in a matter of minutes. If your application is already using either one of (OpenSSL, IPP-CP), you can use our provider or wrapper to test out the performance delivered by AOCL-Cryptography or even integrate it permanently.
 
   Using AOCL-Crypto's Native API is better than using Providers or Wrappers as there are some performance overheads associated with them. Our suggested workflow is to get stated with the Providers or Wrapper interfaces, once convinced with the performance, dedicate effort to move to native API.
 
@@ -41,7 +41,7 @@ colorlinks: true
   Please continue reading [Getting Started](#getting-started)
 
 ### Already Existing Application
-  If you trying to integrate with already exisiting application, it will take time for you to change from your current library provider to AOCL-Cryptography in one go. Hence we recommend you to use OpenSSL provider (if already using OpenSSL) or (IPP Provider), then rewrite the parts of your code step by step slowly until you replace the dependency with OpenSSL or IPP.
+  If you are trying to integrate with an already existing application, it will take time for you to change from your current library provider to AOCL-Cryptography in one go. Hence we recommend you to use OpenSSL provider (if already using OpenSSL) or (IPP Provider), then rewrite the parts of your code step by step slowly until you replace the dependency with OpenSSL or IPP.
 
 #### OpenSSL 3.x Based Application
   Application based on OpenSSL can easily use AOCL-Crypto by configuring it to use the provider. AOCL-Crypto's OpenSSL provider documentation found [here](https://amd.github.io/aocl-crypto/crypto/html/openssl_README.html), will provide the necessary steps to configure openssl provider for your application. Taking each module, removing OpenSSL code, and replacing with AOCL-Crypto API will allow you to slowly migrate to AOCL-Cryptography without too much effort.
@@ -51,7 +51,7 @@ colorlinks: true
 
 
 #### Other library based Application
-  Other Libraries can be a fork of OpenSSL or IPP-CP, in that case the provider or wrapper interface may still work, its not recommended to use provider or wrapper interface in the perticular situation as it may result in undefined behaviour in the cryptographic application and this can cause security vulnerabilities. Some other libraries like libsodium, libsalt, WolfSSL, MbedTLS etc does not have any provider or wrapper implementation.
+  Other Libraries can be a fork of OpenSSL or IPP-CP, in that case the provider or wrapper interface may still work, its not recommended to use provider or wrapper interface in the particular situation as it may result in undefined behaviour in the cryptographic application and this can cause security vulnerabilities. Some other libraries like libsodium, libsalt, WolfSSL, MbedTLS etc does not have any provider or wrapper implementation.
 
   To migrate from Other Library to AOCL-Cryptography, you can slowly phase out the code which which calls the Other Library and replace it with AOCL-Cryptography, one disadvantage of this approach is that only the part you have replaced with AOCL-Crypto API will be using AOCL-Crypto hence there is still a dependency to the depreciated crypto library.
 
@@ -59,7 +59,7 @@ colorlinks: true
 # Getting Started
 
 
-All the examples shown here are available under examples section, if you have recieved a binary tarball or source code, there should be an `examples` directory. In this examples directory there are working examples which you can compile and run.
+All the examples shown here are available under examples section, if you have received a binary tarball or source code, there should be an `examples` directory. In this examples directory there are working examples which you can compile and run.
 
 For a binary tarball you should be able to run `make` command on the root directory to compile the examples.
 
@@ -69,14 +69,14 @@ For more info go to doxygen
 
 Life cycle of any algorithm of AOCL-Crypto is divided into 5 steps.
 
-1. Context Allocation - `alc_<algo>_handle_t handle` contains context `handle.context`, this context is used for storing information internal to AOCL Crypto. You can allocate the context by involking  `handle.context = malloc(alcp_<algo>_context_size(info))`. As this memory is allocated by the application, deallocation has to be handled by the application itself.
+1. Context Allocation - `alc_<algo>_handle_t handle` contains context `handle.context`, this context is used for storing information internal to AOCL Crypto. You can allocate the context by invoking  `handle.context = malloc(alcp_<algo>_context_size(info))`. As this memory is allocated by the application, deallocation has to be handled by the application itself.
 
 2. Request - Requesting a context from AOCL-Crypto will finalize the internal paths required to achieve the requested task.
 Certain APIS also have an API to check for support, `alcp_<algo>_supported(alc_<algo>_info_t)` indicating based on the given info whether the algorithm is supported. You can request by invoking `alcp_<algo>_request(&info,handle)`.
 
 3. Init - Initialise the handle with the input variables depending on the algorithm. For example, for cipher init will take key and iv as input arguments.
 
-4. Core Operation - Core Operations of the algorithm involes feeding in the data required by the algorithm. Each algotithm will have its own core operations.
+4. Core Operation - Core Operations of the algorithm involves feeding in the data required by the algorithm. Each algorithm will have its own core operations.
 
 5. Finish/Finalize - Some algorithms require `finish` and `finalize` but most of them only require `finish`. To `finish` the operation, you can invoke `alcp_<algo>_finish(&handle)`. Once finished the handle is no longer valid and must be destroyed by deallocating context. Optionally you can also write zeros to the context memory.
 
@@ -241,4 +241,3 @@ alcp_cipher_aead_finish(&handle);
 // Deallocate context
 free(handle.context);
 ```
-

@@ -10,7 +10,7 @@ To preload temporarily, one can modify the environment variable LD_PRELOAD. This
 
 LD_PRELOAD can be used for on demand preloading to test out if preloading works as indented. Temporary preloading is also recommended because it does not modify the loader parameters for programs that do not require the preload.
 
-If you are looking for a more perminant setup which is not recommended, you can look below.
+If you are looking for a more permanent setup which is not recommended, you can look below.
 
 ## Permanent Preloading
 
@@ -85,4 +85,3 @@ wget https://raw.githubusercontent.com/intel/cryptography-primitives/refs/heads/
 g++ aes-256-ctr-encryption.cpp -o aes-ctr -lippcp
 LD_PRELOAD=$PWD/lib/libipp-compat.so ./aes_ctr
 ```
-

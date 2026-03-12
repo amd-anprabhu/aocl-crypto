@@ -9,9 +9,10 @@
 5. `cmake -B build -DALCP_ENABLE_EXAMPLES=ON -DALCP_ENABLE_BENCH=ON  -DCMAKE_BUILD_TYPE=Release`
 6. `cmake --build build`
 
-> <span style="color:red">__Note:__</span> To include IPP, please define `-DENABLE_TESTS_IPP_API=ON -DIPP_INSTALL_DIR=/path/to/ipp_prefix` in step 3. <br>
-> <span style="color:red"> __Note:__</span> To include OpenSSL, please define `-DENABLE_TESTS_OPENSSL_API=ON -DOPENSSL_INSTALL_DIR=/path/to/openssl_prefix` in step 3.<br>
-> <span style="color:red">__Note:__</span> To enable Multi Init lifecycle benchmarking, please append `-DMULTI_INIT_BENCH=ON` in step3<br>
+> **Note:** To include IPP, please define `-DENABLE_TESTS_IPP_API=ON -DIPP_INSTALL_DIR=/path/to/ipp_prefix` in step 5. <br>
+> **Note:** To include OpenSSL, please define `-DENABLE_TESTS_OPENSSL_API=ON -DOPENSSL_INSTALL_DIR=/path/to/openssl_prefix` in step 5.<br>
+> **Note:** To enable Multi Init lifecycle benchmarking, please append `-DMULTI_INIT_BENCH=ON` in step 5.<br>
+> **Note:** `ALCP_ENABLE_TESTS` must also be enabled to compile benchmarks (`-DALCP_ENABLE_TESTS=ON`).
 
 
 <a name = "Executing_Benches"></a>
@@ -118,8 +119,13 @@ For using IPP just specify `-i` command line argument.
 For using OpenSSL just specify `-o` command line argument.
 
 ### Force runtime CPU Architecture
-To force runtime CPU Architecture, use the environment variable AOCL_ENABLE_INSTRUCTION before running the test executable.
-Supported options are ZEN1, ZEN2, ZEN3, ZEN4, ZEN5
+To force a specific CPU architecture level at runtime, use the environment variable `AOCL_ENABLE_INSTRUCTION` before running the executable.
+Supported values: `ZEN`, `ZEN1`, `ZEN2`, `ZEN3`, `ZEN4`, `ZEN5` (ZEN and ZEN1 are equivalent).
+
+> **Note:** This can only **downgrade** the kernel level — setting a higher level on lower hardware has no effect.
+> For example, setting `ZEN4` on a Zen3 CPU will still use Zen3 kernels. An invalid value will cause the process to exit with an error.
+> For detailed per-algorithm dispatch behavior, see [CPU Feature Kernel Map](../docs/cpu_feature_kernel_map.md).
+
 ```sh
 $ AOCL_ENABLE_INSTRUCTION=ZEN3 ./bench/cipher/bench_cipher
 ```

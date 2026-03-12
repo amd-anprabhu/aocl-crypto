@@ -40,7 +40,7 @@ int main(void)
 {
     OSSL_PROVIDER *alcp_provider;
 
-	OSSL_PROVIDER_set_default_search_path("/path/to/alcp/lib")
+	OSSL_PROVIDER_set_default_search_path(NULL, "/path/to/alcp/lib");
 
     alcp_provider = OSSL_PROVIDER_load(NULL, "libopenssl-compat");
     if (NULL == alcp_provider) {
@@ -54,9 +54,9 @@ int main(void)
     exit(EXIT_SUCCESS);
 }
 ```
-### Configuring provider to be loaded by default.
+### Configuring provider to be loaded by default
 
-For more information please take a look at [this](https://www.openssl.org/docs/manmaster/man5/config.html). Modify or replace openssl.cnf with this. 
+For more information please take a look at [this](https://www.openssl.org/docs/manmaster/man5/config.html). Modify or replace openssl.cnf with this.
 
 ```sh
 openssl_conf = openssl_init
@@ -67,6 +67,7 @@ providers = provider_sect
 [provider_sect]
 alcp  = alcp_sect
 default = default_sect
+base = base_sect
 
 [default_sect]
 activate = 1
@@ -74,13 +75,16 @@ activate = 1
 [alcp_sect]
 module = /path/to/libopenssl-compat.so
 activate = 1
+
+[base_sect]
+activate = 1
 ```
 
 To find out where openssl looks for `openssl.cnf`, type the command ```openssl info -configdir```.
 
 You can also set OPENSSL_CONF environment variable with the full path to the openssl.cnf configured with AOCL-Cryptography openssl compat library as shown above. Thus its possible to use the compat library without modifying the existing openssl.cnf file.
 
-To **Verify the OpenSSL provider has been succesfully loaded**, run ```openssl list -providers``` which should show the following output:
+To **Verify the OpenSSL provider has been successfully loaded**, run ```openssl list -providers``` which should show the following output:
 
 ```
 Providers:
@@ -91,7 +95,7 @@ Providers:
     version: <OpenSSL version>
     status: active
 ```
-This indicates that AOCL-Cryptography OpenSSL compat library has been succesfully loaded.
+This indicates that AOCL-Cryptography OpenSSL compat library has been successfully loaded.
 
 ## Optionally enabling/disabling OpenSSL Provider algorithms during compile time
 
@@ -110,7 +114,7 @@ Within each module it is possible to disable sub algorithms as well:
 
 Cipher Algorithm | Compiler Option|Default value|
 :------:|:--------------:|:-----------:|
-|AES-CBC|ALCP_COMPAT_ENABLE_OPENSSL_CIPHER_CBC|OFF|
+|AES-CBC|ALCP_COMPAT_ENABLE_OPENSSL_CIPHER_CBC|ON|
 |AES-OFB|ALCP_COMPAT_ENABLE_OPENSSL_CIPHER_OFB|ON|
 |AES-CFB|ALCP_COMPAT_ENABLE_OPENSSL_CIPHER_CFB|ON|
 |AES-CTR|ALCP_COMPAT_ENABLE_OPENSSL_CIPHER_CTR|ON|
@@ -136,3 +140,36 @@ MAC Algorithm | Compiler Option|Default value|
 |POLY1305|ALCP_COMPAT_ENABLE_OPENSSL_MAC_POLY1305|ON|
 
 If OpenSSL Cipher Multi Update functionalities are required, ensure to compile with -DALCP_ENABLE_CIPHER_MULTI_UPDATE=ON.
+
+## Supported OpenSSL Versions
+
+The AOCL-Cryptography OpenSSL provider has been tested with OpenSSL versions **3.1.3 through 3.5.x**.
+
+> **Note:** The provider only works when the version of OpenSSL used to compile the provider is greater than or equal to the version of the OpenSSL library loaded at runtime.
+
+## Known Limitations with OpenSSL Test Suite
+
+When running the OpenSSL test suite (`make test`) with the AOCL-Cryptography provider loaded, the following tests are known to fail and should be excluded:
+
+| Test Name | Reason |
+|-----------|--------|
+| `test_quicapi` | QUIC protocol APIs not supported by the ALCP provider |
+| `test_sslapi` | SSL/TLS-specific functionality not dispatched through ALCP |
+| `test_evp_extra` | Exercises EVP features beyond ALCP provider scope |
+| `test_pkcs12` | PKCS#12 operations not fully supported |
+| `test_ml_dsa` | ML-DSA (post-quantum) not implemented in ALCP |
+| `test_mp_rsa` | Multi-prime RSA not supported (OpenSSL 3.5+) |
+| `test_evp_kdf` | KDF operations not dispatched through ALCP (OpenSSL 3.5+) |
+| `test_evp_pkey_provided` | Certain provided pkey operations not implemented (OpenSSL 3.3+) |
+| `test_bio_enc` | BIO encryption tests not supported (OpenSSL 3.3+) |
+
+To exclude these tests when running the OpenSSL test suite:
+```bash
+make test TESTS="-test_quicapi -test_sslapi -test_evp_extra -test_pkcs12 -test_ml_dsa -test_mp_rsa -test_evp_kdf -test_evp_pkey_provided -test_bio_enc"
+```
+You can also set the `OPENSSL_CONF` environment variable with the full path to the openssl.cnf configured with AOCL-Cryptography openssl compat library as shown above. This allows using the compat library without modifying the existing system openssl.cnf file:
+
+```bash
+export OPENSSL_CONF=/path/to/custom/openssl.cnf
+openssl list -providers
+```

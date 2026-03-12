@@ -14,7 +14,8 @@
 ## Introduction {#Introduction}
 
 <b> AOCL-Cryptography </b> supports a dynamic dispatcher feature that executes the most optimal function variant offering a single optimized library portable across different x86 CPU architectures. 
-AOCL Crypto framework is developed in C / C++ for Unix and Windows based systems. A test suite is provided for validation and performance benchmarking for the supported Ciphers, Digest, MAC, EC, and RSA APIs. The test suite also supports the benchmarking of IPP and Openssl different methods like AES cryptographic encryption / decryption, SHA2, SHA3 and other algorithms. Below are details of AOCL Crypto APIs and supported features
+For details on per-algorithm CPU feature requirements and kernel dispatch logic, see the [CPU Feature Kernel Map](md_docs_cpu_feature_kernel_map.html).
+AOCL Crypto framework is developed in C / C++ for Unix and Windows based systems. A test suite is provided for validation and performance benchmarking for the supported Ciphers, Digest, MAC, EC, and RSA APIs. The test suite also supports the benchmarking of IPP and OpenSSL different methods like AES cryptographic encryption / decryption, SHA2, SHA3 and other algorithms. Below are details of AOCL Crypto APIs and supported features
 
 ### Cipher
 

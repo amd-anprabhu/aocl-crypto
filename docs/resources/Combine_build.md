@@ -79,7 +79,7 @@ To enable sanitizers (asan, tsan etc), append `-DALCP_SANITIZE=ON` to the cmake 
 ```sh
 $ cmake -DALCP_SANITIZE=ON ../
 ```
-ENABLE_AOCL_UTILS is OFF by default
+ALCP_SANITIZE is OFF by default
 
 #### For Compiling with Valgrind Memcheck {#memcheck}
 
@@ -112,7 +112,7 @@ $ ./bench/{algorithm_type}/bench_{algorithm_type}
 #### Arguments can be provided in above bench as
 ```
 $ ./bench/digest/bench_digest --benchmark_filter=SHA2_<SHA SCHEME>_<Block Size>
-$ ./bench/digest/bench_digest --benchmark_filter=SHA2_512_16 (runs SHA256 schemes for 16 block size)
+$ ./bench/digest/bench_digest --benchmark_filter=SHA2_512_16 (runs SHA512 schemes for 16 byte block size)
 $ ./bench/digest/bench_digest --benchmark_filter=SHA2 (runs for all SHA2 schemes and block sizes)
 ```
 
@@ -178,7 +178,7 @@ These are flags to enable/disable optional features as required.
 ### Following software should be installed prior to build AOCL Cryptography
 
 - MS Visual Studio (2019 or greater)
-- Clang 15.0 or above
+- Clang 14.0 or above
 - Cmake 3.26 or greater
 - Git
 - Ninja(Alternative to Visual Studio Build System)
@@ -186,7 +186,7 @@ These are flags to enable/disable optional features as required.
 ### Environment Setup:
 
 1. Install visual Studio with workload: *Desktop development with c++*
-	- Enable Clang/cl tools(required) & Address Santizer(if require)
+	- Enable Clang/cl tools(required) & Address Sanitizer(if required)
 2. If using LLVM/Clang as external toolset:
 	- Install LLVM
 	- Install plugin: *llvm2019.vsix* :https://marketplace.visualstudio.com/items?itemName=MarekAniola.mangh-llvm2019
@@ -380,7 +380,7 @@ After running all the above commands you should see a `openssl-compat.dll` in `\
 Enabling IPP-Crypto
 ```
 PS> cd aocl-crypto/build
-PS> cmake --DAOCL_COMPAT_LIBS=ipp ../
+PS> cmake -DAOCL_COMPAT_LIBS=ipp ../
 PS> cmake --build build --config=release
 ```
 

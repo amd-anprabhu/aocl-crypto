@@ -96,12 +96,9 @@ ALCP_query_operation(void* vctx, int operation_id, int* no_cache)
     const char* openssl_version = OpenSSL_version(OPENSSL_VERSION_STRING);
 #endif
     switch (operation_id) {
-/*FIXME: When Cipher Provider is enabled and MAC provider is
- * disabled, CMAC will fail with OpenSSL Provider as OpenSSL
- * internally tries to use CBC from alcp and multi update is not
- * supported in ALCP as of now.  */
-
-// FIXME: OpenSSL Test test_quic_multistream fails on OpenSSL 3.3.
+/* Note: CMAC requires CBC cipher support. If the Cipher Provider is
+ * enabled but MAC provider is disabled, ensure CBC is also enabled
+ * (ALCP_COMPAT_ENABLE_OPENSSL_CIPHER_CBC). */
 #ifdef ALCP_COMPAT_ENABLE_OPENSSL_CIPHER
         case OSSL_OP_CIPHER:
             // Check if openssl version is <= than the compiled "with" version
@@ -112,7 +109,7 @@ ALCP_query_operation(void* vctx, int operation_id, int* no_cache)
             break;
 #endif // ifdef ALCP_COMPAT_ENABLE_OPENSSL_CIPHER
 
-// Digest providers are disabled as of now due to provider overhead
+// SHA2 digest provider is disabled by default; SHA3 and SHAKE are enabled
 #ifdef ALCP_COMPAT_ENABLE_OPENSSL_DIGEST
         case OSSL_OP_DIGEST:
             EXIT();

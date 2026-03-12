@@ -27,7 +27,15 @@ openssl speed -evp aes-128-cbc
 
 In this section we will discuss how to use provider without configuration files. OpenSSL binary can be given arguments to load provider from a custom directory. If openssl.cnf is already configured to use the custom directory and the provider, then specifying provider in argument is not necessary.
 
-To load the OpenSSL provider for AOCL Crypto, we have to provide the path of the provider and the name of the .so file.
+To load the OpenSSL provider for AOCL Crypto, we have to provide the path to the directory containing the provider `.so` file and the provider name.
+
+When running from a **build directory**, the `libopenssl-compat.so` is located in the build root:
+
+ ```bash
+ openssl speed -provider-path /path/to/aocl-crypto/build -provider libopenssl-compat
+ ```
+
+When running from an **installed package**, the provider is located in the `lib/` subdirectory:
 
  ```bash
  openssl speed -provider-path /path/to/alcp/lib -provider libopenssl-compat
@@ -96,6 +104,5 @@ openssl speed -provider-path /path/to/alcp/lib -provider libopenssl-compat \
 openssl speed -provider-path /path/to/alcp/lib -provider libopenssl-compat \
 -evp aes-256-gcm
 ```
-
 
 
