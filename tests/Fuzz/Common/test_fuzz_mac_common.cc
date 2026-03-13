@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -49,7 +49,7 @@ std::map<alc_digest_mode_t, std::string> mac_sha_mode_string_map = {
     { ALC_SHAKE_128, "ALC_SHAKE_128" }, { ALC_SHAKE_256, "ALC_SHAKE_256" }
 };
 
-std::map<_alc_mac_type, std::string> mac_type_string_map = {
+std::map<alc_mac_type_t, std::string> mac_type_string_map = {
     { ALC_MAC_HMAC, "HMAC" },
     { ALC_MAC_CMAC, "CMAC" },
     { ALC_MAC_POLY1305, "POLY1305" },
@@ -127,7 +127,7 @@ TestMacLifecycle_2(alc_mac_handle_t handle,
 
 /* the second argument is relevant only for Hmac*/
 int
-ALCP_Fuzz_Mac(_alc_mac_type     mac_type,
+ALCP_Fuzz_Mac(alc_mac_type_t     mac_type,
               alc_digest_mode_t mode,
               const Uint8*      buf,
               size_t            len,

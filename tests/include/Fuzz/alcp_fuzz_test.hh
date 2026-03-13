@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -182,7 +182,7 @@ ALCP_Fuzz_Digest(alc_digest_mode_t mode,
                  size_t            len,
                  bool              TestNegLifeCycle);
 int
-ALCP_Fuzz_Mac(_alc_mac_type     mac_type,
+ALCP_Fuzz_Mac(alc_mac_type_t     mac_type,
               alc_digest_mode_t mode,
               const Uint8*      buf,
               size_t            len,
