@@ -198,7 +198,6 @@ DecryptCfbKernel(const Uint8* pSrc,
     }
 
     if (res) {
-        // FIXME: To be merged into
         b1             = alcp_loadu_128((const __m512i*)pIv);
         auto p_out_128 = reinterpret_cast<__m128i*>(pOut_512);
 
