@@ -30,14 +30,7 @@
 #define _ALCP_TYPES_H_ 2
 
 #ifndef __cplusplus
-#ifndef bool
-typedef enum
-{
-    false,
-    true
-} bool;
-#endif
-
+#include <stdbool.h>
 #include <stdint.h>
 #else
 #include <cstdint>
