@@ -70,7 +70,10 @@ Poly1305<archLevel>::init(const Uint8 key[], Uint64 keyLen)
         err = ALC_ERROR_NOT_SUPPORTED;
         return err;
     }
+    // Clear accumulated state before loading new key material
     state.finalized = false;
+    state.reset();
+
     if constexpr (CpuArchLevel::eReference == archLevel
                   || CpuArchLevel::eZen == archLevel
                   || CpuArchLevel::eZen3 == archLevel) {
@@ -80,7 +83,6 @@ Poly1305<archLevel>::init(const Uint8 key[], Uint64 keyLen)
         err = ALC_ERROR_NONE;
         return err;
     } else if constexpr (CpuArchLevel::eDynamic == archLevel) {
-        // Manual dispatch in case we don't know where to dispatch to.
         static CpuArchLevel arch =
             CpuId::getCachedArchLevel(AlgorithmType::ePoly1305);
         if (arch >= CpuArchLevel::eZen4) {

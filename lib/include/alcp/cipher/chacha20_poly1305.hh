@@ -61,17 +61,28 @@ using utils::CpuArchLevel;
 template<CpuArchLevel arch>
 class ALCP_API_EXPORT ChaChPolyT
     : public ChaCha256T<arch>
-    , public alcp::mac::poly1305::Poly1305<CpuArchLevel::eDynamic>
+    , public alcp::mac::poly1305::Poly1305<arch>
     , public iCipherAead
 {
   protected:
-    Uint8                             m_poly1305_key[32]{};
     static constexpr Uint8            m_zero_padding[16]{};
+    static constexpr Uint32           cChaChaBlockSize = CHACHA20_BLOCK_SIZE;
     len_input_processed               m_len_input_processed{};
     len_aad_processed                 m_len_aad_processed{};
+    Uint8                             m_keystreamBuffer[cChaChaBlockSize]{};
+    Uint32                            m_keystreamOffset = cChaChaBlockSize;
+    Uint32                            m_chacha20Counter = 1;
+    bool                              m_aadPadded       = false;
 
     alc_error_t setIvInternal(const Uint8* iv, Uint64 ivLen);
-    alc_error_t setKeyInternal(const Uint8* key, Uint64 keylen);
+    alc_error_t initPoly1305Key();
+    alc_error_t padAadToBlockBoundary();
+    void        setChaChaCounter(Uint32 counter);
+    template<bool isDecrypt>
+    alc_error_t cryptAndAuth(const Uint8* inputBuffer,
+                             Uint8*       outputBuffer,
+                             Uint64       bufferLength,
+                             Uint64*      outlen);
 
   public:
     ChaChPolyT() = default;
