@@ -205,9 +205,8 @@ FUNCTION(AES_TEST TYPE MOD)
     TARGET_LINK_LIBRARIES(aes_${MOD}_experimental_${TYPE} ${LIBS} 
                                                       ${OPENSSL_LIBS} 
                                                       ${IPP_LIBS})
-    gtest_add_tests(TARGET aes_${MOD}_experimental_${TYPE}
-        TEST_SUFFIX .${MOD})
-    gtest_discover_tests(aes_${MOD}_experimental_${TYPE} NO_PRETTY_VALUES NO_PRETTY_TYPES)
+    gtest_discover_tests(aes_${MOD}_experimental_${TYPE} NO_PRETTY_VALUES NO_PRETTY_TYPES
+        PROPERTIES LABELS "cipher")
 ENDFUNCTION()
 
 FUNCTION(LINK_IF_EXISTS SOURCE DESTINATION LINK_TYPE)

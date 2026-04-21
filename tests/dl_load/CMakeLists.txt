@@ -39,4 +39,5 @@ TARGET_INCLUDE_DIRECTORIES(test_dynamic_load PRIVATE
 TARGET_COMPILE_OPTIONS(test_dynamic_load PUBLIC ${ALCP_WARNINGS})
 TARGET_LINK_LIBRARIES(test_dynamic_load ${LIBS_DL})
 
-gtest_add_tests(TARGET test_dynamic_load)
+gtest_add_tests(TARGET test_dynamic_load TEST_LIST _dl_tests)
+set_tests_properties(${_dl_tests} PROPERTIES LABELS "unit")
