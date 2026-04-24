@@ -94,12 +94,6 @@ IF(UNIX)
 	TARGET_LINK_OPTIONS(alcp PUBLIC -Wl,--enable-new-dtags)
 ENDIF(UNIX)
 
-# check if build type is coverage
-string(TOUPPER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_UPPER)
-if(BUILD_TYPE_UPPER STREQUAL "COVERAGE")
-    alcp_add_coverage_flags()
-endif()
-
 IF(UNIX)
 	SET_TARGET_PROPERTIES(alcp_static PROPERTIES OUTPUT_NAME alcp)
 ENDIF(UNIX)
@@ -138,6 +132,12 @@ ADD_SUBDIRECTORY(ref)
 ADD_SUBDIRECTORY(arch)
 ADD_SUBDIRECTORY(capi)
 ADD_SUBDIRECTORY(tests)
+
+# check if build type is coverage - apply after all targets are defined
+string(TOUPPER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_UPPER)
+if(BUILD_TYPE_UPPER STREQUAL "COVERAGE")
+    alcp_add_coverage_flags()
+endif()
 
 TARGET_INCLUDE_DIRECTORIES(alcp PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/include)
