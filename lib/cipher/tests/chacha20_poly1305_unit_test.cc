@@ -1367,7 +1367,7 @@ TEST(Chacha20Poly1305_Negative, ZeroLengthInput)
                       0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
     Uint8 AAD[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
                     0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
-    Uint8 dummy;
+    Uint8 dummy = 0;
     std::vector<Uint8> tag(16);
 
     ref::ChaChaPoly256 chacha_poly;
