@@ -28,10 +28,14 @@
 
 #include "alcp/cipher/chacha20_poly1305.hh"
 #include "alcp/base.hh"
+#include "alcp/utils/endian.hh"
+
+#include <algorithm>
 
 namespace alcp::cipher {
 
 using mac::poly1305::Poly1305;
+using alcp::utils::StoreLittleEndian;
 
 template<CpuArchLevel arch>
 alc_error_t
@@ -109,7 +113,7 @@ inline void
 ChaChPolyT<arch>::setChaChaCounter(Uint32 counter)
 {
     Uint8* pIv = ChaCha256T<arch>::getIv();
-    (*(reinterpret_cast<Uint32*>(pIv))) = counter;
+    StoreLittleEndian(pIv, counter);
 }
 
 template<CpuArchLevel arch>

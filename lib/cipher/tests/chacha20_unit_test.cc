@@ -33,6 +33,7 @@
 #include "gtest/gtest.h"
 #include <openssl/bio.h>
 #include <algorithm>
+#include <cstdint>
 
 #include "alcp/utils/benchmark.hh"
 #if 1
@@ -139,6 +140,35 @@ class ChaCha20Test : public ::testing::Test
 constexpr Uint8 ChaCha20Test::testKey[32];
 constexpr Uint8 ChaCha20Test::testIv12[12];
 constexpr Uint8 ChaCha20Test::testIv16[16];
+
+TEST(ChaCha20ScalarProcessInput, RejectsInvalidLengthsBeforeBufferReads)
+{
+    Uint8 key[32]        = {};
+    Uint8 plaintext[1]  = {};
+    Uint8 ciphertext[1] = {};
+    Uint8 iv[16]         = {};
+    const auto* unreadableIv =
+        reinterpret_cast<const Uint8*>(static_cast<std::uintptr_t>(1));
+
+    EXPECT_EQ(ProcessInput(key,
+                           sizeof(key) - 1,
+                           unreadableIv,
+                           sizeof(iv),
+                           plaintext,
+                           ciphertext,
+                           0,
+                           1),
+              ALC_ERROR_INVALID_ARG);
+    EXPECT_EQ(ProcessInput(key,
+                           sizeof(key),
+                           unreadableIv,
+                           sizeof(iv) - 1,
+                           plaintext,
+                           ciphertext,
+                           0,
+                           1),
+              ALC_ERROR_INVALID_ARG);
+}
 
 // Parameterized test fixture for data size variations
 class ChaCha20DataSizeTest : public ::testing::TestWithParam<size_t>
