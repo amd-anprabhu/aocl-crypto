@@ -67,10 +67,38 @@ class ALCP_API_EXPORT ChaChPolyT
   protected:
     static constexpr Uint8            m_zero_padding[16]{};
     static constexpr Uint32           cChaChaBlockSize = CHACHA20_BLOCK_SIZE;
+    static constexpr Uint32           cKsBatchBytes = 4 * cChaChaBlockSize;
     len_input_processed               m_len_input_processed{};
     len_aad_processed                 m_len_aad_processed{};
-    Uint8                             m_keystreamBuffer[cChaChaBlockSize]{};
-    Uint32                            m_keystreamOffset = cChaChaBlockSize;
+    // Keystream cache state:
+    //
+    // The cache serves two call patterns:
+    //
+    // 1. Single-shot or first short update:
+    //    Generate only the number of 64-byte ChaCha20 blocks needed for
+    //    this update. This avoids producing a full 256-byte batch when
+    //    the caller may immediately finalize and discard the unused
+    //    keystream.
+    //
+    // 2. Multi-update streaming:
+    //    Once an operation has already produced message keystream, refill
+    //    the cache with one full 4-block kernel batch. Later short updates
+    //    can then drain the cached bytes without re-entering the ChaCha20
+    //    kernel.
+    //
+    // Because those two paths can fill different amounts of the same buffer,
+    // the cache tracks both:
+    //
+    //   m_keystreamValid:  number of bytes in m_keystreamBuffer that contain
+    //                      real, usable ChaCha20 keystream.
+    //   m_keystreamOffset: index of the next unread byte inside that valid
+    //                      range.
+    //
+    // The currently cached bytes are:
+    //   m_keystreamBuffer[m_keystreamOffset ... m_keystreamValid)
+    alignas(64) Uint8                 m_keystreamBuffer[cKsBatchBytes]{};
+    Uint32                            m_keystreamOffset = 0;
+    Uint32                            m_keystreamValid  = 0;
     Uint32                            m_chacha20Counter = 1;
     bool                              m_aadPadded       = false;
 

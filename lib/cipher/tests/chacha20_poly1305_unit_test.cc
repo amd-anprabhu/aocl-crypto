@@ -1025,6 +1025,154 @@ TEST_F(ChaCha20Poly1305Lifecycle, EncryptMultiUpdate)
     delete aead;
 }
 
+TEST_F(ChaCha20Poly1305Lifecycle, EncryptBatchedKeystreamThirtyTwoUpdates)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 aad[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<Uint8> plaintext(512);
+    for (size_t i = 0; i < plaintext.size(); i++) {
+        plaintext[i] = static_cast<Uint8>((i * 7) & 0xff);
+    }
+    std::vector<Uint8> ciphertext(plaintext.size()), expected_ciphertext(plaintext.size());
+    std::vector<Uint8> tag(16), expected_tag(16);
+
+    encryptWithFreshObject(key,
+                           sizeof(key) * 8,
+                           nonce,
+                           sizeof(nonce),
+                           aad,
+                           sizeof(aad),
+                           plaintext.data(),
+                           plaintext.size(),
+                           expected_ciphertext,
+                           expected_tag);
+
+    auto aead = createAead();
+    ASSERT_NE(aead, nullptr);
+    initAndSetAad(
+        aead, key, sizeof(key) * 8, nonce, sizeof(nonce), aad, sizeof(aad));
+
+    for (size_t off = 0; off < plaintext.size(); off += 16) {
+        Uint64 outlen = 0;
+        alc_error_t err =
+            aead->encrypt(plaintext.data() + off, ciphertext.data() + off, 16, &outlen);
+        ASSERT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, 16);
+    }
+    alc_error_t err = aead->getTag(tag.data(), tag.size());
+    ASSERT_EQ(err, ALC_ERROR_NONE);
+
+    EXPECT_EQ(ciphertext, expected_ciphertext);
+    EXPECT_EQ(tag, expected_tag);
+    delete aead;
+}
+
+TEST_F(ChaCha20Poly1305Lifecycle, DecryptBatchedKeystreamThirtyTwoUpdates)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 aad[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    std::vector<Uint8> plaintext(512);
+    for (size_t i = 0; i < plaintext.size(); i++) {
+        plaintext[i] = static_cast<Uint8>((i * 11) & 0xff);
+    }
+    std::vector<Uint8> ciphertext(plaintext.size()), decrypted(plaintext.size());
+    std::vector<Uint8> tag(16), expected_tag(16);
+
+    encryptWithFreshObject(key,
+                           sizeof(key) * 8,
+                           nonce,
+                           sizeof(nonce),
+                           aad,
+                           sizeof(aad),
+                           plaintext.data(),
+                           plaintext.size(),
+                           ciphertext,
+                           expected_tag);
+
+    auto aead = createAead();
+    ASSERT_NE(aead, nullptr);
+    initAndSetAad(
+        aead, key, sizeof(key) * 8, nonce, sizeof(nonce), aad, sizeof(aad));
+
+    for (size_t off = 0; off < ciphertext.size(); off += 16) {
+        Uint64 outlen = 0;
+        alc_error_t err =
+            aead->decrypt(ciphertext.data() + off, decrypted.data() + off, 16, &outlen);
+        ASSERT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, 16);
+    }
+    alc_error_t err = aead->getTag(tag.data(), tag.size());
+    ASSERT_EQ(err, ALC_ERROR_NONE);
+
+    EXPECT_EQ(decrypted, plaintext);
+    EXPECT_EQ(tag, expected_tag);
+    delete aead;
+}
+
+TEST_F(ChaCha20Poly1305Lifecycle, EncryptBatchedKeystreamMixedUpdates)
+{
+    Uint8 key[] = { 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+                    0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+                    0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97,
+                    0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f };
+    Uint8 nonce[] = { 0x07, 0x00, 0x00, 0x00, 0x40, 0x41,
+                      0x42, 0x43, 0x44, 0x45, 0x46, 0x47 };
+    Uint8 aad[] = { 0x50, 0x51, 0x52, 0x53, 0xc0, 0xc1,
+                    0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7 };
+    const std::vector<size_t> chunks = { 17, 31, 5, 96, 13, 128, 222 };
+    std::vector<Uint8> plaintext(512);
+    for (size_t i = 0; i < plaintext.size(); i++) {
+        plaintext[i] = static_cast<Uint8>((i * 13 + 3) & 0xff);
+    }
+    std::vector<Uint8> ciphertext(plaintext.size()), expected_ciphertext(plaintext.size());
+    std::vector<Uint8> tag(16), expected_tag(16);
+
+    encryptWithFreshObject(key,
+                           sizeof(key) * 8,
+                           nonce,
+                           sizeof(nonce),
+                           aad,
+                           sizeof(aad),
+                           plaintext.data(),
+                           plaintext.size(),
+                           expected_ciphertext,
+                           expected_tag);
+
+    auto aead = createAead();
+    ASSERT_NE(aead, nullptr);
+    initAndSetAad(
+        aead, key, sizeof(key) * 8, nonce, sizeof(nonce), aad, sizeof(aad));
+
+    size_t off = 0;
+    for (size_t chunk : chunks) {
+        Uint64 outlen = 0;
+        alc_error_t err =
+            aead->encrypt(plaintext.data() + off, ciphertext.data() + off, chunk, &outlen);
+        ASSERT_EQ(err, ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, chunk);
+        off += chunk;
+    }
+    EXPECT_EQ(off, plaintext.size());
+    alc_error_t err = aead->getTag(tag.data(), tag.size());
+    ASSERT_EQ(err, ALC_ERROR_NONE);
+
+    EXPECT_EQ(ciphertext, expected_ciphertext);
+    EXPECT_EQ(tag, expected_tag);
+    delete aead;
+}
+
 // Lifecycle: init -> setAad -> encrypt(len=0) -> getTag
 //         -> repeat with same AAD and changed AAD to validate determinism/sensitivity.
 TEST_F(ChaCha20Poly1305Lifecycle, ZeroLengthPlaintextWithAad)

@@ -161,12 +161,15 @@ ChaChPolyT<arch>::init(const Uint8* pKey,
         }
 
         // Reset multi-update state for new AEAD operation.
-        // Zero the keystream buffer to clear residual key-derived material.
+        if (m_keystreamValid > 0) {
+            std::fill(m_keystreamBuffer,
+                      m_keystreamBuffer + m_keystreamValid,
+                      0);
+        }
         m_chacha20Counter = 1;
-        m_keystreamOffset = cChaChaBlockSize; // buffer empty
+        m_keystreamOffset = 0;
+        m_keystreamValid  = 0;
         m_aadPadded       = false;
-        std::fill(
-            m_keystreamBuffer, m_keystreamBuffer + cChaChaBlockSize, 0);
     }
 
     return ALC_ERROR_NONE;
@@ -209,6 +212,13 @@ ChaChPolyT<arch>::cryptAndAuth(const Uint8* inputBuffer,
     const Uint8* pIn  = inputBuffer;
     Uint8*       pOut = outputBuffer;
     Uint64       processed = 0;
+    // Snapshot the call pattern before this update mutates the counter.
+    // If prior updates have already produced message keystream, this looks
+    // like a multi-update stream and the tail path should refill a full
+    // 4-block batch. If this is the first message update, keep the refill
+    // sized to this request so single-shot callers do not over-generate
+    // keystream that getTag() will immediately wipe.
+    const bool   streaming = (m_chacha20Counter > 1);
 
     // For decrypt, feed ciphertext (input) to Poly1305 BEFORE XOR decryption.
     // This is critical for in-place operation (inputBuffer == outputBuffer)
@@ -222,17 +232,18 @@ ChaChPolyT<arch>::cryptAndAuth(const Uint8* inputBuffer,
         }
     }
 
-    // ChaCha20 generates keystream in 64-byte blocks. If a previous update
-    // consumed only part of a block, resume from the saved offset first so
-    // stream position stays continuous across multi-update calls.
-    if (m_keystreamOffset < cChaChaBlockSize && bufferLength > 0) {
-        Uint32 avail = cChaChaBlockSize - m_keystreamOffset;
-        Uint32 use   = (bufferLength < avail) ? static_cast<Uint32>(bufferLength)
-                                              : avail;
-        for (Uint32 i = 0; i < use; i++) {
-            pOut[i] = pIn[i] ^ m_keystreamBuffer[m_keystreamOffset + i];
+    // Drain cached keystream from a previous short update before
+    // entering the kernel again. The Zen4 ChaCha20 kernel produces a
+    // 4-block batch efficiently; caching the unused bytes lets several
+    // short streaming updates share one kernel invocation.
+    if (m_keystreamOffset < m_keystreamValid && bufferLength > 0) {
+        Uint64 avail = m_keystreamValid - m_keystreamOffset;
+        Uint64 use   = (bufferLength < avail) ? bufferLength : avail;
+        const Uint8* pKs = m_keystreamBuffer + m_keystreamOffset;
+        for (Uint64 i = 0; i < use; i++) {
+            pOut[i] = pIn[i] ^ pKs[i];
         }
-        m_keystreamOffset += use;
+        m_keystreamOffset += static_cast<Uint32>(use);
         processed += use;
     }
 
@@ -244,39 +255,52 @@ ChaChPolyT<arch>::cryptAndAuth(const Uint8* inputBuffer,
         return ALC_ERROR_NOT_PERMITTED;
     }
 
-    // Full blocks go directly through the optimized ChaCha20 kernel
-    if (remaining >= cChaChaBlockSize) {
-        Uint64 fullBlocks = remaining / cChaChaBlockSize;
+    // Full 4-block batches go directly through the optimized ChaCha20 kernel.
+    if (remaining >= cKsBatchBytes) {
+        Uint64 batchBytes = (remaining / cKsBatchBytes) * cKsBatchBytes;
         setChaChaCounter(m_chacha20Counter);
         Uint64 chacha_outlen = 0;
         err                  = ChaCha256T<arch>::encrypt(
             pIn + processed,
             pOut + processed,
-            fullBlocks * cChaChaBlockSize,
+            batchBytes,
             &chacha_outlen);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
-        m_chacha20Counter += static_cast<Uint32>(fullBlocks);
-        processed += fullBlocks * cChaChaBlockSize;
+        m_chacha20Counter += static_cast<Uint32>(batchBytes / cChaChaBlockSize);
+        processed += batchBytes;
     }
 
-    // Handle remaining bytes that don't fill a complete 64-byte block.
-    // Generate a full keystream block, XOR only the needed bytes, and
-    // save the unused keystream for the next multi-update call.
+    // Handle remaining bytes that don't fill a complete 4-block batch.
+    // For the first short update of an operation, generate only enough
+    // 64-byte blocks to cover the request. Once the operation has already
+    // produced message keystream, assume a streaming caller and refill a
+    // full 4-block batch so follow-up short updates drain from cache.
     remaining = bufferLength - processed;
     if (remaining > 0) {
-        Uint8 zeros[cChaChaBlockSize] = {};
+        Uint64 reqBytes = cKsBatchBytes;
+        if (!streaming) {
+            Uint64 needBlocks =
+                (remaining + cChaChaBlockSize - 1) / cChaChaBlockSize;
+            reqBytes = needBlocks * cChaChaBlockSize;
+        }
+        Uint64 reqBlocks = reqBytes / cChaChaBlockSize;
+        if (reqBlocks > UINT32_MAX - m_chacha20Counter) {
+            return ALC_ERROR_NOT_PERMITTED;
+        }
+
+        Uint8 zeros[cKsBatchBytes] = {};
         setChaChaCounter(m_chacha20Counter);
 
-        // Generate a full 64-byte keystream block by encrypting zeros
+        // Generate keystream by encrypting zeros.
         Uint64 ksOutlen = 0;
         err = ChaCha256T<arch>::encrypt(
-            zeros, m_keystreamBuffer, cChaChaBlockSize, &ksOutlen);
+            zeros, m_keystreamBuffer, reqBytes, &ksOutlen);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
-        m_chacha20Counter++;
+        m_chacha20Counter += static_cast<Uint32>(reqBlocks);
 
         // XOR only the remaining bytes with the keystream
         for (Uint64 i = 0; i < remaining; i++) {
@@ -286,6 +310,7 @@ ChaChPolyT<arch>::cryptAndAuth(const Uint8* inputBuffer,
         // Mark how many keystream bytes were consumed; the rest are
         // available for the next update call to resume from
         m_keystreamOffset = static_cast<Uint32>(remaining);
+        m_keystreamValid  = static_cast<Uint32>(reqBytes);
     }
 
     // For encrypt, feed ciphertext (output) to Poly1305 after XOR.
@@ -389,10 +414,15 @@ ChaChPolyT<arch>::getTag(Uint8* pOutput, Uint64 len)
     // Compute and write the 16-byte authentication tag
     err = Poly1305<arch>::finalize(pOutput, len);
 
-    // AEAD operation is complete. Zero the keystream buffer to clear
-    // residual key-derived material from memory.
-    std::fill(m_keystreamBuffer, m_keystreamBuffer + cChaChaBlockSize, 0);
-    m_keystreamOffset = cChaChaBlockSize;
+    // AEAD operation is complete. Zero any generated keystream cache
+    // to clear residual key-derived material from memory.
+    if (m_keystreamValid > 0) {
+        std::fill(m_keystreamBuffer,
+                  m_keystreamBuffer + m_keystreamValid,
+                  0);
+        m_keystreamOffset = 0;
+        m_keystreamValid  = 0;
+    }
 
     return err;
 }
