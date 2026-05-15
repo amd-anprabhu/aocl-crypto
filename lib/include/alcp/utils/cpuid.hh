@@ -33,6 +33,7 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace alcp::utils {
@@ -159,19 +160,24 @@ enum class Avx512Flags
 };
 
 /**
- * @brief CPU Zen version for exact microarchitecture detection
+ * @brief Convert an EUarch enum integer value to a human-readable name.
  *
- * Used for fine-grained dispatch where different Zen generations
- * may require different kernel selections (e.g., SHA3 on Zen5+Clang).
+ * Uses the sequential enum layout of Au::EUarch:
+ *   Unknown=0, Zen=1, ZenPlus=2, Zen2=3, Zen3=4, Zen4=5, Zen5=6, Zen6=7, ...
+ * For values >= 3, the name follows "ZenN" where N = val - 1.
+ * This auto-extends for future Zen generations without code changes.
  */
-enum class CpuZenVer
+inline std::string
+EUarchValToString(int val)
 {
-    ZEN  = 0,
-    ZEN2 = 1,
-    ZEN3 = 2,
-    ZEN4 = 3,
-    ZEN5 = 4,
-};
+    if (val == 0)
+        return "Unknown";
+    if (val == 1)
+        return "Zen";
+    if (val == 2)
+        return "Zen+";
+    return "Zen" + std::to_string(val - 1);
+}
 
 class ALCP_API_EXPORT CpuId
 {
@@ -267,31 +273,6 @@ class ALCP_API_EXPORT CpuId
      */
     static bool cpuHasAvx512VL();
 
-    // Zen microarchitecture detection
-    /**
-     * @brief Returns true if currently executing CPU is Zen1
-     */
-    static bool cpuIsZen1();
-
-    /**
-     * @brief Returns true if currently executing CPU is Zen2
-     */
-    static bool cpuIsZen2();
-
-    /**
-     * @brief Returns true if currently executing CPU is Zen3
-     */
-    static bool cpuIsZen3();
-
-    /**
-     * @brief Returns true if currently executing CPU is Zen4
-     */
-    static bool cpuIsZen4();
-
-    /**
-     * @brief Returns true if currently executing CPU is Zen5
-     */
-    static bool cpuIsZen5();
     /**
      * @brief Returns true if the CPU vendor is AMD
      */

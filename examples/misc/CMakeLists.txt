@@ -1,4 +1,4 @@
- # Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ # Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions are met:
@@ -25,4 +25,18 @@
  
 
 ADD_EXAMPLE(cpuid.cc)
+# cpuid example directly uses Au::X86Cpu for microarchitecture detection
+IF(ENABLE_AOCL_UTILS AND AOCL_UTILS_INSTALL_DIR)
+    IF(MSVC)
+        target_link_libraries(cpuid_cpp PRIVATE
+            ${AOCL_UTILS_INSTALL_DIR}/lib/au_cpuid.lib)
+        target_link_libraries(cpuid_cpp-static PRIVATE
+            ${AOCL_UTILS_INSTALL_DIR}/lib/au_cpuid.lib)
+    ELSE()
+        target_link_libraries(cpuid_cpp PRIVATE
+            ${AOCL_UTILS_INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libau_cpuid.so)
+        target_link_libraries(cpuid_cpp-static PRIVATE
+            ${AOCL_UTILS_INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libau_cpuid.a)
+    ENDIF()
+ENDIF()
 ADD_EXAMPLE(filecrypt.cc)
