@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+# Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -100,6 +100,19 @@ ensure_no_directory_conflict(){
 
 # Function to clone the repo both aocl-utils and aocl-crypto.
 clone_repos(){
+
+    # KAT test data files in aocl-crypto are managed by git-lfs.
+    # Ensure git-lfs is installed and initialized before cloning so the
+    # CSV datasets are downloaded automatically alongside the source.
+    if ! command -v git-lfs > /dev/null 2>&1; then
+        echo "WARNING: git-lfs not found. KAT test data will not be downloaded."
+        echo "         Install git-lfs (https://git-lfs.github.com) and re-run,"
+        echo "         or run 'git lfs install && git lfs pull' inside aocl-crypto afterwards."
+    else
+        echo "Running \"git lfs install\""
+        git lfs install
+        quit_if_status_not_zero $?
+    fi
 
     # Clone AOCL-Cryptography
     echo "Running \"git clone $AOCL_CRYPTO_REPO -b $AOCL_BRANCH\""

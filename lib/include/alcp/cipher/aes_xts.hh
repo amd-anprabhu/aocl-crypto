@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,77 +33,59 @@
 #include "alcp/error.h"
 
 #include "alcp/base/error.hh"
-#include "alcp/cipher/aes.hh"
+#include "alcp/cipher/cipher_common.hh"
 #include "alcp/cipher/cipher_wrapper.hh"
 #include "alcp/utils/constants.hh"
 #include "alcp/utils/copy.hh"
-#include "alcp/utils/cpuid.hh"
 
-using alcp::utils::CpuId;
 namespace alcp::cipher {
 
-// FIXME: _alc_cipher_xts_data structure needs further refinement.
+// XTS-specific data (IV is stored in IvManager)
 typedef struct _alc_cipher_xts_data
 {
-    __attribute__((aligned(64))) Uint8 m_iv_xts[16];
     __attribute__((aligned(64))) Uint8 m_tweak_block[16];
-    Uint8  m_tweak_round_key[(RIJ_SIZE_ALIGNED(32) * (16))];
-    Uint8* m_pTweak_key; // this pointer can be removed.
-    Int64  m_aes_block_id;
+    Uint8 m_tweak_round_key[(RIJ_SIZE_ALIGNED(32) * (16))];
+    Int64 m_aes_block_id;
 
 } _alc_cipher_xts_data_t;
 
 /*
  * @brief        AES Encryption in XTS(XEX Tweakable Block Ciphertext
  * Stealing Mode)
+ *
+ * Uses composition for state, key (with Rijndael), and IV management.
+ * KeyManager inherits from Rijndael and handles key expansion internally.
  */
 class ALCP_API_EXPORT Xts
-    : public Aes
-    , public virtual iCipher
 {
-  public:
-    Uint8* m_pIv_xts;
-    Uint32 m_iv_xts_size          = 0;
-    Uint8* m_ptweak_round_key     = NULL;
-    Uint32 m_tweak_round_key_size = 0;
+  protected:
+    // Composed components
+    StateManager m_stateManager;
+    KeyManager   m_keyManager;
+    IvManager    m_ivManager;
 
+  public:
+    // XTS-specific data
     _alc_cipher_xts_data_t m_xts;
 
     Xts(Uint32 keyLen_in_bytes, CipherMode mode)
-        : Aes(keyLen_in_bytes)
+        : m_keyManager(keyLen_in_bytes)
+        , m_ivManager(16, 16) // XTS uses fixed 16-byte IV
     {
-        setMode(mode);
-        m_ivLen_max = 16;
-        m_ivLen_min = 16;
-
-        m_pIv_xts     = m_xts.m_iv_xts;
-        m_iv_xts_size = sizeof(m_xts.m_iv_xts);
-
-        m_ptweak_round_key     = m_xts.m_tweak_round_key;
-        m_tweak_round_key_size = sizeof(m_xts.m_tweak_round_key);
-
-        // Aes::setMode(CipherMode::eAesXTS);
         m_xts.m_aes_block_id = -1;
-        memset(m_xts.m_iv_xts, 0, m_iv_xts_size);
-        memset(m_ptweak_round_key, 0, m_tweak_round_key_size);
+        memset(m_xts.m_tweak_round_key, 0, sizeof(m_xts.m_tweak_round_key));
     };
+    
     ~Xts()
     { // clear keys
-        memset(m_pIv_xts, 0, m_iv_xts_size);
-        memset(m_ptweak_round_key, 0, m_tweak_round_key_size);
+        memset(m_xts.m_tweak_round_key, 0, sizeof(m_xts.m_tweak_round_key));
     }
-    alc_error_t init(const Uint8* pKey,
-                     Uint64       keyLen,
-                     const Uint8* pIv,
-                     Uint64       ivLen) override;
+    
+    virtual alc_error_t init(const Uint8* pKey,
+                             Uint64       keyLen,
+                             const Uint8* pIv,
+                             Uint64       ivLen);
 
-    // alc_error_t encrypt(const Uint8* pPlainText,
-    //                     Uint8*       pCipherText,
-    //                     Uint64       len,
-    //                     Uint64*      outlen) override
-    // {
-    //     return ALC_ERROR_NOT_SUPPORTED;
-    // }
 
     void tweakBlockSet(Uint64 aesBlockId);
 
@@ -119,10 +101,10 @@ GetSbox(Uint8 offset, bool use_invsbox = false)
     return utils::GetSbox(offset, use_invsbox);
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, utils::CpuArchLevel arch>
 class XtsT
     : public Xts
-    , public virtual iCipher
+    , public iCipher
 {
   public:
     XtsT()
@@ -132,6 +114,14 @@ class XtsT
     ~XtsT() = default;
 
   public:
+    // iCipher methods - delegate init to base class
+    alc_error_t init(const Uint8* pKey,
+                     Uint64       keyLen,
+                     const Uint8* pIv,
+                     Uint64       ivLen) override
+    {
+        return Xts::init(pKey, keyLen, pIv, ivLen);
+    }
     alc_error_t encrypt(const Uint8* pPlainText,
                         Uint8*       pCipherText,
                         Uint64       len,
@@ -140,38 +130,18 @@ class XtsT
                         Uint8*       pPlainText,
                         Uint64       len,
                         Uint64*      outlen) override;
-    alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
+    alc_error_t finish() override { return ALC_ERROR_NONE; }
     alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
-    alc_error_t flush(const Uint8** pPlainText,
-                      Uint64        numBuffers,
-                      Uint64        len) override
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
-    alc_error_t dequeue(Uint8** pCipherText,
-                        Uint64  numBuffers,
-                        Uint64  len) override
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
-    alc_error_t multibufferInit(const Uint8*  pKey,
-                                Uint64        keyLen,
-                                const Uint8** pIv,
-                                Uint64        ivLen,
-                                Uint64        numBuffers) override
     {
         return ALC_ERROR_NOT_SUPPORTED;
     }
 };
 
-/* iCipherSeg classes */
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+/* XTS Block cipher with segmented capability */
+template<CipherKeyLen keyLenBits, utils::CpuArchLevel arch>
 class XtsBlockT
     : public Xts
-    , public virtual iCipherSeg
+    , public iCipherSegment
 {
   public:
     XtsBlockT()
@@ -190,18 +160,14 @@ class XtsBlockT
     }
     alc_error_t encrypt(const Uint8* pPlainText,
                         Uint8*       pCipherText,
-                        Uint64       len) override;
-    alc_error_t encrypt(const Uint8* pPlainText,
-                        Uint8*       pCipherText,
                         Uint64       len,
                         Uint64*      outlen) override;
     alc_error_t decrypt(const Uint8* pCipherText,
                         Uint8*       pPlainText,
-                        Uint64       len) override;
-    alc_error_t decrypt(const Uint8* pCipherText,
-                        Uint8*       pPlainText,
                         Uint64       len,
                         Uint64*      outlen) override;
+
+    // Segmented capability methods
     alc_error_t encryptSegment(const Uint8* pSrc,
                                Uint8*       pDest,
                                Uint64       currSrcLen,
@@ -210,28 +176,9 @@ class XtsBlockT
                                Uint8*       pDest,
                                Uint64       currSrcLen,
                                Uint64       startBlockNum) override;
-    alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
+
+    alc_error_t finish() override { return ALC_ERROR_NONE; }
     alc_error_t CopyCtx(const iCipher* pSrc, iCipher* pDst) override
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
-    alc_error_t flush(const Uint8** pPlainText,
-                      Uint64        numBuffers,
-                      Uint64        len) override
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
-    alc_error_t dequeue(Uint8** pCipherText,
-                        Uint64  numBuffers,
-                        Uint64  len) override
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
-    alc_error_t multibufferInit(const Uint8*  pKey,
-                                Uint64        keyLen,
-                                const Uint8** pIv,
-                                Uint64        ivLen,
-                                Uint64        numBuffers) override
     {
         return ALC_ERROR_NOT_SUPPORTED;
     }

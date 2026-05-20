@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -86,6 +86,7 @@ RngBase::genRandomBytes(std::size_t l)
     ret = std::vector<Uint8>(l, 0);
     if (alcp_rng_gen_random(&m_handle, &(ret[0]), l) == ALC_ERROR_NO_ENTROPY) {
         try {
+            // TODO: Q. why not simply `std::cerr <<` the message ?
             throw "rng_base.cc : Bail out! not enough entropy!";
         } catch (const char* exc) {
             std::cerr << exc << std::endl;

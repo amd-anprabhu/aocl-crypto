@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -222,36 +222,36 @@ AlcpCipherBase::context_copy()
     return true;
 }
 
+// Primary multi-buffer flush API (variable-length)
 bool
-AlcpCipherBase::flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len)
+AlcpCipherBase::flush(const Uint8** pPlainText, const Uint64* pLengths, Uint64 numBuffers)
 {
-    // use alcp_flush to flush to plaintext buffer
     alc_error_t err;
-    err = alcp_flush(m_handle, pPlainText, numBuffers, len);
+    err = alcp_flush(m_handle, pPlainText, pLengths, numBuffers);
     if (alcp_is_error(err)) {
-        std::cout << "Error code in alcp_cipher_flush:" << err << std::endl;
+        std::cout << "Error code in alcp_flush:" << err << std::endl;
         return false;
     }
     return true;
 }
 
+// Primary multi-buffer dequeue API (variable-length)
 bool
-AlcpCipherBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len)
+AlcpCipherBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, const Uint64* pLengths)
 {
-    // use alcp_dequeue to dequeue from ciphertext buffer
     alc_error_t err;
-    err = alcp_dequeue(m_handle, pCipherText, numBuffers, len);
+    err = alcp_dequeue(m_handle, pCipherText, numBuffers, pLengths);
     if (alcp_is_error(err)) {
         if (err == ALC_ERROR_NO_FALLBACK) {
             std::cout << "Not supported on non-avx512 architectures" << std::endl;
         } else {
-            std::cout << "Error code in alcp_cipher_dequeue:" << err
-                      << std::endl;
+            std::cout << "Error code in alcp_dequeue:" << err << std::endl;
         }
         return false;
     }
     return true;
 }
+// Uniform-length wrappers are inherited from CipherBase
 
 bool
 AlcpCipherBase::multibufferInit(const Uint8*  pKey,

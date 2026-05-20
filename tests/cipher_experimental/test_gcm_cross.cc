@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -37,6 +37,8 @@
 #include "csv.hh"
 #include "rng_base.hh"
 #include "utils.hh"
+#include <exception>
+#include <iostream>
 
 using alcp::testing::Csv;
 
@@ -355,20 +357,19 @@ using namespace alcp::testing::cipher::gcm;
 using alcp::testing::cipher::LibrarySelect;
 using alcp::testing::utils::ArgsMap;
 using alcp::testing::utils::ParamType;
-using alcp::testing::utils::parseArgs;
+using alcp::testing::utils::parseTestArgs;
 
 #if 1
 int
 main(int argc, char** argv)
 {
-    ::testing::InitGoogleTest(&argc, argv);
-
-    std::shared_ptr<alcp::testing::RngBase> rng =
-        std::make_shared<alcp::testing::RngBase>();
-
-    ArgsMap argsMap = parseArgs(argc, argv);
-
     try {
+        ArgsMap argsMap = parseTestArgs(&argc, argv);
+        ::testing::InitGoogleTest(&argc, argv);
+
+        std::shared_ptr<alcp::testing::RngBase> rng =
+            std::make_shared<alcp::testing::RngBase>();
+
         assert(argsMap["USE_OSSL"].paramType == ParamType::TYPE_BOOL);
         assert(argsMap["USE_IPP"].paramType == ParamType::TYPE_BOOL);
         assert(argsMap["OVERRIDE_ALCP"].paramType == ParamType::TYPE_BOOL);
@@ -407,7 +408,14 @@ main(int argc, char** argv)
 
         return RUN_ALL_TESTS();
     } catch (const std::bad_variant_access& e) {
-        std::cout << e.what() << '\n';
+        std::cerr << "Bad variant access: " << e.what() << std::endl;
+        return 1;
+    } catch (const std::exception& e) {
+        std::cerr << "Unhandled exception: " << e.what() << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "Unknown exception caught" << std::endl;
+        return 1;
     }
 }
 #endif

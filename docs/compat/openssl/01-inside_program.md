@@ -1,6 +1,6 @@
 # Using provider in a C program
 
-Instructions to use provider in a C program is given in [this link](https://github.com/openssl/openssl/blob/master/README-PROVIDERS.md)
+Instructions to use provider in a C program are given in [this link](https://github.com/openssl/openssl/blob/master/README-PROVIDERS.md)
 
 ```c
 #include <stdio.h>
@@ -12,7 +12,7 @@ int main(void)
 {
     OSSL_PROVIDER *alcp_provider;
 
-	OSSL_PROVIDER_set_default_search_path("/path/to/alcp/lib")
+	OSSL_PROVIDER_set_default_search_path(NULL, "/path/to/alcp/lib");
 
     alcp_provider = OSSL_PROVIDER_load(NULL, "libopenssl-compat");
     if (NULL == alcp_provider) {
@@ -27,4 +27,4 @@ int main(void)
 }
 ```
 
-For more information on the Provider APIs OSSL_PROVIDER_set_default_search_path, OSSL_PROVIDER_load, OSSL_PROVIDER_unload etc. please refer to https://docs.openssl.org/3.0/man3/OSSL_PROVIDER/.
+For more information on the Provider APIs OSSL_PROVIDER_set_default_search_path, OSSL_PROVIDER_load, OSSL_PROVIDER_unload etc. please refer to https://docs.openssl.org/master/man3/OSSL_PROVIDER/.

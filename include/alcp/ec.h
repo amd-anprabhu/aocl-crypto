@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -47,36 +47,36 @@ EXTERN_C_BEGIN
 /**
  * @brief Store info about curve id used for EC
  *
- * @typedef enum alc_ec_curve_id
+ * @enum alc_ec_curve_id
  */
-typedef enum
+typedef enum alc_ec_curve_id
 {
-    ALCP_EC_CURVE25519 = 0,
-    ALCP_EC_SECP256R1,
-    ALCP_EC_MAX,
+    ALCP_EC_CURVE25519 = 0, /**< Curve25519 (Montgomery curve for X25519 ECDH) */
+    ALCP_EC_SECP256R1, /**< NIST P-256 (secp256r1) curve */
+    ALCP_EC_MAX, /**< Sentinel value for curve enumeration */
 } alc_ec_curve_id;
 
 /**
  * @brief Store info about curve type used for EC
  *
- * @typedef enum alc_ec_curve_type
+ * @enum alc_ec_curve_type
  */
-typedef enum
+typedef enum alc_ec_curve_type
 {
-    ALCP_EC_CURVE_TYPE_SHORT_WEIERSTRASS = 0,
-    ALCP_EC_CURVE_TYPE_MONTGOMERY,
-    ALCP_EC_CURVE_TYPE_MAX
+    ALCP_EC_CURVE_TYPE_SHORT_WEIERSTRASS = 0, /**< Short Weierstrass curve form (used by P-256) */
+    ALCP_EC_CURVE_TYPE_MONTGOMERY, /**< Montgomery curve form (used by Curve25519) */
+    ALCP_EC_CURVE_TYPE_MAX /**< Sentinel value for curve type enumeration */
 } alc_ec_curve_type;
 
 /**
  * @brief Store info about point format id used for EC
  *
- * @typedef enum alc_ec_point_format_id
+ * @enum alc_ec_point_format_id
  */
-typedef enum
+typedef enum alc_ec_point_format_id
 {
-    ALCP_EC_POINT_FORMAT_UNCOMPRESSED = 0,
-    ALCP_EC_POINT_FORMAT_COMPRESSED,
+    ALCP_EC_POINT_FORMAT_UNCOMPRESSED = 0, /**< Uncompressed point format */
+    ALCP_EC_POINT_FORMAT_COMPRESSED, /**< Compressed point format */
 } alc_ec_point_format_id;
 
 /**
@@ -119,8 +119,8 @@ typedef struct _alc_ec_handle
  * @brief       Returns the context size of the interaction
  *
  * @parblock <br> &nbsp;
- * <b>This API can be called after @ref alcp_ec_request only otherwise
- * Context will be empty </b>
+ * <b>This API should be called before @ref alcp_ec_request to
+ * determine the required context size for allocation.</b>
  * @endparblock
  *
  * @note        @ref alcp_ec_supported() should be called first to
@@ -128,7 +128,7 @@ typedef struct _alc_ec_handle
  *
  * @param [in]      p_ec_info   Description of the requested ec session
  *
- * @return      Size of Context
+ * @return      Size in bytes of the EC context buffer to allocate.
  */
 ALCP_API_EXPORT Uint64
 alcp_ec_context_size(const alc_ec_info_p p_ec_info);
@@ -141,20 +141,18 @@ alcp_ec_context_size(const alc_ec_info_p p_ec_info);
  * know if EC that is being requested is supported or not </b>
  * @endparblock
  *
- * @note        alcp_ec_supported() should be called
- *              know if the given curveType and configuration is valid.
+ * @note        Call this API to determine if the given curveType and
+ *              configuration are valid.
  *
  * @param [in]      pEcInfo Description of the requested ec session
  *
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE, an error has occurred and handle will be invalid for
- * future operations
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_ec_supported(const alc_ec_info_p pEcInfo);
 
 /**
- * @brief       Request a handle for ec  for a configuration
+ * @brief       Request a handle for ec for a configuration
  *              as pointed by p_ec_info_p
  *
  * @parblock <br> &nbsp;
@@ -170,9 +168,7 @@ alcp_ec_supported(const alc_ec_info_p pEcInfo);
  * @param [out]      pEcHandle Library populated session handle for future
  * EC operations.
  *
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE, an error has occurred and handle will be invalid for
- * future operations
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_ec_request(const alc_ec_info_p pEcInfo, alc_ec_handle_p pEcHandle);

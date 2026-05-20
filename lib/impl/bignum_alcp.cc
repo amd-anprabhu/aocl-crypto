@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -30,6 +30,7 @@
 #include "alcp/digest/sha2.hh"
 #include "alcp/rng/drbg_hmac.hh"
 #include "alcp/utils/bignum.hh"
+#include "alcp/utils/bits.hh"
 #include <algorithm>
 #include <bitset>
 #include <climits>
@@ -410,7 +411,7 @@ BigNum::Impl::total_bits() const
     int ans = 0;
     if (m_data.size() > 1)
         ans = (m_data.size() - 1) * 64;
-    ans += (m_data.back() == 0 ? 64 : 64 - (__builtin_clzll(m_data.back())));
+    ans += (m_data.back() == 0 ? 64 : 64 - (utils::CountLeadingZeros64(m_data.back())));
     return ans;
 }
 
@@ -763,7 +764,7 @@ BigNum::Impl::lshift(int shifts)
     int    len = m_data.size() + (shifts / 64)
               + (m_data.back() == 0
                      ? 0
-                     : (((shifts % 64) > __builtin_clzll(m_data.back()))));
+                     : (((shifts % 64) > utils::CountLeadingZeros64(m_data.back()))));
 
     result.pImpl()->m_data.resize(len);
 
@@ -780,7 +781,7 @@ BigNum::Impl::rshift(int shifts)
         m_data.size() - (shifts / 64)
         - (((shifts % 64)
             > (64
-               - (m_data.back() != 0 ? __builtin_clzll(m_data.back()) : 64))));
+               - (m_data.back() != 0 ? utils::CountLeadingZeros64(m_data.back()) : 64))));
     if (len <= 0) {
         result.fromInt32(0);
         return result;

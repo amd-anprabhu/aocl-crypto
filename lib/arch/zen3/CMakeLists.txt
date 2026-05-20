@@ -1,4 +1,4 @@
- # Copyright (C) 2021-2025, Advanced Micro Devices. All rights reserved.
+ # Copyright (C) 2021-2026, Advanced Micro Devices. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions are met:
@@ -47,8 +47,8 @@ ADD_LIBRARY(arch_zen3
 	${ZEN3_SRCS})
 
 # FIXME: temporarily suppressing this. Known issue with gcc14
-if(CMAKE_COMPILER_IS_GCC AND CMAKE_COMPILER_GCC_VERSION MATCHES "14")
-	MESSAGE(WARNING "GCC14: Disabling array out of bounds checks (-Wno-array-bounds) for zen3 sources")
+if(CMAKE_COMPILER_IS_GCC AND CMAKE_COMPILER_GCC_VERSION VERSION_GREATER_EQUAL "14")
+	MESSAGE(WARNING "GCC${CMAKE_COMPILER_GCC_VERSION}: Disabling array out of bounds checks (-Wno-array-bounds) for zen3 sources")
 	TARGET_COMPILE_OPTIONS(arch_zen3 PRIVATE "-Wno-array-bounds")
 endif()
 
@@ -56,13 +56,6 @@ IF(ALCP_ENABLE_CIPHER_MULTI_UPDATE)
 	TARGET_COMPILE_DEFINITIONS(arch_zen3 PRIVATE "AES_MULTI_UPDATE")	
 ENDIF(ALCP_ENABLE_CIPHER_MULTI_UPDATE)
 
-
-IF(ALCP_ENABLE_CBC_INPLACE_BUFFER)
-	set_source_files_properties(vaes_cbc_decrypt.cc PROPERTIES COMPILE_DEFINITIONS "AES_CBC_INPLACE_BUFFER")
-	MESSAGE(STATUS "CBC In-Place Buffer support is enabled.")
-ELSE()
-	MESSAGE(STATUS "CBC In-Place Buffer support is disabled.")
-ENDIF(ALCP_ENABLE_CBC_INPLACE_BUFFER)
 
 
 TARGET_LINK_LIBRARIES(alcp PRIVATE arch_zen3)

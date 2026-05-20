@@ -20,8 +20,8 @@ colorlinks: true
 # Key Terminologies
 
 1) IPP-CP - Intel Performance Primitives - CP
-2) Asymmetric Cryptography - Cryptography which uses single key
-3) Symmetric Cryptography  - Cryptography which uses two keys, one private key and one public key for encryption and decryption.
+2) Symmetric Cryptography - Cryptography which uses a single shared key for both encryption and decryption.
+3) Asymmetric Cryptography  - Cryptography which uses two keys, one public key and one private key for encryption and decryption.
 4) Hashing - Creating a value which represents a data which is a trap door(cant be decoded/converted back to the original file), which is mainly used for checking the integrity.
 5) RNG - Random Number Generator
 6) BRNG - Base Random Number Generator
@@ -83,5 +83,4 @@ LD_PRELOAD=/path/to/libipp-compat.so ./program_to_run
 * Preload Path should be the .so file itself.
 * Any command can follow LD_PRELOAD.
 
-For more details, please refer to [Preloading_IPP] (Preloading IPP-CP wrapper plugin)
-
+For more details, please refer to [Preloading IPP-CP wrapper plugin](ipp/01-Preloading.md)

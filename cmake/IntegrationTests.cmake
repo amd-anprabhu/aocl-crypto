@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+# Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -31,27 +31,59 @@ FetchContent_Declare(gtest
 FetchContent_MakeAvailable(gtest)
 find_package(Threads)
 
-message(STATUS "checking for git-lfs installation")
-find_program(GITLFS "git-lfs")
-if (NOT GITLFS)
-    message(FATAL_ERROR "git-lfs installation not found, KAT tests will not run!")
+# KAT test data files are tracked by git-lfs.  Detect files that are absent
+# or still LFS pointer stubs (e.g. when cloning without git-lfs installed or
+# when the source was obtained as a zip archive without a .git directory).
+# Discover all test_data sub-directories under tests/ that carry a
+# .gitattributes file marking *.csv as LFS objects.
+file(GLOB _LFS_TEST_DATA_DIRS
+     LIST_DIRECTORIES true
+     "${CMAKE_SOURCE_DIR}/tests/*/test_data")
+set(_LFS_PROBLEM_FILES "")
+foreach(_lfs_dir ${_LFS_TEST_DATA_DIRS})
+    if(NOT IS_DIRECTORY "${_lfs_dir}")
+        continue()
+    endif()
+    if(NOT EXISTS "${_lfs_dir}/.gitattributes")
+        continue()
+    endif()
+    file(GLOB _lfs_csvs "${_lfs_dir}/*.csv")
+    if(NOT _lfs_csvs)
+        list(APPEND _LFS_PROBLEM_FILES "${_lfs_dir}/*.csv  <-- directory has no CSV files>")
+    else()
+        foreach(_lfs_csv ${_lfs_csvs})
+            file(READ "${_lfs_csv}" _lfs_header LIMIT 64)
+            if("${_lfs_header}" MATCHES "version https://git-lfs\\.github\\.com")
+                list(APPEND _LFS_PROBLEM_FILES "${_lfs_csv}  <-- git-lfs pointer stub>")
+            endif()
+        endforeach()
+    endif()
+endforeach()
+unset(_lfs_dir)
+unset(_lfs_csvs)
+unset(_lfs_csv)
+unset(_lfs_header)
+unset(_LFS_TEST_DATA_DIRS)
+if(_LFS_PROBLEM_FILES)
+    string(REPLACE ";" "\n    " _LFS_PROBLEM_LIST "${_LFS_PROBLEM_FILES}")
+    message(WARNING
+        "One or more KAT test data files are missing or are git-lfs pointer stubs:\n\n"
+        "    ${_LFS_PROBLEM_LIST}\n"
+        "\nThese CSV files are managed by git-lfs and must be fetched separately.\n"
+        "To resolve:\n"
+        "  1. Install git-lfs from https://git-lfs.github.com\n"
+        "  2. Run the following from the repository root:\n"
+        "         git lfs install\n"
+        "         git lfs pull\n"
+        "  Or, if cloning fresh, install git-lfs first and then clone:\n"
+        "         git lfs install\n"
+        "         git clone <repo-url>\n"
+        "KAT tests that depend on missing data files will fail at runtime.")
 else()
-    message(STATUS "git-lfs installation found")
-    # execute git-lfs fetch command
-    execute_process(COMMAND ${GITLFS} fetch
-                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                    RESULT_VARIABLE result)
-    if (NOT result EQUAL 0)
-        message(FATAL_ERROR "git-lfs fetch command failed, KAT tests will not run!")
-    endif()
-    # execute git-lfs checkout command
-    execute_process(COMMAND ${GITLFS} checkout
-                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                    RESULT_VARIABLE result)
-    if (NOT result EQUAL 0)
-        message(FATAL_ERROR "git-lfs checkout command failed, KAT tests will not run!")
-    endif()
+    message(STATUS "KAT test data: all LFS-tracked CSV files are present and valid.")
 endif()
+unset(_LFS_PROBLEM_FILES)
+unset(_LFS_PROBLEM_LIST)
 
 FILE(GLOB COMMON_SRCS ${CMAKE_SOURCE_DIR}/tests/common/base/*.cc)
 

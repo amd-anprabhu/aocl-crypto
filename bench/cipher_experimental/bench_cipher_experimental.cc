@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -32,7 +32,7 @@
 #include "cipher_experimental/alc_cipher_gcm.hh"
 #include "cipher_experimental/alc_cipher_xts.hh"
 #include "cipher_experimental/factory.hh"
-#include "common/experimental/gtest_essentials.hh"
+#include "gbench_base.hh"
 #include "utils.hh"
 #include <variant>
 
@@ -183,15 +183,19 @@ BenchXtsCipherExperimental(benchmark::State&            state,
         key[i] = i;
     }
 
+    for (Uint32 i = 0; i < 16; i++) {
+        iv[i] = i;
+    }
+
     alc_test_xts_init_data_t dataInit;
     dataInit.m_iv      = iv;
-    dataInit.m_iv_len  = 12;
+    dataInit.m_iv_len  = 16;
     dataInit.m_key     = key;
     dataInit.m_key_len = keylen / 8;
 
     alc_test_xts_update_data_t dataUpdate;
     dataUpdate.m_iv              = iv;
-    dataUpdate.m_iv_len          = 12;
+    dataUpdate.m_iv_len          = 16;
     dataUpdate.m_output          = output_text;
     dataUpdate.m_output_len      = cBlockSize;
     dataUpdate.m_input           = input_text;
@@ -349,72 +353,62 @@ BENCH_AES_DECRYPT_XTS_256(benchmark::State& state)
 
 using alcp::testing::cipher::CipherFactory;
 using alcp::testing::cipher::LibrarySelect;
-using alcp::testing::utils::ArgsMap;
-using alcp::testing::utils::ParamType;
-using alcp::testing::utils::parseArgs;
 using alcp::testing::utils::printErrors;
 int
 main(int argc, char** argv)
 {
     std::vector<Int64> testlibs = {};
 
+    parseBenchArgs(&argc, argv);
     ::benchmark::Initialize(&argc, argv);
 
-    ArgsMap argsMap = parseArgs(argc, argv);
-
-    try {
-        assert(argsMap["USE_OSSL"].paramType == ParamType::TYPE_BOOL);
-        assert(argsMap["USE_IPP"].paramType == ParamType::TYPE_BOOL);
-        assert(argsMap["USE_ALCP"].paramType == ParamType::TYPE_BOOL);
-
-        if (std::get<bool>(argsMap["USE_OSSL"].value) == false
-            && std::get<bool>(argsMap["USE_IPP"].value) == false
-            && std::get<bool>(argsMap["USE_ALCP"].value) == false) {
+    if (!useossl && !useipp && !use_alcp) {
 #ifdef USE_IPP
-            testlibs.insert(testlibs.begin(),
-                            static_cast<Int64>(LibrarySelect::IPP));
+        testlibs.insert(testlibs.begin(),
+                        static_cast<Int64>(LibrarySelect::IPP));
 #endif
+#ifdef USE_OSSL
+        testlibs.insert(testlibs.begin(),
+                        static_cast<Int64>(LibrarySelect::OPENSSL));
+#endif
+        testlibs.insert(testlibs.begin(),
+                        static_cast<Int64>(LibrarySelect::ALCP));
+    } else {
+        if (use_alcp) {
+            testlibs.insert(testlibs.begin(),
+                            static_cast<Int64>(LibrarySelect::ALCP));
+        }
+        if (useossl) {
 #ifdef USE_OSSL
             testlibs.insert(testlibs.begin(),
                             static_cast<Int64>(LibrarySelect::OPENSSL));
-#endif
-            testlibs.insert(testlibs.begin(),
-                            static_cast<Int64>(LibrarySelect::ALCP));
-        } else {
-            if (std::get<bool>(argsMap["USE_ALCP"].value) == true) {
-                testlibs.insert(testlibs.begin(),
-                                static_cast<Int64>(LibrarySelect::ALCP));
-            }
-            if (std::get<bool>(argsMap["USE_OSSL"].value) == true) {
-#ifdef USE_OSSL
-                testlibs.insert(testlibs.begin(),
-                                static_cast<Int64>(LibrarySelect::OPENSSL));
 #else
-                printErrors("OpenSSL unavailable at compile time!");
-                return -1;
+            printErrors(
+                "OpenSSL unavailable at compile time! Defaulting to ALCP.");
 #endif
-            }
-            if (std::get<bool>(argsMap["USE_IPP"].value) == true) {
-#ifdef USE_IPP
-                testlibs.insert(testlibs.begin(),
-                                static_cast<Int64>(LibrarySelect::IPP));
-#else
-                printErrors("IPP unavailable at compile time!");
-                return -1;
-#endif
-            }
         }
-    } catch (const std::bad_variant_access& e) {
-        std::cout << e.what() << '\n';
+        if (useipp) {
+#ifdef USE_IPP
+            testlibs.insert(testlibs.begin(),
+                            static_cast<Int64>(LibrarySelect::IPP));
+#else
+            printErrors(
+                "IPP unavailable at compile time! Defaulting to ALCP.");
+#endif
+        }
+    }
+
+    // If the requested library isn't compiled in, run ALCP instead of failing.
+    if (testlibs.empty()) {
+        testlibs.insert(testlibs.begin(), static_cast<Int64>(LibrarySelect::ALCP));
     }
 
     /* check if custom block size is provided by user */
-    if (alcp::testing::utils::block_size != 0) {
-        std::cout << "Custom block size selected:"
-                  << alcp::testing::utils::block_size << std::endl;
+    if (block_size != 0) {
+        std::cerr << "Custom block size selected:"
+                  << block_size << std::endl;
         alcp::benchmarking::cipher::blocksizes.resize(1);
-        alcp::benchmarking::cipher::blocksizes[0] =
-            alcp::testing::utils::block_size;
+        alcp::benchmarking::cipher::blocksizes[0] = block_size;
     }
 
     // GCM

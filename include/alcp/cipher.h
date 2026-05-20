@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2021-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -48,29 +48,29 @@ EXTERN_C_BEGIN
 /**
  * @brief Specify which mode to be used for encrypt and decrypt.
  *
- * @typedef enum  alc_cipher_mode_t
+ * @enum alc_cipher_mode
  */
-typedef enum _alc_cipher_mode
+typedef enum alc_cipher_mode
 {
-    ALC_AES_MODE_NONE = 0,
+    ALC_AES_MODE_NONE = 0, /**< No cipher mode selected */
 
     // aes ciphers
-    ALC_AES_MODE_ECB,
-    ALC_AES_MODE_CBC,
-    ALC_AES_MODE_OFB,
-    ALC_AES_MODE_CTR,
-    ALC_AES_MODE_CFB,
-    ALC_AES_MODE_XTS,
+    ALC_AES_MODE_ECB, /**< AES Electronic Codebook mode */
+    ALC_AES_MODE_CBC, /**< AES Cipher Block Chaining mode */
+    ALC_AES_MODE_OFB, /**< AES Output Feedback mode */
+    ALC_AES_MODE_CTR, /**< AES Counter mode */
+    ALC_AES_MODE_CFB, /**< AES Cipher Feedback mode */
+    ALC_AES_MODE_XTS, /**< AES XEX-based Tweaked-codebook mode with ciphertext Stealing */
     // non-aes ciphers
-    ALC_CHACHA20,
+    ALC_CHACHA20, /**< ChaCha20 stream cipher */
     // aes AEAD ciphers
-    ALC_AES_MODE_GCM,
-    ALC_AES_MODE_CCM,
-    ALC_AES_MODE_SIV,
+    ALC_AES_MODE_GCM, /**< AES Galois/Counter Mode (AEAD) */
+    ALC_AES_MODE_CCM, /**< AES Counter with CBC-MAC (AEAD) */
+    ALC_AES_MODE_SIV, /**< AES Synthetic Initialization Vector (AEAD) */
     // non-aes aead ciphers
-    ALC_CHACHA20_POLY1305,
+    ALC_CHACHA20_POLY1305, /**< ChaCha20-Poly1305 authenticated encryption (AEAD) */
 
-    ALC_AES_MODE_MAX,
+    ALC_AES_MODE_MAX, /**< Sentinel value for mode enumeration */
 
 } alc_cipher_mode_t;
 
@@ -131,7 +131,7 @@ alcp_cipher_context_size(void);
  * @param [in]    keyLen           key length in bits
  * @param [out]   pCipherHandle    Library populated session handle for future
  * cipher operations.
- * @return   &nbsp; Error Code for the API called.
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_cipher_request(const alc_cipher_mode_t cipherMode,
@@ -144,14 +144,14 @@ alcp_cipher_request(const alc_cipher_mode_t cipherMode,
  * <b>This API can be called after @ref alcp_cipher_request is
  * called.</b>
  * @endparblock
+ * @note     Error needs to be checked for each call,
+ *           valid only if @ref alcp_is_error (ret) is false
  * @param [in] pCipherHandle Session handle for cipher operation
  * @param[in] pKey  Key
  * @param[in] keyLen  key Length in bits
  * @param[in] pIv  IV/Nonce
  * @param[in] ivLen  IV length in bytes
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE then an error has occurred and handle will be invalid
- * for future operations
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_cipher_init(const alc_cipher_handle_p pCipherHandle,
@@ -161,22 +161,32 @@ alcp_cipher_init(const alc_cipher_handle_p pCipherHandle,
                  Uint64                    ivLen);
 
 /**
- * @brief  Initialize a cipher session for multi-buffer processing.
+ * @brief       Initialize multi-buffer cipher operation with key and per-buffer IVs.
+ *
  * @parblock <br> &nbsp;
- * <b>This API can be called after @ref alcp_cipher_request. It prepares the
- * session to process multiple buffers in parallel by accepting an array of IVs
- * (one IV per buffer) for modes that support parallel buffers</b>
+ * <b>This API prepares a multi-buffer cipher session for parallel encryption
+ * of multiple independent buffers. It must be called after
+ * @ref alcp_cipher_request and before @ref alcp_flush.</b>
+ *
+ * Multi-buffer mode processes up to 127 independent plaintext buffers in
+ * parallel using AVX-512 instructions. Each buffer uses its own IV for
+ * independent encryption streams.
+ *
+ * Supported cipher modes: AES-CBC, AES-CFB.
  * @endparblock
- * @param [in] pCipherHandle  Session handle for cipher operation
- * @param [in] pKey           Key
- * @param [in] keyLen         Key length in bits
- * @param [in] pIv            Array of pointers to IV/Nonce values (one per
- *                            buffer)
- * @param [in] ivLen          IV length in bytes (applies to every buffer)
- * @param [in] numBuffers     Number of buffers to be processed in parallel
- * @return   &nbsp; Error Code for the API called. If alc_error_t is not
- * ALC_ERROR_NONE then an error has occurred and handle will be invalid for
- * future operations
+ *
+ * @note     Error needs to be checked for each call,
+ *           valid only if @ref alcp_is_error (ret) is false
+ * @note     Requires AVX-512 capable CPU. Otherwise falls back to single buffer implementation.
+ *
+ * @param[in] pCipherHandle  Session handle from @ref alcp_cipher_request
+ * @param[in] pKey           Encryption key (NULL to reuse key from request)
+ * @param[in] keyLen         Key length in bits (0 if pKey is NULL)
+ * @param[in] pIv            Array of pointers to IV buffers, one per buffer
+ * @param[in] ivLen          Length of each IV in bytes (e.g., 16 for AES)
+ * @param[in] numBuffers     Number of buffers to process (max 127)
+ *
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_multibuffer_init(const alc_cipher_handle_p pCipherHandle,
@@ -202,7 +212,7 @@ alcp_multibuffer_init(const alc_cipher_handle_p pCipherHandle,
  * @param[in]    datalen           Length of cipher/plain text
  * @param[out]   outlen        Pointer to store actual bytes written to
  * pCipherText
- * @return   &nbsp; Error Code for the API called.
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_cipher_encrypt(const alc_cipher_handle_p pCipherHandle,
@@ -228,7 +238,7 @@ alcp_cipher_encrypt(const alc_cipher_handle_p pCipherHandle,
  * @param[in]    datalen           Length of cipher/plain text
  * @param[out]   outlen        Pointer to store actual bytes written to
  * pPlainText
- * @return   &nbsp; Error Code for the API called.
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_cipher_decrypt(const alc_cipher_handle_p pCipherHandle,
@@ -260,66 +270,90 @@ alcp_cipher_finish(const alc_cipher_handle_p pCipherHandle);
  * another. Both source and destination must be initialized with the same cipher
  * mode and key length.</b>
  * @endparblock
+ * @note     Error needs to be checked for each call,
+ *           valid only if @ref alcp_is_error (ret) is false
  *
  * @param[in]  src  Source cipher handle containing the context to copy from
- * @param[in]  dst  Destination cipher handle where the context will be copied
+ * @param[out] dst  Destination cipher handle where the context will be copied
  * to
  *
- * @return Error code:
- *         - ALC_ERROR_NONE          Success
- *         - ALC_ERROR_BAD_STATE     Either src or dst is in an invalid state
- *         - ALC_ERROR_INVALID_ARG   Source and destination context types don't
- * match
- *         - ALC_ERROR_GENERIC       Generic error during copy operation
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_cipher_context_copy(const alc_cipher_handle_p src,
                          alc_cipher_handle_p       dst);
 
 /**
- * @brief Submit multiple plaintext buffers for encryption (multi-buffer API)
+ * @brief       Enqueue multiple plaintext buffers for parallel encryption.
  *
  * @parblock <br> &nbsp;
- * <b>This API enqueues a batch of buffers for processing after a successful
- * @ref alcp_multibuffer_init call. The number of buffers and their lengths must
- * match the parameters provided during initialization.</b>
+ * <b>Stages a batch of plaintext buffers for parallel SIMD encryption.
+ * Each buffer can have a different length (variable-length multi-buffer).
+ * Call @ref alcp_dequeue to retrieve the encrypted results.</b>
+ *
+ * This API must be called after @ref alcp_multibuffer_init. The buffers
+ * are not encrypted immediately — actual processing happens during
+ * @ref alcp_dequeue.
+ *
+ * Supported cipher modes: AES-CBC, AES-CFB.
  * @endparblock
  *
- * @param[in] pCipherHandle Session handle for cipher operation
- * @param[in] pPlainText    Array of pointers to plaintext buffers
- * @param[in] numBuffers    Number of buffers in the batch
- * @param[in] len           Length of each buffer in bytes
- * @return Error code:
- *         - ALC_ERROR_NONE          Success
+ * @note     Error needs to be checked for each call,
+ *           valid only if @ref alcp_is_error (ret) is false
+ * @note     Requires AVX-512 capable CPU for SIMD multi-buffer execution.
+ *           On platforms without AVX-512, falls back to single-buffer
+ *           processing.
+ *
+ * @pre      @ref alcp_multibuffer_init must be called before this API.
+ *
+ * @param[in] pCipherHandle  Session handle for cipher operation
+ * @param[in] pPlainText     Array of pointers to plaintext buffers
+ * @param[in] pLengths       Array of per-buffer lengths in bytes
+ * @param[in] numBuffers     Number of buffers in the batch (max 127)
+ *
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_flush(const alc_cipher_handle_p pCipherHandle,
-           const Uint8**             pPlainText,
-           Uint64                    numBuffers,
-           Uint64                    len);
+                   const Uint8**             pPlainText,
+                   const Uint64*             pLengths,
+                   Uint64                    numBuffers);
 
 /**
- * @brief Dequeue processed ciphertext buffers (multi-buffer API)
+ * @brief       Retrieve encrypted ciphertext from multi-buffer operation.
  *
  * @parblock <br> &nbsp;
- * <b>This API retrieves the outputs corresponding to the buffers submitted via
- * @ref alcp_flush. Each output buffer pointer must be pre-allocated by the
- * caller with space for the specified length.</b>
+ * <b>Performs the actual parallel encryption of buffers staged via
+ * @ref alcp_flush and writes results to the provided output buffers.
+ * Uses the Iterative MinLen algorithm for maximum SIMD parallelism across
+ * variable-length buffers.</b>
+ *
+ * Each output buffer must be pre-allocated by the caller with at least
+ * the corresponding length from pLengths.
+ *
+ * Supported cipher modes: AES-CBC, AES-CFB.
  * @endparblock
  *
- * @param[in]  pCipherHandle Session handle for cipher operation
- * @param[out] pCipherText   Array of pointers to ciphertext buffers (outputs)
- * @param[in]  numBuffers    Number of buffers to dequeue
- * @param[in]  len           Length of each buffer in bytes
- * @return Error code:
- *         - ALC_ERROR_NONE          Success
- *         - ALC_ERROR_BAD_STATE     Either src or dst is in an invalid state
+ * @note     Error needs to be checked for each call,
+ *           valid only if @ref alcp_is_error (ret) is false
+ * @note     On platforms without AVX-512, falls back to single-buffer
+ *           processing.
+ *
+ * @pre      @ref alcp_flush must be called before this API.
+ *
+ * @param[in]  pCipherHandle  Session handle for cipher operation
+ * @param[out] pCipherText    Array of pointers to pre-allocated output buffers
+ * @param[in]  numBuffers     Number of buffers to dequeue
+ * @param[in]  pLengths       Array of per-buffer lengths in bytes
+ *
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_dequeue(const alc_cipher_handle_p pCipherHandle,
-             Uint8**                   pCipherText,
-             Uint64                    numBuffers,
-             Uint64                    len);
+                     Uint8**                   pCipherText,
+                     Uint64                    numBuffers,
+                     const Uint64*             pLengths);
+
 EXTERN_C_END
 
 #endif /* _ALCP_CIPHER_H_ */

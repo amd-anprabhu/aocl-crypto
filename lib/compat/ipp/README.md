@@ -5,6 +5,7 @@ By preloading the IPP Compat library you will be able to run any applications us
 ## Building
 
 ```
+git lfs install
 git clone <repo url> aocl-crypto
 mkdir aocl-crypto/build
 cd aocl-crypto/build

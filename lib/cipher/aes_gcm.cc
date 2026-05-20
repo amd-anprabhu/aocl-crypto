@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,12 +26,9 @@
  *
  */
 
-#include "alcp/cipher/aes.hh"
+#include "alcp/cipher/aes_gcm.hh"
 #include "alcp/cipher/cipher_wrapper.hh"
 #include "alcp/utils/compare.hh"
-//
-#include "alcp/cipher/aes_gcm.hh"
-#include "alcp/utils/cpuid.hh"
 
 #include <immintrin.h>
 #include <wmmintrin.h>
@@ -41,40 +38,44 @@ using alcp::utils::CpuId;
 #define DEBUG_PROV_GCM_INIT 0
 
 namespace alcp::cipher {
-// init & finish implementation
+
+
+// init implementation
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-Gcm::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv, Uint64 ivLen)
+GcmT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv, Uint64 ivLen)
 {
     alc_error_t err = ALC_ERROR_NONE;
-    // Uint8*      pExpKey = nullptr;
-    if (pKey != NULL && keyLen != 0) {
-        // err = setKey(pKey, pExpKey, keyLen);
-        err                        = setKey(pKey, keyLen);
-        m_gcm_ctx.m_update_counter = 0; // reset counter
+
+    // Validate and set key -- let KeyManager reject null/bad length
+    if (keyLen != 0 || pKey != nullptr) {
+        err = m_keyManager.setKey(pKey, keyLen);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
+        m_stateManager.onKeySet();
+        m_gcm_ctx.m_update_counter = 0; // reset counter
     }
 
-    if (pIv != NULL && ivLen != 0) {
-        err                        = setIv(pIv, ivLen);
-        m_gcm_ctx.m_update_counter = 0; // reset counter
+    // Validate and set IV -- let IvManager reject null/bad length
+    if (pIv != nullptr) {
+        err = m_ivManager.setIv(pIv, ivLen);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
+        m_stateManager.onIvSet();
+        m_gcm_ctx.m_update_counter = 0; // reset counter
     }
 
-    // In init call, we generate HashSubKey, partial
-    // tag data.
-    if (m_ivState_aes && m_isKeySet_aes) {
+    // In init call, we generate HashSubKey, partial tag data.
+    if (m_stateManager.isReady()) {
         m_gcm_ctx.m_gHash_128       = _mm_setzero_si128();
         m_gcm_ctx.m_hash_subKey_128 = _mm_setzero_si128();
-        m_dataLen                   = 0;
-        // printf("\n gcm init");
-        err = aesni::InitGcm(m_cipher_key_data.m_enc_key,
-                             m_nrounds,
-                             m_pIv_aes,
-                             m_ivLen_aes,
+        m_gcm_ctx.m_dataLen         = 0;
+        err = aesni::InitGcm(m_keyManager.getCipherKeyData().m_enc_key,
+                             m_keyManager.getRounds(),
+                             m_ivManager.getIv(),
+                             m_ivManager.getIvLen(),
                              m_gcm_ctx.m_hash_subKey_128,
                              m_gcm_ctx.m_tag_128,
                              m_gcm_ctx.m_counter_128,
@@ -83,9 +84,7 @@ Gcm::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv, Uint64 ivLen)
 
     #ifdef AES_MULTI_UPDATE
     // Initialize streaming fields
-    memset(m_gcm_ctx.m_partial_buffer, 0, 16);
-    m_gcm_ctx.m_partial_buffer_len = 0;
-    m_gcm_ctx.m_has_partial_data = false;
+    m_partialBuffer.clear();
     // Initialize AAD buffering fields
     m_gcm_ctx.m_aad_buffer.clear();
     m_gcm_ctx.m_aad_processed = false;
@@ -94,19 +93,57 @@ Gcm::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv, Uint64 ivLen)
     return err;
 }
 
-// authentication api implementation
+// Helper function to process buffered AAD data
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
+inline alc_error_t
+GcmT<keyLenBits, arch>::processBufferedAad()
+{
+    alc_error_t err = ALC_ERROR_NONE;
+
+    // If AAD has already been processed or there's no buffered AAD, nothing to do
+    if (m_gcm_ctx.m_aad_processed || m_gcm_ctx.m_aad_buffer.empty()) {
+        m_gcm_ctx.m_aad_processed = true;
+        return ALC_ERROR_NONE;
+    }
+
+#if DEBUG_PROV_GCM_INIT
+    printf("processBufferedAad: processing %zu bytes of buffered AAD\n", m_gcm_ctx.m_aad_buffer.size());
+#endif
+
+    // Process all buffered AAD data at once
+    err = aesni::processAdditionalDataGcm(m_gcm_ctx.m_aad_buffer.data(),
+                                          m_gcm_ctx.m_aad_buffer.size(),
+                                          m_gcm_ctx.m_gHash_128,
+                                          m_gcm_ctx.m_hash_subKey_128,
+                                          m_gcm_ctx.m_reverse_mask_128);
+
+    // Mark AAD as processed
+    m_gcm_ctx.m_aad_processed = true;
+
+    return err;
+}
+
+// Internal tag matching is disable for ipp compat support
+#define INTERNAL_TAG_MATCH 1
+
+// setAad implementation
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-GcmAuth::setAad(const Uint8* pInput, Uint64 aadLen)
+GcmT<keyLenBits, arch>::setAad(const Uint8* pInput, Uint64 aadLen)
 {
     alc_error_t err = ALC_ERROR_NONE;
 
     /* iv is not initialized means wrong order, we
      * will return its a bad state to call setAad*/
-    if (m_pIv_aes == nullptr) {
+    if (!m_ivManager.isIvSet()) {
         err = ALC_ERROR_BAD_STATE;
         return err;
     }
     
+    if (pInput == nullptr && aadLen > 0) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+
     // Skip processing if no AAD data provided
     if (pInput == nullptr || aadLen == 0) {
         return ALC_ERROR_NONE;
@@ -139,63 +176,44 @@ GcmAuth::setAad(const Uint8* pInput, Uint64 aadLen)
     return err;
 }
 
-// Helper function to process buffered AAD data
-inline alc_error_t
-GcmAuth::processBufferedAad()
-{
-    alc_error_t err = ALC_ERROR_NONE;
-    
-    // If AAD has already been processed or there's no buffered AAD, nothing to do
-    if (m_gcm_ctx.m_aad_processed || m_gcm_ctx.m_aad_buffer.empty()) {
-        m_gcm_ctx.m_aad_processed = true;
-        return ALC_ERROR_NONE;
-    }
-    
-#if DEBUG_PROV_GCM_INIT
-    printf("processBufferedAad: processing %zu bytes of buffered AAD\n", m_gcm_ctx.m_aad_buffer.size());
-#endif
-    
-    // Process all buffered AAD data at once
-    err = aesni::processAdditionalDataGcm(m_gcm_ctx.m_aad_buffer.data(),
-                                          m_gcm_ctx.m_aad_buffer.size(),
-                                          m_gcm_ctx.m_gHash_128,
-                                          m_gcm_ctx.m_hash_subKey_128,
-                                          m_gcm_ctx.m_reverse_mask_128);
-    
-    // Mark AAD as processed
-    m_gcm_ctx.m_aad_processed = true;
-    
-    return err;
-}
-
-// Internal tag matching is disable for ipp compat support
-#define INTERNAL_TAG_MATCH 1
-
-
-
+// setTagLength implementation
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-GcmAuth::setTagLength(Uint64 tagLength)
+GcmT<keyLenBits, arch>::setTagLength(Uint64 tagLength)
 {
+    // GCM tag length must be between 4 and 16 bytes (32-128 bits)
+    // Per NIST SP 800-38D, valid tag lengths are 128, 120, 112, 104, 96 bits
+    // For maximum security, 96-128 bits (12-16 bytes) is recommended
+    if (tagLength < 4 || tagLength > 16) {
+        return ALC_ERROR_INVALID_SIZE;
+    }
+    m_gcm_ctx.m_tagLength = tagLength;
     return ALC_ERROR_NONE;
 }
 
-template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+// decrypt implementation
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 GcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
-                                Uint8*       pOutput,
-                                Uint64       len,
-                                Uint64*      outlen)
+                               Uint8*       pOutput,
+                               Uint64       len,
+                               Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
-    m_isEnc_aes     = ALCP_DEC;
+    m_gcm_ctx.m_isEncrypt = false;
 
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (outlen == nullptr) {
         return ALC_ERROR_INVALID_ARG;
     }
     *outlen = 0;
 
-    if (!(m_ivState_aes && m_isKeySet_aes)) {
+    if (!m_stateManager.isReady()) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
     }
@@ -207,7 +225,7 @@ GcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
     }
 #endif 
 
-    m_dataLen += len;
+    m_gcm_ctx.m_dataLen += len;
 
 #if DEBUG_PROV_GCM_INIT
     printf("decrypt len %ld \n", len);
@@ -228,18 +246,18 @@ GcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
     Uint64 output_offset = 0;
     
     // Check if we have partial data from previous call
-    if (m_gcm_ctx.m_has_partial_data && m_gcm_ctx.m_partial_buffer_len > 0) {
+    if (m_partialBuffer.size() > 0) {
         // This is the second call - combine buffered data with new input
-        Uint64 bytes_needed = 16 - m_gcm_ctx.m_partial_buffer_len;
+        Uint64 bytes_needed = 16 - m_partialBuffer.size();
         Uint64 bytes_to_take = (len >= bytes_needed) ? bytes_needed : len;
         
         // Create a combined 16-byte buffer
         Uint8 combined_block[16];
-        memcpy(combined_block, m_gcm_ctx.m_partial_buffer, m_gcm_ctx.m_partial_buffer_len);
-        memcpy(combined_block + m_gcm_ctx.m_partial_buffer_len, pInput, bytes_to_take);
+        memcpy(combined_block, m_partialBuffer.data(), m_partialBuffer.size());
+        memcpy(combined_block + m_partialBuffer.size(), pInput, bytes_to_take);
         
         // If we have a complete 16-byte block, process it
-        if (m_gcm_ctx.m_partial_buffer_len + bytes_to_take >= 16) {
+        if (m_partialBuffer.size() + bytes_to_take >= 16) {
             Uint8 temp_output[16];
             
             // Set counter to 1 (this is the FIRST complete block in the stream)
@@ -250,13 +268,12 @@ GcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
             if (err != ALC_ERROR_NONE) return err;
             
             // Return only the NEW bytes (skip the buffered part)
-            memcpy(pOutput + output_offset, temp_output + m_gcm_ctx.m_partial_buffer_len, bytes_to_take);
+            memcpy(pOutput + output_offset, temp_output + m_partialBuffer.size(), bytes_to_take);
             output_offset += bytes_to_take;
             input_offset += bytes_to_take;
             
             // Clear partial buffer
-            m_gcm_ctx.m_partial_buffer_len = 0;
-            m_gcm_ctx.m_has_partial_data = false;
+            m_partialBuffer.clear();
         }
     }
     
@@ -285,106 +302,101 @@ GcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
         Uint64 saved_counter = m_gcm_ctx.m_update_counter;
         m_gcm_ctx.m_update_counter++;
         // Buffer the original input for next call
-        memcpy(m_gcm_ctx.m_partial_buffer+m_gcm_ctx.m_partial_buffer_len, pInput + input_offset, remaining_len);
-        Uint64 temp_offset = m_gcm_ctx.m_has_partial_data? m_gcm_ctx.m_partial_buffer_len : 0;
-        m_gcm_ctx.m_partial_buffer_len += remaining_len;
-        m_gcm_ctx.m_has_partial_data = true;
+        Uint32 temp_offset = m_partialBuffer.size();
+        m_partialBuffer.append(pInput + input_offset, remaining_len);
 
-        // create a temporary context
-        alc_gcm_ctx_t temp_ctx = m_gcm_ctx;  // Use copy constructor instead of memcpy
-        err = decryptBlock(m_gcm_ctx.m_partial_buffer, temp_output, 16);
-        m_gcm_ctx = temp_ctx;  // Use copy assignment instead of memcpy
+        // Save only the critical state fields that decryptBlock modifies
+        // This is much faster than copying the entire context (which includes std::vector)
+        __m128i saved_gHash = m_gcm_ctx.m_gHash_128;
+        __m128i saved_counter_128 = m_gcm_ctx.m_counter_128;
+
+        err = decryptBlock(m_partialBuffer.data(), temp_output, 16);
+
+        // Restore only the modified state
+        m_gcm_ctx.m_gHash_128 = saved_gHash;
+        m_gcm_ctx.m_counter_128 = saved_counter_128;
+        m_gcm_ctx.m_update_counter = saved_counter;
 
         if (err != ALC_ERROR_NONE) return err;
-        
-        //  Reset the counter 
-        m_gcm_ctx.m_update_counter = saved_counter;
-        
-        // Return the correct bytes to user
-        memcpy(pOutput+output_offset , temp_output+temp_offset, remaining_len);
-        
 
+        // Return the correct bytes to user
+        memcpy(pOutput + output_offset, temp_output + temp_offset, remaining_len);
     }
-    
+
     return ALC_ERROR_NONE;
 }
 
 // Helper function to call the appropriate decryption backend
-template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 GcmT<keyLenBits, arch>::decryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64 len)
 {
     alc_error_t err = ALC_ERROR_NONE;
 
-    if constexpr (arch == CpuCipherFeatures::eVaes512) {
-        if constexpr (keyLenBits == alcp::cipher::CipherKeyLen::eKey128Bit) {
+    if constexpr (arch == CpuArchLevel::eZen4) {
+        if constexpr (keyLenBits == CipherKeyLen::eKey128Bit) {
             err = vaes512::decryptGcm128(pInput,
                                          pOutput,
                                          len,
                                          m_gcm_ctx.m_update_counter,
-                                         m_cipher_key_data.m_enc_key,
-                                         getRounds(),
+                                         m_keyManager.getCipherKeyData().m_enc_key,
+                                         m_keyManager.getRounds(),
                                          &m_gcm_ctx);
             return err;
-        } else if constexpr (keyLenBits
-                             == alcp::cipher::CipherKeyLen::eKey192Bit) {
+        } else if constexpr (keyLenBits == CipherKeyLen::eKey192Bit) {
             err = vaes512::decryptGcm192(pInput,
                                          pOutput,
                                          len,
                                          m_gcm_ctx.m_update_counter,
-                                         m_cipher_key_data.m_enc_key,
-                                         getRounds(),
+                                         m_keyManager.getCipherKeyData().m_enc_key,
+                                         m_keyManager.getRounds(),
                                          &m_gcm_ctx);
             return err;
-        } else if constexpr (keyLenBits
-                             == alcp::cipher::CipherKeyLen::eKey256Bit) {
+        } else if constexpr (keyLenBits == CipherKeyLen::eKey256Bit) {
             err = vaes512::decryptGcm256(pInput,
                                          pOutput,
                                          len,
                                          m_gcm_ctx.m_update_counter,
-                                         m_cipher_key_data.m_enc_key,
-                                         getRounds(),
+                                         m_keyManager.getCipherKeyData().m_enc_key,
+                                         m_keyManager.getRounds(),
                                          &m_gcm_ctx);
             return err;
         }
-    } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
-        if constexpr (keyLenBits == alcp::cipher::CipherKeyLen::eKey128Bit) {
+    } else if constexpr (arch == CpuArchLevel::eZen3) {
+        if constexpr (keyLenBits == CipherKeyLen::eKey128Bit) {
             err = vaes::decryptGcm128(pInput,
                                       pOutput,
                                       len,
                                       m_gcm_ctx.m_update_counter,
-                                      m_cipher_key_data.m_enc_key,
-                                      getRounds(),
+                                      m_keyManager.getCipherKeyData().m_enc_key,
+                                      m_keyManager.getRounds(),
                                       &m_gcm_ctx);
             return err;
-        } else if constexpr (keyLenBits
-                             == alcp::cipher::CipherKeyLen::eKey192Bit) {
+        } else if constexpr (keyLenBits == CipherKeyLen::eKey192Bit) {
             err = vaes::decryptGcm192(pInput,
                                       pOutput,
                                       len,
                                       m_gcm_ctx.m_update_counter,
-                                      m_cipher_key_data.m_enc_key,
-                                      getRounds(),
+                                      m_keyManager.getCipherKeyData().m_enc_key,
+                                      m_keyManager.getRounds(),
                                       &m_gcm_ctx);
             return err;
-        } else if constexpr (keyLenBits
-                             == alcp::cipher::CipherKeyLen::eKey256Bit) {
+        } else if constexpr (keyLenBits == CipherKeyLen::eKey256Bit) {
             err = vaes::decryptGcm256(pInput,
                                       pOutput,
                                       len,
                                       m_gcm_ctx.m_update_counter,
-                                      m_cipher_key_data.m_enc_key,
-                                      getRounds(),
+                                      m_keyManager.getCipherKeyData().m_enc_key,
+                                      m_keyManager.getRounds(),
                                       &m_gcm_ctx);
             return err;
         }
-    } else if constexpr (arch == CpuCipherFeatures::eAesni) {
+    } else if constexpr (arch == CpuArchLevel::eZen) {
         err = aesni::CryptGcm(pInput,
                               pOutput,
                               len,
-                              m_cipher_key_data.m_enc_key,
-                              m_nrounds,
+                              m_keyManager.getCipherKeyData().m_enc_key,
+                              m_keyManager.getRounds(),
                               &m_gcm_ctx,
                               false);
         return err;
@@ -393,23 +405,29 @@ GcmT<keyLenBits, arch>::decryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64
     return ALC_ERROR_NOT_SUPPORTED;
 }
 
-template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+// encrypt implementation
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 GcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
-                                Uint8*       pOutput,
-                                Uint64       len,
-                                Uint64*      outlen)
+                               Uint8*       pOutput,
+                               Uint64       len,
+                               Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
-    m_isEnc_aes     = ALCP_ENC;
+    m_gcm_ctx.m_isEncrypt = true;
 
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (outlen == nullptr) {
         return ALC_ERROR_INVALID_ARG;
     }
     *outlen = 0;
 
-    if (!(m_ivState_aes && m_isKeySet_aes)) {
+    if (!m_stateManager.isReady()) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
     }
@@ -421,7 +439,7 @@ GcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
         return err;
     }
 #endif
-    m_dataLen += len;
+    m_gcm_ctx.m_dataLen += len;
 
 #if DEBUG_PROV_GCM_INIT
     printf("encrypt len %ld \n", len);
@@ -442,18 +460,18 @@ GcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
     Uint64 output_offset = 0;
     
     // Check if we have partial data from previous call
-    if (m_gcm_ctx.m_has_partial_data && m_gcm_ctx.m_partial_buffer_len > 0) {
+    if (m_partialBuffer.size() > 0) {
         // This is the second call - combine buffered data with new input
-        Uint64 bytes_needed = 16 - m_gcm_ctx.m_partial_buffer_len;
+        Uint64 bytes_needed = 16 - m_partialBuffer.size();
         Uint64 bytes_to_take = (len >= bytes_needed) ? bytes_needed : len;
         
         // Create a combined 16-byte buffer
         Uint8 combined_block[16];
-        memcpy(combined_block, m_gcm_ctx.m_partial_buffer, m_gcm_ctx.m_partial_buffer_len);
-        memcpy(combined_block + m_gcm_ctx.m_partial_buffer_len, pInput, bytes_to_take);
+        memcpy(combined_block, m_partialBuffer.data(), m_partialBuffer.size());
+        memcpy(combined_block + m_partialBuffer.size(), pInput, bytes_to_take);
         
         // If we have a complete 16-byte block, process it
-        if (m_gcm_ctx.m_partial_buffer_len + bytes_to_take >= 16) {
+        if (m_partialBuffer.size() + bytes_to_take >= 16) {
             Uint8 temp_output[16];
             
             // this is the FIRST complete block in the stream
@@ -464,13 +482,12 @@ GcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
             if (err != ALC_ERROR_NONE) return err;
             
             // Return only the NEW bytes (skip the buffered part)
-            memcpy(pOutput + output_offset, temp_output + m_gcm_ctx.m_partial_buffer_len, bytes_to_take);
+            memcpy(pOutput + output_offset, temp_output + m_partialBuffer.size(), bytes_to_take);
             output_offset += bytes_to_take;
             input_offset += bytes_to_take;
             
             // Clear partial buffer
-            m_gcm_ctx.m_partial_buffer_len = 0;
-            m_gcm_ctx.m_has_partial_data = false;
+            m_partialBuffer.clear();
         }
     }
     
@@ -499,24 +516,25 @@ GcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
         Uint64 saved_counter = m_gcm_ctx.m_update_counter;
         m_gcm_ctx.m_update_counter++;
         // Buffer the original input for next call
-        memcpy(m_gcm_ctx.m_partial_buffer+m_gcm_ctx.m_partial_buffer_len, pInput + input_offset, remaining_len);
-        Uint64 temp_offset = m_gcm_ctx.m_has_partial_data? m_gcm_ctx.m_partial_buffer_len : 0;
-        m_gcm_ctx.m_partial_buffer_len += remaining_len;
-        m_gcm_ctx.m_has_partial_data = true;
+        Uint32 temp_offset = m_partialBuffer.size();
+        m_partialBuffer.append(pInput + input_offset, remaining_len);
 
-        // create a temporary context
-        alc_gcm_ctx_t temp_ctx = m_gcm_ctx;  // Use copy constructor instead of memcpy
-        
-        err = encryptBlock(m_gcm_ctx.m_partial_buffer, temp_output, 16);
-        m_gcm_ctx = temp_ctx;  // Use copy assignment instead of memcpy
+        // Save only the critical state fields that encryptBlock modifies
+        // This is much faster than copying the entire context (which includes std::vector)
+        __m128i saved_gHash = m_gcm_ctx.m_gHash_128;
+        __m128i saved_counter_128 = m_gcm_ctx.m_counter_128;
+
+        err = encryptBlock(m_partialBuffer.data(), temp_output, 16);
+
+        // Restore only the modified state
+        m_gcm_ctx.m_gHash_128 = saved_gHash;
+        m_gcm_ctx.m_counter_128 = saved_counter_128;
+        m_gcm_ctx.m_update_counter = saved_counter;
+
         if (err != ALC_ERROR_NONE) return err;
 
-        // Reset the counter 
-        m_gcm_ctx.m_update_counter = saved_counter;
-        
         // Return the correct bytes to user
-        memcpy(pOutput+output_offset , temp_output+temp_offset, remaining_len);
-        
+        memcpy(pOutput + output_offset, temp_output + temp_offset, remaining_len);
     }
     
     return ALC_ERROR_NONE;
@@ -524,81 +542,76 @@ GcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
 
 
 // Helper function to call the appropriate encryption backend
-template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 GcmT<keyLenBits, arch>::encryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64 len)
 {
     alc_error_t err = ALC_ERROR_NONE;
 
-    if constexpr (arch == CpuCipherFeatures::eVaes512) {
-        if constexpr (keyLenBits == alcp::cipher::CipherKeyLen::eKey128Bit) {
+    if constexpr (arch == CpuArchLevel::eZen4) {
+        if constexpr (keyLenBits == CipherKeyLen::eKey128Bit) {
             err = vaes512::encryptGcm128(pInput,
                                          pOutput,
                                          len,
                                          m_gcm_ctx.m_update_counter,
-                                         m_cipher_key_data.m_enc_key,
-                                         getRounds(),
+                                         m_keyManager.getCipherKeyData().m_enc_key,
+                                         m_keyManager.getRounds(),
                                          &m_gcm_ctx);
             return err;
-        } else if constexpr (keyLenBits
-                             == alcp::cipher::CipherKeyLen::eKey192Bit) {
+        } else if constexpr (keyLenBits == CipherKeyLen::eKey192Bit) {
             err = vaes512::encryptGcm192(pInput,
                                          pOutput,
                                          len,
                                          m_gcm_ctx.m_update_counter,
-                                         m_cipher_key_data.m_enc_key,
-                                         getRounds(),
+                                         m_keyManager.getCipherKeyData().m_enc_key,
+                                         m_keyManager.getRounds(),
                                          &m_gcm_ctx);
             return err;
-        } else if constexpr (keyLenBits
-                             == alcp::cipher::CipherKeyLen::eKey256Bit) {
+        } else if constexpr (keyLenBits == CipherKeyLen::eKey256Bit) {
             err = vaes512::encryptGcm256(pInput,
                                          pOutput,
                                          len,
                                          m_gcm_ctx.m_update_counter,
-                                         m_cipher_key_data.m_enc_key,
-                                         getRounds(),
+                                         m_keyManager.getCipherKeyData().m_enc_key,
+                                         m_keyManager.getRounds(),
                                          &m_gcm_ctx);
             return err;
         }
-    } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
-        if constexpr (keyLenBits == alcp::cipher::CipherKeyLen::eKey128Bit) {
+    } else if constexpr (arch == CpuArchLevel::eZen3) {
+        if constexpr (keyLenBits == CipherKeyLen::eKey128Bit) {
             err = vaes::encryptGcm128(pInput,
                                       pOutput,
                                       len,
                                       m_gcm_ctx.m_update_counter,
-                                      m_cipher_key_data.m_enc_key,
-                                      getRounds(),
+                                      m_keyManager.getCipherKeyData().m_enc_key,
+                                      m_keyManager.getRounds(),
                                       &m_gcm_ctx);
             return err;
-        } else if constexpr (keyLenBits
-                             == alcp::cipher::CipherKeyLen::eKey192Bit) {
+        } else if constexpr (keyLenBits == CipherKeyLen::eKey192Bit) {
             err = vaes::encryptGcm192(pInput,
                                       pOutput,
                                       len,
                                       m_gcm_ctx.m_update_counter,
-                                      m_cipher_key_data.m_enc_key,
-                                      getRounds(),
+                                      m_keyManager.getCipherKeyData().m_enc_key,
+                                      m_keyManager.getRounds(),
                                       &m_gcm_ctx);
             return err;
-        } else if constexpr (keyLenBits
-                             == alcp::cipher::CipherKeyLen::eKey256Bit) {
+        } else if constexpr (keyLenBits == CipherKeyLen::eKey256Bit) {
             err = vaes::encryptGcm256(pInput,
                                       pOutput,
                                       len,
                                       m_gcm_ctx.m_update_counter,
-                                      m_cipher_key_data.m_enc_key,
-                                      getRounds(),
+                                      m_keyManager.getCipherKeyData().m_enc_key,
+                                      m_keyManager.getRounds(),
                                       &m_gcm_ctx);
             return err;
         }
-    } else if constexpr (arch == CpuCipherFeatures::eAesni) {
+    } else if constexpr (arch == CpuArchLevel::eZen) {
         err = aesni::CryptGcm(pInput,
                               pOutput,
                               len,
-                              m_cipher_key_data.m_enc_key,
-                              m_nrounds,
+                              m_keyManager.getCipherKeyData().m_enc_key,
+                              m_keyManager.getRounds(),
                               &m_gcm_ctx,
                               true);
         return err;
@@ -607,17 +620,23 @@ GcmT<keyLenBits, arch>::encryptBlock(const Uint8* pInput, Uint8* pOutput, Uint64
     return ALC_ERROR_NOT_SUPPORTED;
 }
 
-// Override getTag in GcmT template class to handle buffered data with full encrypt dispatch
-template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+// getTag implementation
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 GcmT<keyLenBits, arch>::getTag(Uint8* ptag, Uint64 tagLen)
 {
     alc_error_t err = ALC_ERROR_NONE;
-    if (m_pIv_aes == nullptr) {
+    if (ptag == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (!m_ivManager.isIvSet()) {
         err = ALC_ERROR_BAD_STATE;
         return err;
-    } else if (tagLen > 16 || tagLen == 0) {
+    } else if (tagLen == 0 || tagLen > m_gcm_ctx.m_tagLength
+               || (tagLen < 4)
+               || (tagLen > 4 && tagLen < 8)
+               || (tagLen > 8 && tagLen < 12)) {
+        // Per NIST SP 800-38D, valid tag lengths are: 4, 8, 12, 13, 14, 15, 16
         return ALC_ERROR_INVALID_SIZE;
     }
 #if DEBUG_PROV_GCM_INIT
@@ -625,7 +644,7 @@ GcmT<keyLenBits, arch>::getTag(Uint8* ptag, Uint64 tagLen)
 #endif
 #ifdef AES_MULTI_UPDATE
     // If no data has been processed yet, ensure buffered AAD is processed
-    if (m_dataLen == 0) {
+    if (m_gcm_ctx.m_dataLen == 0) {
         err = processBufferedAad();
         if (err != ALC_ERROR_NONE) {
             return err;
@@ -634,27 +653,26 @@ GcmT<keyLenBits, arch>::getTag(Uint8* ptag, Uint64 tagLen)
 #endif
 #ifdef AES_MULTI_UPDATE
     // Process any remaining buffered data using appropriate block function
-    if (m_gcm_ctx.m_has_partial_data && m_gcm_ctx.m_partial_buffer_len > 0) {
+    if (m_partialBuffer.size() > 0) {
         // Call the appropriate block method based on encryption/decryption mode
         // This ensures proper template dispatch and all buffering logic
-        Uint8 temp_output[16];  // We  just need the GCM state update
+        Uint8 temp_output[16];  // We just need the GCM state update
         // FIXME: Separate out the tag calculation and the crypt logic within the kernels, then we can remove calling encrypt and decrypt fully.
         
-        if (m_isEnc_aes) {
+        if (m_gcm_ctx.m_isEncrypt) {
             // Encryption mode - call encryptBlock
-            err = encryptBlock(m_gcm_ctx.m_partial_buffer, temp_output, m_gcm_ctx.m_partial_buffer_len);
+            err = encryptBlock(m_partialBuffer.data(), temp_output, m_partialBuffer.size());
         } else {
             // Decryption mode - call decryptBlock
-            err = decryptBlock(m_gcm_ctx.m_partial_buffer, temp_output, m_gcm_ctx.m_partial_buffer_len);
+            err = decryptBlock(m_partialBuffer.data(), temp_output, m_partialBuffer.size());
         }
         
         if (err != ALC_ERROR_NONE) {
             return err;
         }
         
-        // The block call should have cleared the buffer, but let's ensure it
-        m_gcm_ctx.m_partial_buffer_len = 0;
-        m_gcm_ctx.m_has_partial_data = false;
+        // Clear the partial buffer
+        m_partialBuffer.clear();
     }
 #endif
 
@@ -662,14 +680,14 @@ GcmT<keyLenBits, arch>::getTag(Uint8* ptag, Uint64 tagLen)
     // During decrypt, tag generated should be compared with
     // input Tag.
     Uint8 tagInput[ALCP_GCM_TAG_MAX_SIZE];
-    if (!m_isEnc_aes) {
+    if (!m_gcm_ctx.m_isEncrypt) {
         // create a copy of input
         memcpy(tagInput, ptag, tagLen);
     }
 #endif
 
     err = aesni::GetTagGcm(tagLen,
-                           m_dataLen,
+                           m_gcm_ctx.m_dataLen,
                            m_gcm_ctx.m_additionalDataLen,
                            m_gcm_ctx.m_gHash_128,
                            m_gcm_ctx.m_tag_128,
@@ -680,9 +698,8 @@ GcmT<keyLenBits, arch>::getTag(Uint8* ptag, Uint64 tagLen)
 #if INTERNAL_TAG_MATCH
     // During decrypt, tag generated should be compared with
     // input Tag.
-    if (!m_isEnc_aes) {
+    if (!m_gcm_ctx.m_isEncrypt) {
         if (utils::CompareConstTime(ptag, tagInput, tagLen) == 0) {
-            // printf("\n Error: Tag mismatch");
             // clear data
             memset(ptag, 0, tagLen);
             memset(tagInput, 0, tagLen);
@@ -694,25 +711,17 @@ GcmT<keyLenBits, arch>::getTag(Uint8* ptag, Uint64 tagLen)
     return err;
 }
 
-template class GcmT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                    CpuCipherFeatures::eVaes512>;
-template class GcmT<alcp::cipher::CipherKeyLen::eKey192Bit,
-                    CpuCipherFeatures::eVaes512>;
-template class GcmT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                    CpuCipherFeatures::eVaes512>;
+// Explicit template instantiations for GcmT
+template class GcmT<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen4>;
+template class GcmT<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen4>;
+template class GcmT<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen4>;
 
-template class GcmT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                    CpuCipherFeatures::eVaes256>;
-template class GcmT<alcp::cipher::CipherKeyLen::eKey192Bit,
-                    CpuCipherFeatures::eVaes256>;
-template class GcmT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                    CpuCipherFeatures::eVaes256>;
+template class GcmT<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen3>;
+template class GcmT<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen3>;
+template class GcmT<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen3>;
 
-template class GcmT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                    CpuCipherFeatures::eAesni>;
-template class GcmT<alcp::cipher::CipherKeyLen::eKey192Bit,
-                    CpuCipherFeatures::eAesni>;
-template class GcmT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                    CpuCipherFeatures::eAesni>;
+template class GcmT<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen>;
+template class GcmT<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen>;
+template class GcmT<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen>;
 
 } // namespace alcp::cipher

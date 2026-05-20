@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,6 +33,7 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <random>
+#include "parse_args.hh"
 
 using namespace alcp::testing;
 using utils::parseBytesToHexStr;
@@ -170,74 +171,23 @@ is_aligned(const Uint8* ptr)
 }
 
 void
-parseArgs(int argc, char** argv)
+parseTestArgs(int argc, char** argv)
 {
-    std::string currentArg;
-    std::string temp;
+    alcp::bench::args::ParsedArgs parsed;
+    alcp::bench::args::strip_custom_args(&argc, argv, parsed);
 
-    std::vector<std::string> verbosity_levels = { "0", "1", "2" };
+    useipp      = parsed.use_ipp;
+    useossl     = parsed.use_ossl;
+    oa_override = parsed.override_alcp;
+    bbxreplay   = parsed.replay_blackbox;
+    verbose     = parsed.verbose;
 
-    if (argc > 1) {
-        for (int i = 1; i < argc; i++) {
-            currentArg = std::string(argv[i]);
-            if ((currentArg == std::string("--help"))
-                || (currentArg == std::string("-h"))) {
-
-                std::string verbosity_string = "(";
-                for (size_t j = 0; j < verbosity_levels.size() - 1; j++) {
-                    verbosity_string += static_cast<char>(j) + '/';
-                }
-                verbosity_string +=
-                    verbosity_levels.at(verbosity_levels.size() - 1) + ")";
-                std::cout << std::endl
-                          << "Additional help for microtests" << std::endl;
-                std::cout << "--verbose or -v <space>  <verbosity level(0/1/2)>"
-                          << std::endl;
-                std::cout << "--use-ipp or -i force IPP use in testing."
-                          << std::endl;
-                std::cout << "--use-ossl or -o force OpenSSL use in testing"
-                          << std::endl;
-                std::cout << "--replay-blackbox or -r replay blackbox with "
-                             "log file"
-                          << std::endl;
-                exit(-1);
-            } else if ((currentArg == std::string("--verbose"))
-                       || (currentArg == std::string("-v"))) {
-                /* now extract the verbose level integer */
-                if (((currentArg.find(std::string("--verbose"))
-                      != currentArg.npos)
-                     || (currentArg.find(std::string("-v")) != currentArg.npos))
-                    && (i + 1 < argc)) {
-                    std::string nextArg = std::string(argv[i + 1]);
-                    // Skip the next iteration
-                    i++;
-                    // check if the provided verbosity is supported
-                    auto it = std::find(verbosity_levels.begin(),
-                                        verbosity_levels.end(),
-                                        nextArg);
-                    if (it != verbosity_levels.end()) {
-                        verbose = std::stoi(nextArg);
-                    } else {
-                        std::cout << RED << "Invalid Verbosity Level \""
-                                  << nextArg << "\"" << RESET << std::endl;
-                        exit(-1);
-                    }
-                }
-
-            } else if ((currentArg == std::string("--use-ipp"))
-                       || (currentArg == std::string("-i"))) {
-                useipp = true;
-            } else if ((currentArg == std::string("--use-ossl"))
-                       || (currentArg == std::string("-o"))) {
-                useossl = true;
-            } else if ((currentArg == std::string("--replay-blackbox"))
-                       || (currentArg == std::string("-r"))) {
-                bbxreplay = true;
-            } else if ((currentArg == std::string("--override-alcp"))
-                       || (currentArg == std::string("-oa"))) {
-                oa_override = true;
-            }
-        }
+    /* --help is consumed by testing::InitGoogleTest before this function is
+     * reached in the normal call flow.  If called before InitGoogleTest (e.g.
+     * to surface AOCL options first), print our section so gtest's own help
+     * follows naturally. */
+    if (parsed.help_requested) {
+        alcp::bench::args::print_test_help();
     }
 }
 

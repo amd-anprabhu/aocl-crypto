@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,45 +26,16 @@
  *
  */
 
-#include "dispatcher.hh"
+#pragma once
 
-using namespace alcp::utils;
-namespace alcp::cipher::unittest {
+#include "alcp/error.h"
 
-CpuCipherFeatures
-getMaxFeature()
-{
-    CpuId             cpu;
-    CpuCipherFeatures maxFeature = {};
-    if (cpu.cpuHasVaes() && cpu.cpuHasAvx512f()) {
-        maxFeature = utils::CpuCipherFeatures::eVaes512;
-    } else if (cpu.cpuHasVaes()) {
-        maxFeature = utils::CpuCipherFeatures::eVaes256;
-    } else if (cpu.cpuHasAesni()) {
-        maxFeature = utils::CpuCipherFeatures::eAesni;
-    } else {
-        maxFeature = utils::CpuCipherFeatures::eReference;
-    }
-    return maxFeature;
-}
-
-std::vector<CpuCipherFeatures>
-getSupportedFeatures()
-{
-    std::vector<CpuCipherFeatures> ret        = {};
-    CpuCipherFeatures              maxFeature = getMaxFeature();
-    switch (maxFeature) {
-        case CpuCipherFeatures::eVaes512:
-            ret.insert(ret.begin(), CpuCipherFeatures::eVaes512);
-        case CpuCipherFeatures::eVaes256:
-            ret.insert(ret.begin(), CpuCipherFeatures::eVaes256);
-        case CpuCipherFeatures::eAesni:
-            ret.insert(ret.begin(), CpuCipherFeatures::eAesni);
-            break;
-        default:
-            ret.insert(ret.begin(), CpuCipherFeatures::eReference);
-            break;
-    }
-    return ret;
-}
-} // namespace alcp::cipher::unittest
+namespace alcp::digest { namespace zen4 {
+    alc_error_t Sha256Dequeue(const Uint8** ppSrcBuf,
+                              Uint32        state[8],
+                              const Uint64  numBuffers,
+                              const Uint64  blocks,
+                              const Uint64  totalMsgLen,
+                              Uint8**       ppDstBuf,
+                              const Uint64  digestLen);
+}} // namespace alcp::digest::zen4

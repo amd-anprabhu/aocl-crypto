@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -35,29 +35,34 @@
 #include <iostream>
 #include <tuple>
 namespace alcp::mac::poly1305 {
+using utils::AlgorithmType;
+using utils::CpuArchLevel;
 using utils::CpuId;
-template<utils::CpuArchFeature feature>
-Poly1305<feature>::Poly1305()
+
+template<CpuArchLevel archLevel>
+Poly1305<archLevel>::Poly1305()
 {
-    if constexpr (utils::CpuArchFeature::eReference == feature
-                  || utils::CpuArchFeature::eAvx2 == feature) {
+    if constexpr (CpuArchLevel::eReference == archLevel
+                  || CpuArchLevel::eZen == archLevel
+                  || CpuArchLevel::eZen3 == archLevel) {
         poly1305_impl = std::make_unique<reference::Poly1305Ref>();
-    } else if constexpr (utils::CpuArchFeature::eDynamic == feature) {
-        // utils::CpuArchFeature::eDynamic
-        if (!(CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-              && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_DQ)
-              && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW))) {
+    } else if constexpr (CpuArchLevel::eDynamic == archLevel) {
+        // CpuArchLevel::eDynamic
+        static CpuArchLevel arch =
+            CpuId::getCachedArchLevel(AlgorithmType::ePoly1305);
+        if (arch < CpuArchLevel::eZen4) {
             poly1305_impl = std::make_unique<reference::Poly1305Ref>();
         }
     }
 }
-template<utils::CpuArchFeature feature>
-Poly1305<feature>::Poly1305(const Poly1305& src)
+
+template<CpuArchLevel archLevel>
+Poly1305<archLevel>::Poly1305(const Poly1305& src)
 {}
 
-template<utils::CpuArchFeature feature>
+template<CpuArchLevel archLevel>
 alc_error_t
-Poly1305<feature>::init(const Uint8 key[], Uint64 keyLen)
+Poly1305<archLevel>::init(const Uint8 key[], Uint64 keyLen)
 {
     alc_error_t err = ALC_ERROR_NONE;
     if (keyLen != 32) {
@@ -66,18 +71,19 @@ Poly1305<feature>::init(const Uint8 key[], Uint64 keyLen)
         return err;
     }
     state.finalized = false;
-    if constexpr ((utils::CpuArchFeature::eReference == feature)
-                  || (utils::CpuArchFeature::eAvx2 == feature)) {
+    if constexpr (CpuArchLevel::eReference == archLevel
+                  || CpuArchLevel::eZen == archLevel
+                  || CpuArchLevel::eZen3 == archLevel) {
         return poly1305_impl->init(key, keyLen);
-    } else if constexpr (utils::CpuArchFeature::eAvx512 == feature) {
+    } else if constexpr (CpuArchLevel::eZen4 == archLevel) {
         zen4::poly1305_init_radix44(state, key);
         err = ALC_ERROR_NONE;
         return err;
-    } else if constexpr (utils::CpuArchFeature::eDynamic == feature) {
+    } else if constexpr (CpuArchLevel::eDynamic == archLevel) {
         // Manual dispatch in case we don't know where to dispatch to.
-        if (CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-            && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_DQ)
-            && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW)) {
+        static CpuArchLevel arch =
+            CpuId::getCachedArchLevel(AlgorithmType::ePoly1305);
+        if (arch >= CpuArchLevel::eZen4) {
             zen4::poly1305_init_radix44(state, key);
             err = ALC_ERROR_NONE;
             return err;
@@ -89,15 +95,16 @@ Poly1305<feature>::init(const Uint8 key[], Uint64 keyLen)
     return err;
 }
 
-template<utils::CpuArchFeature feature>
+template<CpuArchLevel archLevel>
 alc_error_t
-Poly1305<feature>::update(const Uint8 pMsg[], Uint64 msgLen)
+Poly1305<archLevel>::update(const Uint8 pMsg[], Uint64 msgLen)
 {
     alc_error_t err = ALC_ERROR_NONE;
-    if constexpr ((utils::CpuArchFeature::eReference == feature)
-                  || (utils::CpuArchFeature::eAvx2 == feature)) {
+    if constexpr (CpuArchLevel::eReference == archLevel
+                  || CpuArchLevel::eZen == archLevel
+                  || CpuArchLevel::eZen3 == archLevel) {
         return poly1305_impl->update(pMsg, msgLen);
-    } else if constexpr (utils::CpuArchFeature::eAvx512 == feature) {
+    } else if constexpr (CpuArchLevel::eZen4 == archLevel) {
         if (zen4::poly1305_update_radix44(state, pMsg, msgLen) == true) {
             err = ALC_ERROR_NONE;
             return err;
@@ -105,11 +112,11 @@ Poly1305<feature>::update(const Uint8 pMsg[], Uint64 msgLen)
             err = ALC_ERROR_BAD_STATE;
             return err;
         }
-    } else if constexpr (utils::CpuArchFeature::eDynamic == feature) {
+    } else if constexpr (CpuArchLevel::eDynamic == archLevel) {
         // Manual dispatch in case we don't know where to dispatch to.
-        if (CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-            && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_DQ)
-            && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW)) {
+        static CpuArchLevel arch =
+            CpuId::getCachedArchLevel(AlgorithmType::ePoly1305);
+        if (arch >= CpuArchLevel::eZen4) {
             if (zen4::poly1305_update_radix44(state, pMsg, msgLen) == true) {
                 err = ALC_ERROR_NONE;
                 return err;
@@ -125,23 +132,24 @@ Poly1305<feature>::update(const Uint8 pMsg[], Uint64 msgLen)
     return err;
 }
 
-template<utils::CpuArchFeature feature>
+template<CpuArchLevel archLevel>
 alc_error_t
-Poly1305<feature>::reset()
+Poly1305<archLevel>::reset()
 {
     alc_error_t err = ALC_ERROR_NONE;
-    if constexpr ((utils::CpuArchFeature::eReference == feature)
-                  || (utils::CpuArchFeature::eAvx2 == feature)) {
+    if constexpr (CpuArchLevel::eReference == archLevel
+                  || CpuArchLevel::eZen == archLevel
+                  || CpuArchLevel::eZen3 == archLevel) {
         return poly1305_impl->reset();
-    } else if constexpr (utils::CpuArchFeature::eAvx512 == feature) {
+    } else if constexpr (CpuArchLevel::eZen4 == archLevel) {
         state.reset();
         err = ALC_ERROR_NONE;
         return err;
-    } else if constexpr (utils::CpuArchFeature::eDynamic == feature) {
+    } else if constexpr (CpuArchLevel::eDynamic == archLevel) {
         // Manual dispatch in case we don't know where to dispatch to.
-        if (CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-            && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_DQ)
-            && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW)) {
+        static CpuArchLevel arch =
+            CpuId::getCachedArchLevel(AlgorithmType::ePoly1305);
+        if (arch >= CpuArchLevel::eZen4) {
             state.reset();
             err = ALC_ERROR_NONE;
             return err;
@@ -153,15 +161,16 @@ Poly1305<feature>::reset()
     return err;
 }
 
-template<utils::CpuArchFeature feature>
+template<CpuArchLevel archLevel>
 alc_error_t
-Poly1305<feature>::finalize(Uint8 digest[], Uint64 digestLen)
+Poly1305<archLevel>::finalize(Uint8 digest[], Uint64 digestLen)
 {
     alc_error_t err = ALC_ERROR_NONE;
-    if constexpr ((utils::CpuArchFeature::eReference == feature)
-                  || (utils::CpuArchFeature::eAvx2 == feature)) {
+    if constexpr (CpuArchLevel::eReference == archLevel
+                  || CpuArchLevel::eZen == archLevel
+                  || CpuArchLevel::eZen3 == archLevel) {
         return poly1305_impl->finish(digest, digestLen);
-    } else if constexpr (utils::CpuArchFeature::eAvx512 == feature) {
+    } else if constexpr (CpuArchLevel::eZen4 == archLevel) {
         if (zen4::poly1305_finalize_radix44(state, digest, digestLen) == true) {
             err = ALC_ERROR_NONE;
             return err;
@@ -169,11 +178,11 @@ Poly1305<feature>::finalize(Uint8 digest[], Uint64 digestLen)
             err = ALC_ERROR_BAD_STATE;
             return err;
         }
-    } else if constexpr (utils::CpuArchFeature::eDynamic == feature) {
+    } else if constexpr (CpuArchLevel::eDynamic == archLevel) {
         // Manual dispatch in case we don't know where to dispatch to.
-        if (CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-            && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_DQ)
-            && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW)) {
+        static CpuArchLevel arch =
+            CpuId::getCachedArchLevel(AlgorithmType::ePoly1305);
+        if (arch >= CpuArchLevel::eZen4) {
             if (zen4::poly1305_finalize_radix44(state, digest, digestLen)
                 == true) {
                 err = ALC_ERROR_NONE;
@@ -189,8 +198,10 @@ Poly1305<feature>::finalize(Uint8 digest[], Uint64 digestLen)
     err = ALC_ERROR_BAD_STATE;
     return err;
 }
-template class Poly1305<utils::CpuArchFeature::eAvx512>;
-template class Poly1305<utils::CpuArchFeature::eAvx2>;
-template class Poly1305<utils::CpuArchFeature::eReference>;
-template class Poly1305<utils::CpuArchFeature::eDynamic>;
+
+template class Poly1305<CpuArchLevel::eZen4>;
+template class Poly1305<CpuArchLevel::eZen3>;
+template class Poly1305<CpuArchLevel::eZen>;
+template class Poly1305<CpuArchLevel::eReference>;
+template class Poly1305<CpuArchLevel::eDynamic>;
 } // namespace alcp::mac::poly1305

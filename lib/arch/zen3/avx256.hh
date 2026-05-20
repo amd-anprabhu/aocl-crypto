@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "alcp/cipher.hh"
+#include "alcp/cipher/rijndael.hh"
 #include <immintrin.h>
 
 namespace alcp::cipher { namespace vaes {

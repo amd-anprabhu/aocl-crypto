@@ -15,11 +15,11 @@ Data Structures
 
 Functions
 ---------
-.. doxygenfunction:: alcp_rng_supported 
+.. doxygenfunction:: alcp_rng_supported
    :project: crypto
 .. doxygenfunction:: alcp_rng_context_size
    :project: crypto
-.. doxygenfunction:: alcp_rng_request 
+.. doxygenfunction:: alcp_rng_request
    :project: crypto
 .. doxygenfunction:: alcp_rng_gen_random
    :project: crypto
@@ -29,16 +29,16 @@ Functions
    :project: crypto
 .. doxygenfunction:: alcp_rng_finish
    :project: crypto
-    
+
 ----
 
-Variables
----------
-.. doxygenvariable:: alc_rng_type_t
+Enumerations
+------------
+.. doxygenenum:: alc_rng_type
    :project: crypto
-.. doxygenvariable:: alc_rng_source_t
+.. doxygenenum:: alc_rng_source
    :project: crypto
-.. doxygenvariable:: alc_rng_distrib_t
+.. doxygenenum:: alc_rng_distrib
    :project: crypto
-.. doxygenvariable:: alc_rng_algo_flags_t
+.. doxygenenum:: alc_rng_algo_flags
    :project: crypto

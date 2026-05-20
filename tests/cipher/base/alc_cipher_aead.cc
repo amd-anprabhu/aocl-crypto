@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -531,18 +531,18 @@ AlcpCipherAeadBase::context_copy()
 
 bool
 AlcpCipherAeadBase::flush(const Uint8** pPlainText,
-                          Uint64        numBuffers,
-                          Uint64        len)
+                          const Uint64* pLengths,
+                          Uint64        numBuffers)
 {
-    // Default implementation - return success
-    return true;
+    // AEAD modes don't support multi-buffer operations
+    return false;
 }
 
 bool
-AlcpCipherAeadBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len)
+AlcpCipherAeadBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, const Uint64* pLengths)
 {
-    // Default implementation - return success
-    return true;
+    // AEAD modes don't support multi-buffer operations
+    return false;
 }
 bool
 AlcpCipherAeadBase::multibufferInit(const Uint8*  pKey,

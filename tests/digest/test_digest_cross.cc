@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -30,6 +30,7 @@
 #include "digest/gtest_base_digest.hh"
 #include "rng_base.hh"
 #include <alcp/alcp.h>
+#include <exception>
 #include <iostream>
 #include <string.h>
 
@@ -137,18 +138,46 @@ TEST(DIGEST_SHA1, CROSS_160)
     Digest_Cross(160, ALC_SHA1, false);
 }
 
+TEST(DIGEST_SHA2_MB, CROSS_224)
+{
+    if (useipp || useossl || oa_override)
+        GTEST_SKIP()
+            << "IPP/OSSL doesnt have SHA224 multibuffer implemented yet";
+    Digest_Multibuffer_Cross(224, ALC_SHA2_224);
+}
+
+TEST(DIGEST_SHA2_MB, CROSS_256)
+{
+    if (useipp || useossl || oa_override)
+        GTEST_SKIP()
+            << "IPP/OSSL doesnt have SHA256 multibuffer implemented yet";
+    Digest_Multibuffer_Cross(256, ALC_SHA2_256);
+}
+
 int
 main(int argc, char** argv)
 {
-    ::testing::InitGoogleTest(&argc, argv);
-    parseArgs(argc, argv);
+    try {
+        ::testing::InitGoogleTest(&argc, argv);
+        parseTestArgs(argc, argv);
 #ifndef USE_IPP
-    if (useipp)
-        printErrors("IPP is not available");
+        if (useipp)
+            printErrors("IPP is not available");
 #endif
 #ifndef USE_OSSL
-    if (useossl)
-        printErrors("OpenSSL is not available");
+        if (useossl)
+            printErrors("OpenSSL is not available");
 #endif
-    return RUN_ALL_TESTS();
+        return RUN_ALL_TESTS();
+
+    } catch (const std::exception& e) {
+        std::cerr << "Unhandled exception: " << e.what() << std::endl;
+        return 1;
+    } catch (const char* e) {
+        std::cerr << "Unhandled exception: " << e << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "Unknown exception caught" << std::endl;
+        return 1;
+    }
 }

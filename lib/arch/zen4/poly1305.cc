@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2026, Advanced Micro Devices. All rights reserved.
  * Portions of this file consist of AI-generated content.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,6 +29,7 @@
 
 #include <array>
 #include <cassert>
+#include <cstring>
 #include <immintrin.h>
 #include <tuple>
 
@@ -304,6 +305,114 @@ loadx1_message_radix44_nopad(const Uint8* p_msg,
     return 128;
 }
 
+inline void
+load_message_scalar_radix44(const Uint8* p_msg,
+                            Uint64&      m0,
+                            Uint64&      m1,
+                            Uint64&      m2)
+{
+    Uint64 lo, hi;
+    std::memcpy(&lo, p_msg, sizeof(lo));
+    std::memcpy(&hi, p_msg + 8, sizeof(hi));
+
+    constexpr Uint64 mask44 = (1ULL << 44) - 1;
+    constexpr Uint64 mask42 = (1ULL << 42) - 1;
+
+    m0 = lo & mask44;
+    m1 = ((lo >> 44) | (hi << 20)) & mask44;
+    m2 = ((hi >> 24) & mask42) | (1ULL << 40);
+}
+
+inline void
+load_message_scalar_radix44_nopad(const Uint8* p_msg,
+                                  Uint64&      m0,
+                                  Uint64&      m1,
+                                  Uint64&      m2)
+{
+    Uint64 lo, hi;
+    std::memcpy(&lo, p_msg, sizeof(lo));
+    std::memcpy(&hi, p_msg + 8, sizeof(hi));
+
+    constexpr Uint64 mask44 = (1ULL << 44) - 1;
+    constexpr Uint64 mask42 = (1ULL << 42) - 1;
+
+    m0 = lo & mask44;
+    m1 = ((lo >> 44) | (hi << 20)) & mask44;
+    m2 = (hi >> 24) & mask42;
+}
+
+inline void
+poly1305_mult_scalar_radix44(Uint64& a0,
+                             Uint64& a1,
+                             Uint64& a2,
+                             Uint64  r0,
+                             Uint64  r1,
+                             Uint64  r2,
+                             Uint64  s1,
+                             Uint64  s2)
+{
+    constexpr Uint64 mask44 = (1ULL << 44) - 1;
+    constexpr Uint64 mask42 = (1ULL << 42) - 1;
+
+    // BMI2+ADX (mulx + addcarryx) based scalar kernel.
+    unsigned long long d0_lo, d0_hi, d1_lo, d1_hi, d2_lo, d2_hi;
+    unsigned long long t_lo, t_hi;
+    unsigned char      carry;
+
+    d0_lo = _mulx_u64(a0, r0, &d0_hi);
+    t_lo  = _mulx_u64(a1, s2, &t_hi);
+    carry = _addcarryx_u64(0, d0_lo, t_lo, &d0_lo);
+    carry = _addcarryx_u64(carry, d0_hi, t_hi, &d0_hi);
+    t_lo  = _mulx_u64(a2, s1, &t_hi);
+    carry = _addcarryx_u64(0, d0_lo, t_lo, &d0_lo);
+    carry = _addcarryx_u64(carry, d0_hi, t_hi, &d0_hi);
+
+    d1_lo = _mulx_u64(a0, r1, &d1_hi);
+    t_lo  = _mulx_u64(a1, r0, &t_hi);
+    carry = _addcarryx_u64(0, d1_lo, t_lo, &d1_lo);
+    carry = _addcarryx_u64(carry, d1_hi, t_hi, &d1_hi);
+    t_lo  = _mulx_u64(a2, s2, &t_hi);
+    carry = _addcarryx_u64(0, d1_lo, t_lo, &d1_lo);
+    carry = _addcarryx_u64(carry, d1_hi, t_hi, &d1_hi);
+
+    d2_lo = _mulx_u64(a0, r2, &d2_hi);
+    t_lo  = _mulx_u64(a1, r1, &t_hi);
+    carry = _addcarryx_u64(0, d2_lo, t_lo, &d2_lo);
+    carry = _addcarryx_u64(carry, d2_hi, t_hi, &d2_hi);
+    t_lo  = _mulx_u64(a2, r0, &t_hi);
+    carry = _addcarryx_u64(0, d2_lo, t_lo, &d2_lo);
+    carry = _addcarryx_u64(carry, d2_hi, t_hi, &d2_hi);
+
+    // Reduce to radix44 limbs (44/44/42) with modulo trick.
+    unsigned long long c;
+    a0 = d0_lo & mask44;
+    c  = (d0_lo >> 44) | (d0_hi << 20);
+    carry = _addcarryx_u64(0, d1_lo, c, &d1_lo);
+    d1_hi += carry;
+
+    a1 = d1_lo & mask44;
+    c  = (d1_lo >> 44) | (d1_hi << 20);
+    carry = _addcarryx_u64(0, d2_lo, c, &d2_lo);
+    d2_hi += carry;
+
+    a2 = d2_lo & mask42;
+    c  = (d2_lo >> 42) | (d2_hi << 22);
+    a0 += c * 5;
+
+    c = a0 >> 44;
+    a0 &= mask44;
+    a1 += c;
+    c = a1 >> 44;
+    a1 &= mask44;
+    a2 += c;
+    c = a2 >> 42;
+    a2 &= mask42;
+    a0 += c * 5;
+    c = a0 >> 44;
+    a0 &= mask44;
+    a1 += c;
+}
+
 inline int
 loadx8_message_radix44(const Uint8* p_msg,
                        __m512i&     m0,
@@ -437,6 +546,7 @@ poly1305_multx8_radix44(__m512i& a0,
     d2l = _mm512_madd52lo_epu64(d2l, a1, r1);
     d2h = _mm512_madd52hi_epu64(d2h, a1, r1);
 
+    // Third round - optimized scheduling
     d0l = _mm512_madd52lo_epu64(d0l, a2, s1);
     d0h = _mm512_madd52hi_epu64(d0h, a2, s1);
     d1l = _mm512_madd52lo_epu64(d1l, a2, s2);
@@ -563,7 +673,14 @@ load_r1_to_r7(Uint64   r[3],
     reg2 = _mm512_setr_epi64(r7[2], r3[2], r6[2], r2[2], r5[2], r[2], r4[2], 0);
 }
 
-void
+static inline Uint64
+hadd_u64x2(__m128i v)
+{
+    return static_cast<Uint64>(_mm_cvtsi128_si64(v))
+           + static_cast<Uint64>(_mm_extract_epi64(v, 1));
+}
+
+static inline void
 poly1305_blocksx8_final(__m512i& a0,
                         __m512i& a1,
                         __m512i& a2,
@@ -618,9 +735,9 @@ poly1305_blocksx8_final(__m512i& a0,
 
     // Fold a0_128_0, a1_128_0, a2_128_0 to a0, a1, a2
     Uint64 _a0, _a1, _a2;
-    _a0 = a0_128_0[0] + a0_128_0[1];
-    _a1 = a1_128_0[0] + a1_128_0[1];
-    _a2 = a2_128_0[0] + a2_128_0[1];
+    _a0 = hadd_u64x2(a0_128_0);
+    _a1 = hadd_u64x2(a1_128_0);
+    _a2 = hadd_u64x2(a2_128_0);
 
     // Save back _a0, _a1, _a2 to a0, a1, a2, set all other values to 0
     a0 = _mm512_setr_epi64(_a0, 0, 0, 0, 0, 0, 0, 0);
@@ -685,6 +802,8 @@ poly1305_init_radix44(Poly1305State44& state, const Uint8 key[32])
     poly1305_multx1_radix44_standalone(state.r6, state.r, state.r7);
     // R Zenzizenzizenzic / Octic
     poly1305_multx1_radix44_standalone(state.r7, state.r, state.r8);
+    // R**16 (for 2x x8 combine path)
+    poly1305_multx1_radix44_standalone(state.r8, state.r8, state.r16);
 }
 
 #if 0
@@ -804,9 +923,33 @@ poly1305_blocksx8_radix44(Poly1305State44& state,
 
     __m512i reg_r0{}, reg_r1{}, reg_r2{};
     __m512i reg_s1{}, reg_s2{};
+    __m512i reg_r0_16{}, reg_r1_16{}, reg_r2_16{};
+    __m512i reg_s1_16{}, reg_s2_16{};
 
     if (state.fold == false) {
-        poly1305_blocksx1_to_blocksx8(state, pMsg, len);
+        // Check if accumulator is zero (fresh state)
+        __m512i reg_acc0 = _mm512_load_epi64(state.acc0);
+        __m512i reg_acc1 = _mm512_load_epi64(state.acc1);
+        __m512i reg_acc2 = _mm512_load_epi64(state.acc2);
+        __m512i zero     = _mm512_setzero_si512();
+
+        bool acc_is_zero =
+            (_mm512_cmpeq_epi64_mask(reg_acc0, zero) == 0xFF) &&
+            (_mm512_cmpeq_epi64_mask(reg_acc1, zero) == 0xFF) &&
+            (_mm512_cmpeq_epi64_mask(reg_acc2, zero) == 0xFF);
+
+        if (acc_is_zero && state.msg_buffer_len == 0 && len >= 128) {
+            // Direct x8 start: load first 8 blocks as initial accumulators
+            loadx8_message_radix44(pMsg, reg_acc0, reg_acc1, reg_acc2);
+            _mm512_store_epi64(state.acc0, reg_acc0);
+            _mm512_store_epi64(state.acc1, reg_acc1);
+            _mm512_store_epi64(state.acc2, reg_acc2);
+            pMsg += 128;
+            len -= 128;
+        } else {
+            // Existing path for non-fresh state
+            poly1305_blocksx1_to_blocksx8(state, pMsg, len);
+        }
         state.fold = true;
     }
 
@@ -817,6 +960,49 @@ poly1305_blocksx8_radix44(Poly1305State44& state,
     // Move to init sequence
     broadcast_r(state.r8, reg_r0, reg_r1, reg_r2);
     poly1305_calculate_modulo_trick_value(reg_r1, reg_r2, reg_s1, reg_s2);
+    broadcast_r(state.r16, reg_r0_16, reg_r1_16, reg_r2_16);
+    poly1305_calculate_modulo_trick_value(reg_r1_16, reg_r2_16, reg_s1_16, reg_s2_16);
+
+    while (len >= 256) {
+        __m512i reg_msg0_0, reg_msg1_0, reg_msg2_0;
+        __m512i reg_msg0_1, reg_msg1_1, reg_msg2_1;
+
+        loadx8_message_radix44(pMsg, reg_msg0_0, reg_msg1_0, reg_msg2_0);
+        loadx8_message_radix44(pMsg + 128, reg_msg0_1, reg_msg1_1, reg_msg2_1);
+
+        // Combine two Horner steps:
+        //   acc = (acc*r^8 + m0)*r^8 + m1
+        //       = acc*r^16 + (m0*r^8) + m1
+        // This breaks the acc->acc dependency between the two multiplications.
+        poly1305_multx8_radix44(reg_acc0,
+                                reg_acc1,
+                                reg_acc2,
+                                reg_r0_16,
+                                reg_r1_16,
+                                reg_r2_16,
+                                reg_s1_16,
+                                reg_s2_16);
+
+        poly1305_multx8_radix44(reg_msg0_0,
+                                reg_msg1_0,
+                                reg_msg2_0,
+                                reg_r0,
+                                reg_r1,
+                                reg_r2,
+                                reg_s1,
+                                reg_s2);
+
+        reg_acc0 = _mm512_add_epi64(reg_acc0, reg_msg0_0);
+        reg_acc1 = _mm512_add_epi64(reg_acc1, reg_msg1_0);
+        reg_acc2 = _mm512_add_epi64(reg_acc2, reg_msg2_0);
+
+        reg_acc0 = _mm512_add_epi64(reg_acc0, reg_msg0_1);
+        reg_acc1 = _mm512_add_epi64(reg_acc1, reg_msg1_1);
+        reg_acc2 = _mm512_add_epi64(reg_acc2, reg_msg2_1);
+
+        len -= 256;
+        pMsg += 256;
+    }
 
     while (len >= 128) {
         loadx8_message_radix44(pMsg, reg_msg0, reg_msg1, reg_msg2);
@@ -922,9 +1108,9 @@ poly1305_blocksx8_to_blocksx1(Poly1305State44& state) // len is useless here
 
     // Fold a0_128_0, a1_128_0, a2_128_0 to a0, a1, a2
     Uint64 _a0, _a1, _a2;
-    _a0 = a0_128_0[0] + a0_128_0[1];
-    _a1 = a1_128_0[0] + a1_128_0[1];
-    _a2 = a2_128_0[0] + a2_128_0[1];
+    _a0 = hadd_u64x2(a0_128_0);
+    _a1 = hadd_u64x2(a1_128_0);
+    _a2 = hadd_u64x2(a2_128_0);
 
     // Save back _a0, _a1, _a2 to a0, a1, a2, set all other values to 0
     reg_acc0 = _mm512_setr_epi64(_a0, 0, 0, 0, 0, 0, 0, 0);
@@ -968,46 +1154,51 @@ poly1305_blocksx1_radix44(Poly1305State44& state,
                           const Uint8*&    pMsg,
                           Uint64&          len)
 {
-    __m512i reg_msg0, reg_msg1, reg_msg2;
-
-    __m512i reg_r0, reg_r1, reg_r2;
-    __m512i reg_s1, reg_s2;
     if (state.fold) {
         // No need to completely fold
         poly1305_blocksx8_to_blocksx1(state);
         state.fold = false;
     }
 
-    __m512i reg_acc0 = _mm512_load_epi64(state.acc0),
-            reg_acc1 = _mm512_load_epi64(state.acc1),
-            reg_acc2 = _mm512_load_epi64(state.acc2);
+    Uint64 a0 = state.acc0[0];
+    Uint64 a1 = state.acc1[0];
+    Uint64 a2 = state.acc2[0];
 
-    broadcast_r(state.r, reg_r0, reg_r1, reg_r2);
-    poly1305_calculate_modulo_trick_value(reg_r1, reg_r2, reg_s1, reg_s2);
+    const Uint64 r0 = state.r[0];
+    const Uint64 r1 = state.r[1];
+    const Uint64 r2 = state.r[2];
+    const Uint64 s1 = r1 * (5 * 4);
+    const Uint64 s2 = r2 * (5 * 4);
+
+    // Fresh-state fast-path: q = 0*r + m == m (skip first multiply).
+    if (len >= 16 && (a0 | a1 | a2) == 0) {
+        load_message_scalar_radix44(pMsg, a0, a1, a2);
+        pMsg += 16;
+        len -= 16;
+    }
 
     while (len >= 16) {
-        loadx1_message_radix44(pMsg, reg_msg0, reg_msg1, reg_msg2);
+        Uint64 m0, m1, m2;
+        load_message_scalar_radix44(pMsg, m0, m1, m2);
 
-        poly1305_multx8_radix44(reg_acc0,
-                                reg_acc1,
-                                reg_acc2,
-                                reg_r0,
-                                reg_r1,
-                                reg_r2,
-                                reg_s1,
-                                reg_s2);
+        poly1305_mult_scalar_radix44(a0, a1, a2, r0, r1, r2, s1, s2);
 
-        // Add m0, m1, m2 to a0, a1, a2
-        reg_acc0 = _mm512_add_epi64(reg_acc0, reg_msg0);
-        reg_acc1 = _mm512_add_epi64(reg_acc1, reg_msg1);
-        reg_acc2 = _mm512_add_epi64(reg_acc2, reg_msg2);
+        a0 += m0;
+        a1 += m1;
+        a2 += m2;
 
         pMsg += 16;
         len -= 16;
     }
-    _mm512_store_epi64(state.acc0, reg_acc0);
-    _mm512_store_epi64(state.acc1, reg_acc1);
-    _mm512_store_epi64(state.acc2, reg_acc2);
+
+    state.acc0[0] = a0;
+    state.acc1[0] = a1;
+    state.acc2[0] = a2;
+    for (int i = 1; i < 8; i++) {
+        state.acc0[i] = 0;
+        state.acc1[i] = 0;
+        state.acc2[i] = 0;
+    }
 }
 
 inline void
@@ -1026,29 +1217,11 @@ poly1305_blockx1_final(__m512i& a0, __m512i& a1, __m512i& a2, Uint64 r[3])
 void
 poly1305_partial_blocks(Poly1305State44& state)
 {
-    __m512i reg_msg0, reg_msg1, reg_msg2;
-    __m512i reg_acc0 = _mm512_load_epi64(state.acc0),
-            reg_acc1 = _mm512_load_epi64(state.acc1),
-            reg_acc2 = _mm512_load_epi64(state.acc2);
-
-    __m512i reg_r0, reg_r1, reg_r2;
-    __m512i reg_s1, reg_s2;
-
     Uint8* p_msg = state.msg_buffer;
 
     assert(state.msg_buffer_len < 16);
     if (state.fold == true) {
-        poly1305_blocksx8_final(reg_acc0,
-                                reg_acc1,
-                                reg_acc2,
-                                state.r,
-                                state.r2,
-                                state.r3,
-                                state.r4,
-                                state.r5,
-                                state.r6,
-                                state.r7,
-                                state.r8);
+        poly1305_blocksx8_to_blocksx1(state);
         state.fold = false;
     }
 
@@ -1058,26 +1231,40 @@ poly1305_partial_blocks(Poly1305State44& state)
         p_msg[i] = 0x00;
     }
 
-    loadx1_message_radix44_nopad(p_msg, reg_msg0, reg_msg1, reg_msg2);
-
-    // Setup R and S
-    broadcast_r(state.r, reg_r0, reg_r1, reg_r2);
-    poly1305_calculate_modulo_trick_value(reg_r1, reg_r2, reg_s1, reg_s2);
+    Uint64 m0, m1, m2;
+    load_message_scalar_radix44_nopad(p_msg, m0, m1, m2);
 
     state.msg_buffer_len = 0; // Reset message buffer
 
-    // Multiply with r
-    poly1305_multx8_radix44(
-        reg_acc0, reg_acc1, reg_acc2, reg_r0, reg_r1, reg_r2, reg_s1, reg_s2);
+    Uint64 a0 = state.acc0[0];
+    Uint64 a1 = state.acc1[0];
+    Uint64 a2 = state.acc2[0];
 
-    // Add m0, m1, m2 to a0, a1, a2
-    reg_acc0 = _mm512_add_epi64(reg_acc0, reg_msg0);
-    reg_acc1 = _mm512_add_epi64(reg_acc1, reg_msg1);
-    reg_acc2 = _mm512_add_epi64(reg_acc2, reg_msg2);
+    const Uint64 r0 = state.r[0];
+    const Uint64 r1 = state.r[1];
+    const Uint64 r2 = state.r[2];
+    const Uint64 s1 = r1 * (5 * 4);
+    const Uint64 s2 = r2 * (5 * 4);
 
-    _mm512_store_epi64(state.acc0, reg_acc0);
-    _mm512_store_epi64(state.acc1, reg_acc1);
-    _mm512_store_epi64(state.acc2, reg_acc2);
+    if ((a0 | a1 | a2) == 0) {
+        a0 = m0;
+        a1 = m1;
+        a2 = m2;
+    } else {
+        poly1305_mult_scalar_radix44(a0, a1, a2, r0, r1, r2, s1, s2);
+        a0 += m0;
+        a1 += m1;
+        a2 += m2;
+    }
+
+    state.acc0[0] = a0;
+    state.acc1[0] = a1;
+    state.acc2[0] = a2;
+    for (int i = 1; i < 8; i++) {
+        state.acc0[i] = 0;
+        state.acc1[i] = 0;
+        state.acc2[i] = 0;
+    }
 }
 
 bool
@@ -1105,7 +1292,7 @@ poly1305_update_radix44(Poly1305State44& state, const Uint8* pMsg, Uint64 len)
             state.msg_buffer_len = 0;
         }
     }
-    if (len > 256) {
+    if (len >= 128) {
         poly1305_blocksx8_radix44(state, pMsg, len);
     }
     if (len >= 16) {
@@ -1131,10 +1318,10 @@ poly1305_finalize_radix44(Poly1305State44& state,
     if (state.msg_buffer_len != 0) {
         poly1305_partial_blocks(state);
     }
-    __m512i reg_acc0 = _mm512_load_epi64(state.acc0),
-            reg_acc1 = _mm512_load_epi64(state.acc1),
-            reg_acc2 = _mm512_load_epi64(state.acc2);
     if (state.fold) {
+        __m512i reg_acc0 = _mm512_load_epi64(state.acc0),
+                reg_acc1 = _mm512_load_epi64(state.acc1),
+                reg_acc2 = _mm512_load_epi64(state.acc2);
         poly1305_blocksx8_final(reg_acc0,
                                 reg_acc1,
                                 reg_acc2,
@@ -1147,32 +1334,63 @@ poly1305_finalize_radix44(Poly1305State44& state,
                                 state.r7,
                                 state.r8);
         state.fold = false;
+
+        reg_acc0 = _mm512_add_epi64(reg_acc0, _mm512_set1_epi64(state.s[0]));
+        reg_acc1 = _mm512_add_epi64(reg_acc1, _mm512_set1_epi64(state.s[1]));
+        reg_acc2 = _mm512_add_epi64(reg_acc2, _mm512_set1_epi64(state.s[2]));
+
+        // Carry Propagation
+        // carry = a0>>44
+        __m512i carry = _mm512_srli_epi64(reg_acc0, 44);
+        // a1 = a1 + carry
+        reg_acc1 = _mm512_add_epi64(reg_acc1, carry);
+        // a0 = a0 & 0xfffffffffff
+        reg_acc0 = _mm512_and_epi64(reg_acc0, _mm512_set1_epi64(0xfffffffffff));
+
+        // carry = reg_acc1>>44
+        carry = _mm512_srli_epi64(reg_acc1, 44);
+        // a2 = a2 + carry
+        reg_acc2 = _mm512_add_epi64(reg_acc2, carry);
+        // reg_acc1 = reg_acc1 & 0xfffffffffff
+        reg_acc1 = _mm512_and_epi64(reg_acc1, _mm512_set1_epi64(0xfffffffffff));
+
+        _mm512_store_epi64(state.acc0, reg_acc0);
+        _mm512_store_epi64(state.acc1, reg_acc1);
+        _mm512_store_epi64(state.acc2, reg_acc2);
     } else {
-        poly1305_blockx1_final(reg_acc0, reg_acc1, reg_acc2, state.r);
+        Uint64 a0 = state.acc0[0];
+        Uint64 a1 = state.acc1[0];
+        Uint64 a2 = state.acc2[0];
+
+        const Uint64 r0 = state.r[0];
+        const Uint64 r1 = state.r[1];
+        const Uint64 r2 = state.r[2];
+        const Uint64 s1 = r1 * (5 * 4);
+        const Uint64 s2 = r2 * (5 * 4);
+
+        poly1305_mult_scalar_radix44(a0, a1, a2, r0, r1, r2, s1, s2);
+
+        a0 += state.s[0];
+        a1 += state.s[1];
+        a2 += state.s[2];
+
+        constexpr Uint64 mask44 = (1ULL << 44) - 1;
+        Uint64           carry = a0 >> 44;
+        a0 &= mask44;
+        a1 += carry;
+        carry = a1 >> 44;
+        a1 &= mask44;
+        a2 += carry;
+
+        state.acc0[0] = a0;
+        state.acc1[0] = a1;
+        state.acc2[0] = a2;
+        for (int i = 1; i < 8; i++) {
+            state.acc0[i] = 0;
+            state.acc1[i] = 0;
+            state.acc2[i] = 0;
+        }
     }
-
-    reg_acc0 = _mm512_add_epi64(reg_acc0, _mm512_set1_epi64(state.s[0]));
-    reg_acc1 = _mm512_add_epi64(reg_acc1, _mm512_set1_epi64(state.s[1]));
-    reg_acc2 = _mm512_add_epi64(reg_acc2, _mm512_set1_epi64(state.s[2]));
-
-    // Carry Propagation
-    // carry = a0>>44
-    __m512i carry = _mm512_srli_epi64(reg_acc0, 44);
-    // a1 = a1 + carry
-    reg_acc1 = _mm512_add_epi64(reg_acc1, carry);
-    // a0 = a0 & 0xfffffffffff
-    reg_acc0 = _mm512_and_epi64(reg_acc0, _mm512_set1_epi64(0xfffffffffff));
-
-    // carry = reg_acc1>>44
-    carry = _mm512_srli_epi64(reg_acc1, 44);
-    // a2 = a2 + carry
-    reg_acc2 = _mm512_add_epi64(reg_acc2, carry);
-    // reg_acc1 = reg_acc1 & 0xfffffffffff
-    reg_acc1 = _mm512_and_epi64(reg_acc1, _mm512_set1_epi64(0xfffffffffff));
-
-    _mm512_store_epi64(state.acc0, reg_acc0);
-    _mm512_store_epi64(state.acc1, reg_acc1);
-    _mm512_store_epi64(state.acc2, reg_acc2);
 
     Uint64 digest_temp[2];
 

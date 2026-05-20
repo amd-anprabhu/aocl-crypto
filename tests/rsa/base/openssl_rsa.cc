@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -278,7 +278,7 @@ OpenSSLRsaBase::SetPublicKeyBigNum(const alcp_rsa_data_t& data)
         m_VerifyKeyCtxDirect = nullptr;
     }
     m_VerifyKeyCtxDirect =
-        EVP_PKEY_CTX_new_from_pkey(m_libctx, m_pkey_pub, NULL);
+        EVP_PKEY_CTX_new_from_pkey(NULL, m_pkey_pub, NULL);
     if (m_VerifyKeyCtxDirect == nullptr) {
         std::cout << __func__ << ":"
                   << "EVP_PKEY_CTX_new_from_pkey returned null Error:"
@@ -448,7 +448,7 @@ OpenSSLRsaBase::SetPrivateKeyBigNum(const alcp_rsa_data_t& data)
         m_SigningKeyCtxDirect = nullptr;
     }
     m_SigningKeyCtxDirect =
-        EVP_PKEY_CTX_new_from_pkey(m_libctx, m_pkey_pvt, NULL);
+        EVP_PKEY_CTX_new_from_pkey(NULL, m_pkey_pvt, NULL);
     if (m_SigningKeyCtxDirect == nullptr) {
         std::cout << __func__ << ":"
                   << "EVP_PKEY_CTX_new_from_pkey returned null Error:"
@@ -587,13 +587,14 @@ OpenSSLRsaBase::DecryptPvtKey(const alcp_rsa_data_t& data)
 {
     int    ret_val = 0;
     size_t outlen  = 0;
+    const size_t inlen = static_cast<size_t>(data.m_key_len);
 
     /* now call decrypt */
     if (EVP_PKEY_decrypt(m_rsa_handle_keyctx_pvt,
                          NULL,
                          &outlen,
                          data.m_encrypted_data,
-                         outlen)
+                         inlen)
         != 1) {
         std::cout << __func__ << ":"
                   << "EVP_PKEY_decrypt failed: Error:" << std::endl;
@@ -605,7 +606,7 @@ OpenSSLRsaBase::DecryptPvtKey(const alcp_rsa_data_t& data)
                          data.m_decrypted_data,
                          &outlen,
                          data.m_encrypted_data,
-                         outlen)
+                         inlen)
         != 1) {
         std::cout << __func__ << ":"
                   << "EVP_PKEY_decrypt failed: Error:" << std::endl;

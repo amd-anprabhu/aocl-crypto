@@ -1,4 +1,4 @@
- # Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ # Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions are met:
@@ -37,6 +37,9 @@ TARGET_SOURCES(alcp_static
 TARGET_INCLUDE_DIRECTORIES(alcp PRIVATE ${AOCL_INSTALL_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/include)
 TARGET_INCLUDE_DIRECTORIES(alcp_static PRIVATE ${AOCL_INSTALL_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+IF(WIN32)
+	TARGET_LINK_LIBRARIES(alcp PRIVATE bcrypt)
+	TARGET_LINK_LIBRARIES(alcp_static PRIVATE bcrypt)
+ENDIF(WIN32)
 
 ADD_SUBDIRECTORY(tests)
-

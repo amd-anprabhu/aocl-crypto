@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -107,7 +107,7 @@ class AlcpCipherBase : public CipherBase
               const Uint8* key,
               const Uint32 key_len,
               const Uint8* tkey,
-              const Uint64 block_size);
+              const Uint64 block_size) override;
 
     /**
      * @brief Initialize or Reinitialize Cipher Base
@@ -117,14 +117,17 @@ class AlcpCipherBase : public CipherBase
      * @return true -  if no failure
      * @return false - if there is some failure
      */
-    bool init(const Uint8* key, const Uint32 key_len);
-    bool encrypt(alcp_dc_ex_t& data);
-    bool decrypt(alcp_dc_ex_t& data);
-    bool reset();
-    bool context_copy();
-    bool flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len);
-    bool dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len);
-    bool multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint8 ** pIv, Uint64 ivLen, Uint64 numBuffers);
+    bool init(const Uint8* key, const Uint32 key_len) override;
+    bool encrypt(alcp_dc_ex_t& data) override;
+    bool decrypt(alcp_dc_ex_t& data) override;
+    bool reset() override;
+    bool context_copy() override;
+
+    // Primary multi-buffer interface (variable-length)
+    bool flush(const Uint8** pPlainText, const Uint64* pLengths, Uint64 numBuffers) override;
+    bool dequeue(Uint8** pCipherText, Uint64 numBuffers, const Uint64* pLengths) override;
+    bool multibufferInit(const Uint8* pKey, Uint64 keyLen, const Uint8** pIv, Uint64 ivLen, Uint64 numBuffers) override;
+    // Uniform-length wrappers inherited from CipherBase
 };
 
 } // namespace alcp::testing

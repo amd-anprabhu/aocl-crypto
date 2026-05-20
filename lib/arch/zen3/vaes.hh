@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -38,14 +38,12 @@ namespace alcp::cipher { namespace vaes {
     static inline void amd_mm256_broadcast_i64x2(const __m128i* rKey,
                                                  __m256i*       dst)
     {
-        const Uint64* key64 = (const Uint64*)rKey;
-        *dst = _mm256_set_epi64x(key64[1], key64[0], key64[1], key64[0]);
+        *dst = _mm256_broadcastsi128_si256(*rKey);
     }
 
     static inline __m256i amd_mm256_broadcast_i64x2(const __m128i* rKey)
     {
-        const Uint64* key64 = (const Uint64*)rKey;
-        return _mm256_set_epi64x(key64[1], key64[0], key64[1], key64[0]);
+        return _mm256_broadcastsi128_si256(*rKey);
     }
 
     // Encrypt Begins here

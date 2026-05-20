@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2021-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -47,80 +47,80 @@ EXTERN_C_BEGIN
 /**
  * @brief Store info about type of RNG used
  *
- * @typedef enum alc_rng_type_t
+ * @enum alc_rng_type
  */
-typedef enum
+typedef enum alc_rng_type
 {
-    ALC_RNG_TYPE_INVALID = 0,
-    ALC_RNG_TYPE_SIMPLE,
-    ALC_RNG_TYPE_CONTINUOUS,
-    ALC_RNG_TYPE_DISCRETE,
+    ALC_RNG_TYPE_INVALID = 0, /**< Invalid RNG type */
+    ALC_RNG_TYPE_SIMPLE, /**< Simple RNG */
+    ALC_RNG_TYPE_CONTINUOUS, /**< Continuous RNG */
+    ALC_RNG_TYPE_DISCRETE, /**< Discrete RNG */
 
-    ALC_RNG_TYPE_MAX,
+    ALC_RNG_TYPE_MAX, /**< Sentinel value for RNG type enumeration */
 } alc_rng_type_t;
 
 /**
  * @brief Store info about source of RNG used
  *
- * @typedef enum alc_rng_source_t
+ * @enum alc_rng_source
  */
-typedef enum
+typedef enum alc_rng_source
 {
-    ALC_RNG_SOURCE_ALGO = 0, /* Default: select software CRNG/PRNG */
-    ALC_RNG_SOURCE_OS,       /* Use the operating system based support */
-    ALC_RNG_SOURCE_DEV,      /* Device based off-loading support */
-    ALC_RNG_SOURCE_ARCH,     /* Architecture specific source */
-    ALC_RNG_SOURCE_MAX,
+    ALC_RNG_SOURCE_ALGO = 0, /**< Software CRNG/PRNG (default) */
+    ALC_RNG_SOURCE_OS, /**< Operating system RNG */
+    ALC_RNG_SOURCE_DEV, /**< Hardware device RNG */
+    ALC_RNG_SOURCE_ARCH, /**< Architecture-specific RNG (e.g., RDRAND) */
+    ALC_RNG_SOURCE_MAX, /**< Sentinel value for RNG source enumeration */
 } alc_rng_source_t;
 
 /**
  * @brief Store info about distribution used for RNG
  *
- * @typedef enum alc_rng_distrib_t
+ * @enum alc_rng_distrib
  */
-typedef enum
+typedef enum alc_rng_distrib
 {
-    ALC_RNG_DISTRIB_UNKNOWN = 0,
+    ALC_RNG_DISTRIB_UNKNOWN = 0, /**< Unknown distribution */
 
-    ALC_RNG_DISTRIB_BETA,
-    ALC_RNG_DISTRIB_CAUCHY,
-    ALC_RNG_DISTRIB_CHISQUARE,
-    ALC_RNG_DISTRIB_DIRICHLET,
-    ALC_RNG_DISTRIB_EXPONENTIAL,
-    ALC_RNG_DISTRIB_GAMMA,
-    ALC_RNG_DISTRIB_GAUSSIAN,
-    ALC_RNG_DISTRIB_GUMBEL,
-    ALC_RNG_DISTRIB_LAPLACE,
-    ALC_RNG_DISTRIB_LOGISTIC,
-    ALC_RNG_DISTRIB_LOGNORMAL,
-    ALC_RNG_DISTRIB_PARETO,
-    ALC_RNG_DISTRIB_RAYLEIGH,
-    ALC_RNG_DISTRIB_UNIFORM,
-    ALC_RNG_DISTRIB_VONMISES,
-    ALC_RNG_DISTRIB_WEIBULL,
-    ALC_RNG_DISTRIB_WALD,
-    ALC_RNG_DISTRIB_ZIPF,
+    ALC_RNG_DISTRIB_BETA, /**< Beta distribution */
+    ALC_RNG_DISTRIB_CAUCHY, /**< Cauchy distribution */
+    ALC_RNG_DISTRIB_CHISQUARE, /**< Chi-squared distribution */
+    ALC_RNG_DISTRIB_DIRICHLET, /**< Dirichlet distribution */
+    ALC_RNG_DISTRIB_EXPONENTIAL, /**< Exponential distribution */
+    ALC_RNG_DISTRIB_GAMMA, /**< Gamma distribution */
+    ALC_RNG_DISTRIB_GAUSSIAN, /**< Gaussian (normal) distribution */
+    ALC_RNG_DISTRIB_GUMBEL, /**< Gumbel distribution */
+    ALC_RNG_DISTRIB_LAPLACE, /**< Laplace distribution */
+    ALC_RNG_DISTRIB_LOGISTIC, /**< Logistic distribution */
+    ALC_RNG_DISTRIB_LOGNORMAL, /**< Log-normal distribution */
+    ALC_RNG_DISTRIB_PARETO, /**< Pareto distribution */
+    ALC_RNG_DISTRIB_RAYLEIGH, /**< Rayleigh distribution */
+    ALC_RNG_DISTRIB_UNIFORM, /**< Uniform distribution */
+    ALC_RNG_DISTRIB_VONMISES, /**< Von Mises distribution */
+    ALC_RNG_DISTRIB_WEIBULL, /**< Weibull distribution */
+    ALC_RNG_DISTRIB_WALD, /**< Wald (inverse Gaussian) distribution */
+    ALC_RNG_DISTRIB_ZIPF, /**< Zipf distribution */
 
-    ALC_RNG_DISTRIB_BERNOULLI,
-    ALC_RNG_DISTRIB_BINOMIAL,
-    ALC_RNG_DISTRIB_GEOMETRIC,
-    ALC_RNG_DISTRIB_HYPERGEOMETRIC,
-    ALC_RNG_DISTRIB_MULTINOMIAL,
-    ALC_RNG_DISTRIB_NEGBINOMIAL,
-    ALC_RNG_DISTRIB_POISSON,
-    ALC_RNG_DISTRIB_UNIFORM_BITS,
+    ALC_RNG_DISTRIB_BERNOULLI, /**< Bernoulli distribution */
+    ALC_RNG_DISTRIB_BINOMIAL, /**< Binomial distribution */
+    ALC_RNG_DISTRIB_GEOMETRIC, /**< Geometric distribution */
+    ALC_RNG_DISTRIB_HYPERGEOMETRIC, /**< Hypergeometric distribution */
+    ALC_RNG_DISTRIB_MULTINOMIAL, /**< Multinomial distribution */
+    ALC_RNG_DISTRIB_NEGBINOMIAL, /**< Negative binomial distribution */
+    ALC_RNG_DISTRIB_POISSON, /**< Poisson distribution */
+    ALC_RNG_DISTRIB_UNIFORM_BITS, /**< Uniform bits distribution */
 
-    ALC_RNG_DISTRIB_MAX,
+    ALC_RNG_DISTRIB_MAX, /**< Sentinel value for distribution enumeration */
 } alc_rng_distrib_t;
 
 /**
  * @brief Store info about algorithm used for RNG
  *
- * @typedef enum alc_rng_algo_flags_t
+ * @enum alc_rng_algo_flags
  */
-typedef enum _alc_rng_algo_flags
+typedef enum alc_rng_algo_flags
 {
-    ALC_RNG_FLAG_DUMMY,
+    ALC_RNG_FLAG_DUMMY, /**< Placeholder flag */
 } alc_rng_algo_flags_t;
 
 /**
@@ -129,7 +129,7 @@ typedef enum _alc_rng_algo_flags
  * @param ri_type Store info about type of RNG used
  * @param ri_source Store info about source of RNG used
  * @param ri_distrib Store info about distribution used for RNG
- * @param ri_flagsStore info about algorithm used for RNG
+ * @param ri_flags Store info about algorithm used for RNG
  *
  * @struct alc_rng_info_t
  */
@@ -163,9 +163,7 @@ typedef struct
  * @endparblock
  * @param [in]  pRngInfo      Pointer to alc_rng_info_t structure
  *
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE, an error has occurred and handle will be invalid for
- * future operations
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_rng_supported(const alc_rng_info_p pRngInfo);
@@ -181,7 +179,8 @@ alcp_rng_supported(const alc_rng_info_p pRngInfo);
  *
  * @param [in]  pRngInfo    Pointer to RNG configuration
  *
- * @return  Uint64      Size of RNG context in bytes
+ * @return  Uint64      Size of RNG context in bytes. For APIs that return
+ * alc_error_t, use @ref alcp_is_error to check for errors.
  */
 ALCP_API_EXPORT Uint64
 alcp_rng_context_size(const alc_rng_info_p pRngInfo);
@@ -193,14 +192,12 @@ alcp_rng_context_size(const alc_rng_info_p pRngInfo);
  * alcp_rng_finish</b>
  * @endparblock
  * @note       Requested algorithm may be first checked using
- *             @ref alcp_rng_context_size and pHandle as allocated by user.
+ *             @ref alcp_rng_supported and pHandle as allocated by user.
  *
  * @param [in]      pRngInfo        Pointer to RNG configuration
  * @param [out]      pRngHandle      Library populated session handle for future
  * rng operations.
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE, an error has occurred and handle will be invalid for
- * future operations
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_rng_request(const alc_rng_info_p pRngInfo, alc_rng_handle_p pRngHandle);
@@ -216,9 +213,7 @@ alcp_rng_request(const alc_rng_info_p pRngInfo, alc_rng_handle_p pRngHandle);
  * @param [out] pBuf        Output buffer to be filled with random numbers
  * @param [in]  size        Size of pBuf in bytes
  *
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE, an error has occurred and handle will be invalid for
- * future operations
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_rng_gen_random(alc_rng_handle_p pRngHandle,
@@ -235,10 +230,7 @@ alcp_rng_gen_random(alc_rng_handle_p pRngHandle,
  * @note       Some hardware RNGs require initialization
  *
  * @param [in]  pRngHandle      Pointer to handle returned by alcp_rng_request()
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE, an error has occurred and handle will be invalid for
- * future operations
- *
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_rng_init(alc_rng_handle_p pRngHandle);
@@ -256,14 +248,7 @@ alcp_rng_init(alc_rng_handle_p pRngHandle);
  * @param [in]  seed           Pointer to seed
  * @param [in]  size           Length of seed in bytes
  *
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE, an error has occurred and handle will be invalid for
- *future operations
- **/
-ALCP_API_EXPORT alc_error_t
-alcp_rng_seed(alc_rng_handle_p pRngHandle, const Uint8* seed, Uint64 size);
-
-/**
+ * @return   ALC_ERROR_NONE on success.
  * @brief   Complete a session
  * @parblock <br> &nbsp;
  * <b>This API is called to free resources so should be called to free the
@@ -273,9 +258,7 @@ alcp_rng_seed(alc_rng_handle_p pRngHandle, const Uint8* seed, Uint64 size);
  *              @ref alcp_rng_request
  *
  * @param [in]  pRngHandle      Pointer to handle
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE, an error has occurred and handle will be invalid for
- * future operations
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_rng_finish(alc_rng_handle_p pRngHandle);

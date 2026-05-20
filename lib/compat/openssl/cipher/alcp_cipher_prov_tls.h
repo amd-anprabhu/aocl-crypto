@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,19 +26,22 @@
  *
  */
 
-#pragma once
+#ifndef _ALCP_CIPHER_PROV_TLS_H_
+#define _ALCP_CIPHER_PROV_TLS_H_
 
-#include <vector>
+#include <openssl/crypto.h>
+#include <stddef.h>
 
-#include "alcp/utils/cpuid.hh"
+#include "alcp/types.h"
+int
+ALCP_prov_cipher_tlsunpadblock(OSSL_LIB_CTX* libctx,
+                               unsigned int  tlsversion,
+                               Uint8*        buf,
+                               size_t*       buflen,
+                               size_t        blocksize,
+                               Uint8**       mac,
+                               int*          alloced,
+                               size_t        macsize,
+                               int           aead);
 
-using alcp::utils::CpuCipherFeatures;
-namespace alcp::cipher::unittest {
-
-CpuCipherFeatures
-getMaxFeature();
-
-std::vector<CpuCipherFeatures>
-getSupportedFeatures();
-
-} // namespace alcp::cipher::unittest
+#endif /* _ALCP_CIPHER_PROV_TLS_H_ */

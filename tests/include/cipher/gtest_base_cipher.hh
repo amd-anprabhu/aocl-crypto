@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -846,10 +846,7 @@ CipherCrossTest(int               keySize,
             data_alc.m_inl = data_ext.m_inl = pt.size() - 1;
 
             data_alc.m_outl = data_ext.m_outl = data_alc.m_inl;
-/* for CBC mode, let same buffers be used for both input and output if
- * CBC_INPLACE_BUFFER is defined
- */
-#ifdef CBC_INPLACE_BUFFER
+            /* For CBC mode, use same buffer for input and output (in-place) */
             if (modeStr.compare("CBC") == 0) {
                 data_alc.m_out = data_alc.m_in;
                 data_ext.m_out = &(out_ct_ext[0]);
@@ -857,10 +854,6 @@ CipherCrossTest(int               keySize,
                 data_alc.m_out = &(out_ct_alc[0]);
                 data_ext.m_out = &(out_ct_ext[0]);
             }
-#else
-            data_alc.m_out = &(out_ct_alc[0]);
-            data_ext.m_out = &(out_ct_ext[0]);
-#endif
 
             // ALC/Main Lib Data
             data_alc.m_iv  = &(iv[0]);
@@ -1338,9 +1331,10 @@ CipherMultiBufferCrossTest(int               keySize,
 
         std::vector<const Uint8*> input_buffer_pointers(numBuffers);
         std::vector<Uint8*>       output_buffer_pointers(numBuffers);
-        for (int i = 0; i < numBuffers; ++i) {
-            input_buffer_pointers[i]  = vec_in[i].data();
-            output_buffer_pointers[i] = vec_out[i].data();
+        std::vector<Uint64>       bufferLengths(numBuffers, static_cast<Uint64>(i));
+        for (int j = 0; j < numBuffers; ++j) {
+            input_buffer_pointers[j]  = vec_in[j].data();
+            output_buffer_pointers[j] = vec_out[j].data();
         }
 
         // initialize the cipher context
@@ -1351,12 +1345,12 @@ CipherMultiBufferCrossTest(int               keySize,
             return;
         }
 
-        if (!p_cb->flush(input_buffer_pointers.data(), numBuffers, i)) {
+        if (!p_cb->flush(input_buffer_pointers.data(), bufferLengths.data(), numBuffers)) {
             std::cout << "Multi-buffer flush failed." << std::endl;
             return;
         }
 
-        if (!p_cb->dequeue(output_buffer_pointers.data(), numBuffers, i)) {
+        if (!p_cb->dequeue(output_buffer_pointers.data(), numBuffers, bufferLengths.data())) {
             std::cout << "Multi-buffer dequeue failed." << std::endl;
             return;
         }

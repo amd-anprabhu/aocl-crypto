@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,7 +28,7 @@
 #include "avx256.hh"
 #include "vaes.hh"
 
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/types.hh"
 #include "alcp/utils/copy.hh"
 #include "cipher/avx2/aes_xts_avx2.hh"
@@ -335,7 +335,7 @@ EncryptXtsKernel(const Uint8* pSrc,
 
         src_text_1 = lastTweak ^ src_text_1;
 
-        utils::CopyBytes(p_dest8, p_src_text_1, (16));
+        utils::CopyBytes(p_dest8, p_src_text_1, 16);
 
 // Swap low and high
 #ifdef AES_MULTI_UPDATE
@@ -348,7 +348,7 @@ EncryptXtsKernel(const Uint8* pSrc,
 
     if (extra_bytes_in_message_block) {
         utils::CopyBytes(p_dest8 + (16 * blocks),
-                         p_dest8 + (16 * (blocks - 1)),
+                         (p_dest8 - 16) + (16 * blocks),
                          extra_bytes_in_message_block);
         __m256i stealed_text, tweak_1;
         auto    p_stealed_text8 = reinterpret_cast<Uint8*>(&stealed_text);
@@ -727,20 +727,18 @@ DecryptXtsKernel(const Uint8* pSrc,
     }
 
     if (extra_bytes_in_message_block) {
-        /* FIXME: there is an array out-of-bounds reported by gcc14.1 in this
-         * memcpy operation. Fix TBD */
         utils::CopyBytes(p_dest8 + (16 * blocks),
-                         p_dest8 + (16 * (blocks - 1)),
+                         (p_dest8 - 16) + (16 * blocks),
                          extra_bytes_in_message_block);
         __m256i stealed_text, tweak_1;
         Uint8*  p_stealed_text = reinterpret_cast<Uint8*>(&stealed_text);
         Uint8*  p_tweak_1      = reinterpret_cast<Uint8*>(&tweak_1);
 
-        utils::CopyBytes(p_tweak_1, p_lastTweak8 + ((16 * (blocks))), (16));
+        utils::CopyBytes(p_tweak_1, p_lastTweak8 + 16 * blocks, 16);
 
         utils::CopyBytes(
             p_stealed_text + extra_bytes_in_message_block,
-            p_dest8 + (extra_bytes_in_message_block + (16 * (blocks - 1))),
+            (p_dest8 - 16) + extra_bytes_in_message_block + 16 * blocks,
             (16 - extra_bytes_in_message_block));
 
         utils::CopyBytes(p_stealed_text,
@@ -751,7 +749,7 @@ DecryptXtsKernel(const Uint8* pSrc,
         AesDec_1x256(&stealed_text, p_key128, nRounds);
         stealed_text = (tweak_1 ^ stealed_text);
 
-        utils::CopyBytes(p_dest8 + (16 * (blocks - 1)), p_stealed_text, 16);
+        utils::CopyBytes((p_dest8 - 16) + (16 * blocks), p_stealed_text, 16);
     }
 
 #ifdef AES_MULTI_UPDATE

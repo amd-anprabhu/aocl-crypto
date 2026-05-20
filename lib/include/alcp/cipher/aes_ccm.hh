@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -27,12 +27,8 @@
  */
 #pragma once
 
-#include "aes.hh"
-
-#include "alcp/cipher/aes.hh"
 #include "alcp/cipher/cipher_common.hh"
 #include "alcp/utils/copy.hh"
-#include "alcp/utils/cpuid.hh"
 
 #include <cstdint>
 #include <immintrin.h>
@@ -40,7 +36,7 @@
 namespace alcp::cipher {
 
 /**
- * @brief CCM mode (Copy of GCM class)
+ * @brief CCM mode context data
  * @struct ccm_data_t
  */
 
@@ -80,11 +76,26 @@ namespace aesni::ccm {
                       Uint64      len);
 } // namespace aesni::ccm
 
-class ALCP_API_EXPORT Ccm
-    : public Aes
-    , public virtual iCipher
+/**
+ * @brief Unified CCM cipher class
+ *
+ * Uses composition for state, key (with Rijndael), and IV management.
+ * KeyManager inherits from Rijndael and handles key expansion internally.
+ * 
+ * Template parameters:
+ * - keyLenBits: Key length (128, 192, or 256 bits)
+ * - arch: CPU architecture features (currently only eAesni supported)
+ */
+template<CipherKeyLen keyLenBits, utils::CpuArchLevel arch>
+class CcmT
+    : public iCipherCcm
 {
-    // Needs to be protected as class CcmHash should use it
+  private:
+    // Composed components
+    StateManager m_stateManager;
+    KeyManager   m_keyManager;
+    IvManager    m_ivManager;
+
   protected:
     Uint64       m_tagLen            = 12; // default taglen
     Uint64       m_additionalDataLen = 0;
@@ -95,76 +106,37 @@ class ALCP_API_EXPORT Ccm
     ccm_data_t   m_ccm_data{};
 
   protected:
-    alc_error_t setIv(ccm_data_t* ccm_data,
-                      const Uint8 pIv[],
-                      Uint64      ivLen,
-                      Uint64      dataLen);
-
-  public:
-    Ccm(Uint32 keyLen_in_bytes, CipherMode mode)
-        : Aes(keyLen_in_bytes)
-    {
-        setMode(mode);
-    }
-
-    ~Ccm() = default;
-
-    alc_error_t init(const Uint8* pKey,
-                     Uint64       keyLen,
-                     const Uint8* pIv,
-                     Uint64       ivLen) override;
+    alc_error_t setIvInternal(ccm_data_t* ccm_data,
+                              const Uint8 pIv[],
+                              Uint64      ivLen,
+                              Uint64      dataLen);
 
     alc_error_t cryptUpdate(const Uint8 pInput[],
                             Uint8       pOutput[],
                             Uint64      dataLen,
                             bool        isEncrypt);
 
-    alc_error_t flush(const Uint8** pPlainText,
-                      Uint64        numBuffers,
-                      Uint64        len) override
-    {
-        return ALC_ERROR_NONE;
-    }
-    alc_error_t dequeue(Uint8** pCipherText,
-                        Uint64  numBuffers,
-                        Uint64  len) override
-    {
-        return ALC_ERROR_NONE;
-    }
-};
-
-class ALCP_API_EXPORT CcmHash
-    : public Ccm
-    , public virtual iCipherAuth
-{
-  public:
-    CcmHash(Uint32 keyLen_in_bytes, CipherMode mode)
-        : Ccm(keyLen_in_bytes, mode)
-    {
-    }
-    ~CcmHash() {}
-
-    alc_error_t setAad(const Uint8* pInput, Uint64 aadLen) override;
-    alc_error_t getTag(Uint8* pOutput, Uint64 tagLen) override;
-    alc_error_t setTagLength(Uint64 tagLength) override;
-
-    alc_error_t setPlainTextLength(
-        Uint64 len) override; // used in multiupdate case only
-};
-
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
-class CcmT
-    : public CcmHash
-    , public virtual iCipherAead
-{
   public:
     CcmT()
-        : CcmHash((static_cast<Uint32>(keyLenBits)) / 8, CipherMode::eAesCCM)
+        : m_keyManager(static_cast<Uint32>(keyLenBits) / 8)
+        , m_ivManager(7, 13) // CCM IV length: 7-13 bytes
     {
     }
+
     ~CcmT() = default;
 
   public:
+    // iCipherAead auth methods
+    alc_error_t setAad(const Uint8* pInput, Uint64 aadLen) override;
+    alc_error_t getTag(Uint8* pOutput, Uint64 tagLen) override;
+    alc_error_t setTagLength(Uint64 tagLength) override;
+    alc_error_t setPlainTextLength(Uint64 len) override; // used in multiupdate case only
+
+    // iCipher methods
+    alc_error_t init(const Uint8* pKey,
+                     Uint64       keyLen,
+                     const Uint8* pIv,
+                     Uint64       ivLen) override;
     alc_error_t encrypt(const Uint8* pPlainText,
                         Uint8*       pCipherText,
                         Uint64       len,
@@ -178,27 +150,10 @@ class CcmT
         return ALC_ERROR_NOT_SUPPORTED;
     }
 
-    alc_error_t finish(const void*) override { return ALC_ERROR_NONE; }
-    alc_error_t flush(const Uint8** pPlainText,
-                      Uint64        numBuffers,
-                      Uint64        len) override
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
-    alc_error_t dequeue(Uint8** pCipherText,
-                        Uint64  numBuffers,
-                        Uint64  len) override
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
-    alc_error_t multibufferInit(const Uint8*  pKey,
-                                Uint64        keyLen,
-                                const Uint8** pIv,
-                                Uint64        ivLen,
-                                Uint64        numBuffers) override
-    {
-        return ALC_ERROR_NOT_SUPPORTED;
-    }
+    alc_error_t finish() override { return ALC_ERROR_NONE; }
 };
+
+template<CipherKeyLen keyLenBits, utils::CpuArchLevel arch>
+using Ccm = CcmT<keyLenBits, arch>;
 
 } // namespace alcp::cipher

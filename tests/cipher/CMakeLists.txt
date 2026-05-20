@@ -1,4 +1,4 @@
- # Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ # Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions are met:
@@ -68,7 +68,7 @@ FUNCTION(KAT_CIPHER MOD)
     TARGET_LINK_LIBRARIES(${TEST_EXE} ${LIBS})
     alcp_add_integration_tests(${TEST_EXE} ${TEST_EXE} ${MOD})
     # Due to known issues, skipping tests with valgrind
-    # for more details refer https://ontrack-internal.amd.com/browse/CPUPL-4109
+    # for more details refer CPUPL-4109
     IF(ALCP_MEMCHECK_VALGRIND)
         message(WARNING "Due to known issues, skipping cipher tests with valgrind")
         #alcp_add_valgrind_check_test(${TEST_EXE} ${CMAKE_BINARY_DIR}/tests/cipher/${TEST_EXE})
@@ -83,7 +83,7 @@ FUNCTION(CROSS_CIPHER MOD)
     TARGET_LINK_LIBRARIES(${TEST_EXE} ${LIBS})
     alcp_add_integration_tests(${TEST_EXE} ${TEST_EXE} ${MOD})
     # Due to known issues, skipping tests with valgrind
-    # for more details refer https://ontrack-internal.amd.com/browse/CPUPL-4109
+    # for more details refer CPUPL-4109
     IF(ALCP_MEMCHECK_VALGRIND)
         message(WARNING "Due to known issues, skipping cipher tests with valgrind")
         #alcp_add_valgrind_check_test(${TEST_EXE} ${CMAKE_BINARY_DIR}/tests/cipher/${TEST_EXE})
@@ -119,6 +119,19 @@ TARGET_INCLUDE_DIRECTORIES(${TEST_EXE} PRIVATE ${ALCP_INCLUDES} ${EXTRA_INCLUDES
 TARGET_COMPILE_OPTIONS(${TEST_EXE} PUBLIC ${ALCP_WARNINGS})
 TARGET_LINK_LIBRARIES(${TEST_EXE} ${LIBS})
 alcp_add_integration_tests(${TEST_EXE} ${TEST_EXE} "test_multibuffer_cross")
+
+# Test for variable-length multibuffer (>32 buffers with mixed lengths)
+set(TEST_EXE test_multibuffer_variable_length)
+ADD_EXECUTABLE(${TEST_EXE} test_multibuffer_variable_length.cc ${ALC_BASE_FILES} ${EXTRA_SOURCES})
+TARGET_INCLUDE_DIRECTORIES(${TEST_EXE} PRIVATE ${ALCP_INCLUDES} ${EXTRA_INCLUDES})
+TARGET_COMPILE_OPTIONS(${TEST_EXE} PUBLIC ${ALCP_WARNINGS})
+TARGET_LINK_LIBRARIES(${TEST_EXE} ${LIBS})
+# Propagate AES_MULTI_UPDATE flag to test executable so #ifdef checks work correctly
+IF(ALCP_ENABLE_CIPHER_MULTI_UPDATE)
+    TARGET_COMPILE_DEFINITIONS(${TEST_EXE} PRIVATE "AES_MULTI_UPDATE")
+ENDIF(ALCP_ENABLE_CIPHER_MULTI_UPDATE)
+alcp_add_integration_tests(${TEST_EXE} ${TEST_EXE} "test_multibuffer_variable_length")
+
 IF(ALCP_MEMCHECK_VALGRIND)
     message(WARNING "Due to known issues, skipping cipher tests with valgrind")
 ENDIF()

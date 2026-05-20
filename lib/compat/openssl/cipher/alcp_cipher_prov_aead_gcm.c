@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -100,48 +100,57 @@ gcm_init(void*            vctx,
 
     cipherctx->enc = enc;
 
-    // copy iv
+    // Validate IV if provided
     if (iv != NULL) {
         if (ivlen == 0 || ivlen > sizeof(cipherctx->iv_buff)) {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return 0;
         }
-        cipherctx->ivLen = ivlen;
-        memcpy(cipherctx->iv_buff, iv, ivlen);
-        cipherctx->ivState = IV_STATE_BUFFERED;
-#if DEBUG_PROV_GCM_INIT
-        printf("\n setIV");
-#endif
-        // setIv, this maynot be necessary since iv is buffered.
-        // this can be removed after verification.
-        alc_error_t err = alcp_cipher_aead_init(
-            &(ctx->handle), NULL, 0, cipherctx->iv_buff, ivlen);
-        if (alcp_is_error(err)) {
-            return 0;
-        }
     }
-#if DEBUG_PROV_GCM_INIT
-    alc_prov_cipher_data_t* cipherctxTemp = ctx->handle.alc_prov_cipher_data;
-    printf("\n gcm_init enc value %d", cipherctxTemp->enc);
-#endif
-    // set key
+
+    // Validate key if provided
     if (key != NULL) {
         if (keylen != cipherctx->keyLen_in_bytes) {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
             return 0;
         }
+    }
+
+    // Combined key+IV init path when both are provided (single call optimization)
+    if (key != NULL && iv != NULL) {
 #if DEBUG_PROV_GCM_INIT
-        // setKey only
-        printf("\n setKey");
+        printf("\n combined setKey+setIV");
 #endif
         alc_error_t err = alcp_cipher_aead_init(
-            &(ctx->handle), key, cipherctx->keyLen_in_bytes * 8, NULL, 0);
-
+            &(ctx->handle), key, cipherctx->keyLen_in_bytes * 8, iv, ivlen);
         if (alcp_is_error(err)) {
             return 0;
         }
         cipherctx->isKeySet        = 1;
         cipherctx->tls_enc_records = 0;
+        cipherctx->ivLen           = ivlen;
+        memcpy(cipherctx->iv_buff, iv, ivlen);
+        cipherctx->ivState = IV_STATE_COPIED;
+    } else if (key != NULL) {
+        // Key only - IV will be set later
+#if DEBUG_PROV_GCM_INIT
+        printf("\n setKey only");
+#endif
+        alc_error_t err = alcp_cipher_aead_init(
+            &(ctx->handle), key, cipherctx->keyLen_in_bytes * 8, NULL, 0);
+        if (alcp_is_error(err)) {
+            return 0;
+        }
+        cipherctx->isKeySet        = 1;
+        cipherctx->tls_enc_records = 0;
+    } else if (iv != NULL) {
+        // IV only - buffer it for later use in gcm_cipher_internal()
+#if DEBUG_PROV_GCM_INIT
+        printf("\n setIV buffered");
+#endif
+        cipherctx->ivLen = ivlen;
+        memcpy(cipherctx->iv_buff, iv, ivlen);
+        cipherctx->ivState = IV_STATE_BUFFERED;
     }
 #if DEBUG_PROV_GCM_INIT
     printf("\n call setctx\n");
@@ -370,83 +379,108 @@ ALCP_prov_gcm_set_ctx_params(void* vctx, const OSSL_PARAM params[])
     if (params == NULL)
         return 1;
 
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TAG);
-    if (p != NULL) {
-        vp = cipherctx->buf;
-        if (!OSSL_PARAM_get_octet_string(p, &vp, EVP_GCM_TLS_TAG_LEN, &sz)) {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return 0;
-        }
-        if (sz == 0 || cipherctx->enc) {
-            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_TAG);
-            return 0;
-        }
-        cipherctx->tagLength = sz;
-#if PROV_GCM_DEBUG
-        printf("taglen set %lu \n", cipherctx->tagLength);
-#endif
-    }
+    /* Settable parameters - switch based on string length:
+     * +------------+-------------+------------------------------------------+
+     * | Key        | Length(Key) | Parameter Name                           |
+     * +------------+-------------+------------------------------------------+
+     * | tag        | 3           | OSSL_CIPHER_PARAM_AEAD_TAG               |
+     * | ivlen      | 5           | OSSL_CIPHER_PARAM_AEAD_IVLEN             |
+     * | tlsaad     | 6           | OSSL_CIPHER_PARAM_AEAD_TLS1_AAD          |
+     * | tlsivinv   | 8           | OSSL_CIPHER_PARAM_AEAD_TLS1_SET_IV_INV   |
+     * | tlsivfixed | 10          | OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED     |
+     * +------------+-------------+------------------------------------------+
+     */
 
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_IVLEN);
-    if (p != NULL) {
-        if (!OSSL_PARAM_get_size_t(p, &sz)) {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return 0;
-        }
-        if (sz == 0 || sz > sizeof(cipherctx->iv_buff)) {
-            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
-            return 0;
-        }
-        if (cipherctx->ivLen != sz) {
-            /* If the iv was already set or autogenerated, it is invalid. */
-            if (cipherctx->ivState != IV_STATE_UNINITIALISED)
-                cipherctx->ivState = IV_STATE_FINISHED;
-            cipherctx->ivLen = sz;
-        }
-#if PROV_GCM_DEBUG
-        printf("ivlen set %lu \n", cipherctx->ivLen);
-#endif
-    }
+    Uint64      length = 0;
+    const char* ptr    = NULL;
 
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_AAD);
-    if (p != NULL) {
-        if (p->data_type != OSSL_PARAM_OCTET_STRING) {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return 0;
-        }
-        sz = gcm_tls_init(ctx, p->data, p->data_size);
-        if (sz == 0) {
-            ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_AAD);
-            return 0;
-        }
-        cipherctx->tls_aad_pad_sz = sz;
-#if PROV_GCM_DEBUG
-        printf("\t add_pad set %u ", cipherctx->tls_aad_pad_sz);
-#endif
-    }
+    for (p = params; p->key != NULL; p++) {
 
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED);
-    if (p != NULL) {
-        if (p->data_type != OSSL_PARAM_OCTET_STRING) {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return 0;
-        }
-        if (gcm_tls_iv_set_fixed(ctx, p->data, p->data_size) == 0) {
-            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
-            return 0;
-        }
+        length = 0;
+        ptr    = p->key;
+        while (*(ptr++) && ++length)
+            ;
+
+        switch (length) {
+            case 3: /* "tag" */
+                vp = cipherctx->buf;
+                if (!OSSL_PARAM_get_octet_string(
+                        p, &vp, EVP_GCM_TLS_TAG_LEN, &sz)) {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                    return 0;
+                }
+                if (sz == 0 || cipherctx->enc) {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_TAG);
+                    return 0;
+                }
+                cipherctx->tagLength = sz;
 #if PROV_GCM_DEBUG
-        printf("OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED ");
+                printf("taglen set %lu\n", cipherctx->tagLength);
 #endif
-    }
-    p = OSSL_PARAM_locate_const(params, OSSL_CIPHER_PARAM_AEAD_TLS1_SET_IV_INV);
-    if (p != NULL) {
-        if (p->data == NULL || p->data_type != OSSL_PARAM_OCTET_STRING
-            || !setivinv(ctx, p->data, p->data_size)) {
+                break;
+
+            case 5: /* "ivlen" */
+                if (!OSSL_PARAM_get_size_t(p, &sz)) {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                    return 0;
+                }
+                if (sz == 0 || sz > sizeof(cipherctx->iv_buff)) {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
+                    return 0;
+                }
+                if (cipherctx->ivLen != sz) {
+                    /* If the iv was already set or autogenerated, it is
+                     * invalid. */
+                    if (cipherctx->ivState != IV_STATE_UNINITIALISED)
+                        cipherctx->ivState = IV_STATE_FINISHED;
+                    cipherctx->ivLen = sz;
+                }
 #if PROV_GCM_DEBUG
-            printf("OSSL_CIPHER_PARAM_AEAD_TLS1_SET_IV_INV failed ");
+                printf("ivlen set %lu \n", cipherctx->ivLen);
 #endif
-            return 0;
+                break;
+
+            case 6: /* "tlsaad"  */
+                if (p->data_type != OSSL_PARAM_OCTET_STRING) {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                    return 0;
+                }
+                sz = gcm_tls_init(ctx, p->data, p->data_size);
+                if (sz == 0) {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_AAD);
+                    return 0;
+                }
+                cipherctx->tls_aad_pad_sz = sz;
+#if PROV_GCM_DEBUG
+                printf("\t aad_pad set %u ", cipherctx->tls_aad_pad_sz);
+#endif
+                break;
+
+            case 10: /* "tlsivfixed" */
+                if (p->data_type != OSSL_PARAM_OCTET_STRING) {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                    return 0;
+                }
+                if (gcm_tls_iv_set_fixed(ctx, p->data, p->data_size) == 0) {
+                    ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_GET_PARAMETER);
+                    return 0;
+                }
+#if PROV_GCM_DEBUG
+                printf("OSSL_CIPHER_PARAM_AEAD_TLS1_IV_FIXED ");
+#endif
+                break;
+            case 8: /* "tlsivinv" */
+                if (p->data == NULL || p->data_type != OSSL_PARAM_OCTET_STRING
+                    || !setivinv(ctx, p->data, p->data_size)) {
+#if PROV_GCM_DEBUG
+                    printf("OSSL_CIPHER_PARAM_AEAD_TLS1_SET_IV_INV failed");
+#endif
+                    return 0;
+                }
+                break;
+
+            default:
+                break;
         }
     }
 
@@ -626,7 +660,8 @@ gcm_cipher_internal(ALCP_PROV_CIPHER_CTX* ctx,
                 // (void*)&ctx->prov_cipher_data.cipherState);
                 {
                     Uint64 outlen = 0;
-                    err           = alcp_cipher_aead_encrypt(&(ctx->handle), in, out, len, &outlen);
+                    err           = alcp_cipher_aead_encrypt(
+                        &(ctx->handle), in, out, len, &outlen);
                 }
             } else {
 #if PROV_GCM_DEBUG
@@ -636,7 +671,8 @@ gcm_cipher_internal(ALCP_PROV_CIPHER_CTX* ctx,
 #endif
                 {
                     Uint64 outlen = 0;
-                    err           = alcp_cipher_aead_decrypt(&(ctx->handle), in, out, len, &outlen);
+                    err           = alcp_cipher_aead_decrypt(
+                        &(ctx->handle), in, out, len, &outlen);
                 }
             }
 
@@ -647,7 +683,8 @@ gcm_cipher_internal(ALCP_PROV_CIPHER_CTX* ctx,
         }
     } else {
         if (cipherctx->enc) {
-            /* Use configured tag length if available, otherwise default to max */
+            /* Use configured tag length if available, otherwise default to max
+             */
             if (cipherctx->tagLength == UNINITIALISED_SIZET) {
                 cipherctx->tagLength = GCM_TAG_MAX_SIZE;
             }
@@ -775,7 +812,8 @@ alcp_gcm_one_shot(ALCP_PROV_CIPHER_CTX* ctx,
     if (cipherctx->enc) {
         {
             Uint64 outlen = 0;
-            err           = alcp_cipher_aead_encrypt(&(ctx->handle), in, out, in_len, &outlen);
+            err           = alcp_cipher_aead_encrypt(
+                &(ctx->handle), in, out, in_len, &outlen);
         }
 #if PROV_GCM_DEBUG
         printf(" enc len %lu \n", in_len);
@@ -783,7 +821,8 @@ alcp_gcm_one_shot(ALCP_PROV_CIPHER_CTX* ctx,
     } else {
         {
             Uint64 outlen = 0;
-            err           = alcp_cipher_aead_decrypt(&(ctx->handle), in, out, in_len, &outlen);
+            err           = alcp_cipher_aead_decrypt(
+                &(ctx->handle), in, out, in_len, &outlen);
         }
 #if PROV_GCM_DEBUG
         printf(" dec len %lu \n", in_len);

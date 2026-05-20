@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -95,16 +95,16 @@ alcp_cipher_aead_request(const alc_cipher_mode_t mode,
 
     ALCP_ZERO_LEN_ERR_RET(keyLen);
 
-    auto alcpCipher = new CipherFactory<iCipherAead>;
-
-    ctx->m_cipher_factory = static_cast<void*>(alcpCipher);
-
-    auto aead = alcpCipher->create(getCipherAeadMode(mode), getKeyLen(keyLen));
+    // Direct cipher creation (no factory)
+    auto cipherMode = getCipherAeadMode(mode);
+    auto aead = createCipherAead(cipherMode, getKeyLen(keyLen));
     if (aead == nullptr) {
         printf("\n cipher algo create failed");
         return ALC_ERROR_GENERIC;
     }
-    ctx->m_cipher = static_cast<void*>(aead);
+    ctx->m_cipher     = static_cast<iCipher*>(aead);
+    ctx->m_cipherType = CipherType::eCipherAead;
+    ctx->m_cipherMode = cipherMode;
 
     return err;
 }
@@ -128,17 +128,16 @@ alcp_cipher_aead_request_with_extState(const alc_cipher_mode_t mode,
 
     ALCP_ZERO_LEN_ERR_RET(keyLen);
 
-    auto alcpCipher       = new CipherFactory<iCipherAead>;
-    ctx->m_cipher_factory = static_cast<void*>(alcpCipher);
-    // printf("\n aead request cipherstate %p ", (void*)pCipherState);
-
-    auto aead = alcpCipher->create(
-        getCipherAeadMode(mode), getKeyLen(keyLen), pCipherState);
+    // Direct cipher creation with external state (no factory)
+    auto cipherMode = getCipherAeadMode(mode);
+    auto aead = createCipherAead(cipherMode, getKeyLen(keyLen), pCipherState);
     if (aead == nullptr) {
         printf("\n cipher algo create failed");
         return ALC_ERROR_GENERIC;
     }
-    ctx->m_cipher = static_cast<void*>(aead);
+    ctx->m_cipher     = static_cast<iCipher*>(aead);
+    ctx->m_cipherType = CipherType::eCipherAead;
+    ctx->m_cipherMode = cipherMode;
 
     return err;
 }
@@ -154,23 +153,18 @@ alcp_cipher_aead_encrypt(const alc_cipher_handle_p pCipherHandle,
     ALCP_DEBUG_LOG(LOG_DBG, "EncLen %6ld", len);
 #endif
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
-    ALCP_BAD_PTR_ERR_RET(pInput);
-    ALCP_BAD_PTR_ERR_RET(pOutput);
-    ALCP_BAD_PTR_ERR_RET(outlen);
+    // Consolidated null checks with branch prediction hints
+    // These checks should almost never fail in production
+    ALCP_BAD_PTR_ERR_RET_UNLIKELY(pCipherHandle);
+    ALCP_BAD_PTR4_ERR_RET(pCipherHandle->ch_context, pInput, pOutput, outlen);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return ALC_ERROR_BAD_STATE;
+    if (ALCP_UNLIKELY(ctx->m_cipher == nullptr)) {
+        return ALC_ERROR_INVALID_DATA;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipherAead);
 
-    auto i = static_cast<iCipherAead*>(ctx->m_cipher);
-
-    alc_error_t err = i->encrypt(pInput, pOutput, len, outlen);
-
-    return err;
+    return static_cast<iCipherAead*>(ctx->m_cipher)->encrypt(pInput, pOutput, len, outlen);
 }
 
 alc_error_t
@@ -184,23 +178,17 @@ alcp_cipher_aead_decrypt(const alc_cipher_handle_p pCipherHandle,
     ALCP_DEBUG_LOG(LOG_DBG, "DecLen %6ld", len);
 #endif
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
-    ALCP_BAD_PTR_ERR_RET(pInput);
-    ALCP_BAD_PTR_ERR_RET(pOutput);
-    ALCP_BAD_PTR_ERR_RET(outlen);
+    // Consolidated null checks with branch prediction hints
+    ALCP_BAD_PTR_ERR_RET_UNLIKELY(pCipherHandle);
+    ALCP_BAD_PTR4_ERR_RET(pCipherHandle->ch_context, pInput, pOutput, outlen);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return ALC_ERROR_BAD_STATE;
+    if (ALCP_UNLIKELY(ctx->m_cipher == nullptr)) {
+        return ALC_ERROR_INVALID_DATA;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipherAead);
 
-    auto i = static_cast<iCipherAead*>(ctx->m_cipher);
-
-    alc_error_t err = i->decrypt(pInput, pOutput, len, outlen);
-
-    return err;
+    return static_cast<iCipherAead*>(ctx->m_cipher)->decrypt(pInput, pOutput, len, outlen);
 }
 
 alc_error_t
@@ -213,27 +201,23 @@ alcp_cipher_aead_init(const alc_cipher_handle_p pCipherHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "KeyLen %6ld,IVLen %6ld", keyLen, ivLen);
 #endif
-    alc_error_t err = ALC_ERROR_NONE;
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
+    // Consolidated null checks with branch prediction hints
+    ALCP_BAD_PTR_ERR_RET_UNLIKELY(pCipherHandle);
+    ALCP_BAD_PTR_ERR_RET_UNLIKELY(pCipherHandle->ch_context);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return ALC_ERROR_BAD_STATE;
+    if (ALCP_UNLIKELY(ctx->m_cipher == nullptr)) {
+        return ALC_ERROR_INVALID_DATA;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipherAead);
 
-    auto i = static_cast<iCipherAead*>(ctx->m_cipher);
-
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
-
-    /* FIXME: instead of this, should we call ALCP_BAD_PTR_ERR_RET checks ? */
-    if ((pKey != NULL && keyLen != 0) || (pIv != NULL && ivLen != 0)) {
-        err = i->init(pKey, keyLen, pIv, ivLen);
+    // Fast path: if valid key or IV provided, call init
+    if (ALCP_LIKELY((pKey != NULL && keyLen != 0) || (pIv != NULL && ivLen != 0))) {
+        return static_cast<iCipherAead*>(ctx->m_cipher)->init(pKey, keyLen, pIv, ivLen);
     }
 
-    return err;
+    return ALC_ERROR_NONE;
 }
 
 alc_error_t
@@ -244,22 +228,22 @@ alcp_cipher_aead_set_aad(const alc_cipher_handle_p pCipherHandle,
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "ADLen %6ld", aadLen);
 #endif
-    if (aadLen == 0) {
+    // Fast path: empty AAD is common and valid
+    if (ALCP_UNLIKELY(aadLen == 0)) {
         return ALC_ERROR_NONE;
     }
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
-    ALCP_BAD_PTR_ERR_RET(pInput);
+
+    // Consolidated null checks with branch prediction hints
+    ALCP_BAD_PTR_ERR_RET_UNLIKELY(pCipherHandle);
+    ALCP_BAD_PTR2_ERR_RET(pCipherHandle->ch_context, pInput);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return ALC_ERROR_BAD_STATE;
+    if (ALCP_UNLIKELY(ctx->m_cipher == nullptr)) {
+        return ALC_ERROR_INVALID_DATA;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipherAead);
 
-    auto i = static_cast<iCipherAead*>(ctx->m_cipher);
-
-    return i->setAad(pInput, aadLen);
+    return static_cast<iCipherAead*>(ctx->m_cipher)->setAad(pInput, aadLen);
 }
 
 alc_error_t
@@ -271,22 +255,18 @@ alcp_cipher_aead_get_tag(const alc_cipher_handle_p pCipherHandle,
     ALCP_DEBUG_LOG(LOG_DBG, "TagLen %6ld", tagLen);
 #endif
 
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle);
-    ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
-
-    ALCP_BAD_PTR_ERR_RET(pOutput);
-
-    ALCP_ZERO_LEN_ERR_RET(tagLen);
+    // Consolidated null checks with branch prediction hints
+    ALCP_BAD_PTR_ERR_RET_UNLIKELY(pCipherHandle);
+    ALCP_BAD_PTR2_ERR_RET(pCipherHandle->ch_context, pOutput);
+    ALCP_ZERO_LEN_ERR_RET_UNLIKELY(tagLen);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return ALC_ERROR_BAD_STATE;
+    if (ALCP_UNLIKELY(ctx->m_cipher == nullptr)) {
+        return ALC_ERROR_INVALID_DATA;
     }
-    ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipherAead);
 
-    auto i = static_cast<iCipherAead*>(ctx->m_cipher);
-
-    return i->getTag(pOutput, tagLen);
+    return static_cast<iCipherAead*>(ctx->m_cipher)->getTag(pOutput, tagLen);
 }
 
 alc_error_t
@@ -302,14 +282,10 @@ alcp_cipher_aead_set_tag_length(const alc_cipher_handle_p pCipherHandle,
     ALCP_ZERO_LEN_ERR_RET(tagLen);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return ALC_ERROR_BAD_STATE;
-    }
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipherAead);
 
-    auto i = static_cast<iCipherAead*>(ctx->m_cipher);
-    // ALCP_BAD_PTR_ERR_RET(i->setTagLength, err);
-    return i->setTagLength(tagLen);
+    return static_cast<iCipherAead*>(ctx->m_cipher)->setTagLength(tagLen);
 }
 
 alc_error_t
@@ -325,11 +301,15 @@ alcp_cipher_aead_set_ccm_plaintext_length(
 
     auto ctx = static_cast<alcp::cipher::Context*>(pCipherHandle->ch_context);
 
-    /* check if ctx->m_cipher is not nullptr */
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipherAead);
 
-    auto i = static_cast<iCipherAead*>(ctx->m_cipher);
-    return i->setPlainTextLength(plaintextLength);
+    // Check mode - this function is only supported for CCM mode
+    if (ctx->m_cipherMode != CipherMode::eAesCCM) {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+
+    return static_cast<iCipherCcm*>(ctx->m_cipher)->setPlainTextLength(plaintextLength);
 }
 
 void
@@ -345,17 +325,18 @@ alcp_cipher_aead_finish(const alc_cipher_handle_p pCipherHandle)
     }
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return;
-    }
-    auto alcpCipher =
-        static_cast<CipherFactory<iCipherAead>*>(ctx->m_cipher_factory);
 
-    if (alcpCipher != nullptr) {
-        delete alcpCipher;
+    // Validate type before deleting
+    if (ctx->m_cipherType != CipherType::eCipherAead) {
+        return; // Wrong type, don't delete
     }
 
-    ctx->~Context();
+    // Delete cipher object - cast to iCipherAead for proper destructor
+    if (ctx->m_cipher != nullptr) {
+        delete static_cast<iCipherAead*>(ctx->m_cipher);
+        ctx->m_cipher     = nullptr;
+        ctx->m_cipherType = CipherType::eNone;
+    }
 }
 
 EXTERN_C_END

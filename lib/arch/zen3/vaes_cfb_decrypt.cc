@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,7 +28,7 @@
 
 #include "vaes.hh"
 
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/types.hh"
 #include "avx256.hh"
 
@@ -193,9 +193,10 @@ alc_error_t inline DecryptCfbKernel(
     }
 
 #ifdef AES_MULTI_UPDATE
-    // Load last CT from cache
-    alcp_storeu_128(reinterpret_cast<__m256i*>(pIv),
-                    alcp_loadu_128(reinterpret_cast<__m256i*>(p_ct128 - 1)));
+    if (len >= Rijndael::cBlockSize) {
+        alcp_storeu_128(reinterpret_cast<__m256i*>(pIv),
+                        alcp_loadu_128(reinterpret_cast<__m256i*>(p_ct128 - 1)));
+    }
 #endif
 
     return err;
@@ -204,7 +205,7 @@ alc_error_t inline DecryptCfbKernel(
 
 namespace alcp::cipher {
 
-template<CipherKeyLen T, alcp::utils::CpuCipherFeatures arch>
+template<CipherKeyLen T, alcp::utils::CpuArchLevel arch>
 alc_error_t
 DecryptCfb(const Uint8* pSrc,
            Uint8*       pDest,
@@ -222,7 +223,7 @@ DecryptCfb(const Uint8* pSrc,
 template<>
 alc_error_t
 DecryptCfb<alcp::cipher::CipherKeyLen::eKey128Bit,
-           alcp::utils::CpuCipherFeatures::eVaes256>(const Uint8* pSrc,
+           alcp::utils::CpuArchLevel::eZen3>(const Uint8* pSrc,
                                                      Uint8*       pDest,
                                                      Uint64       len,
                                                      const Uint8* pKey,
@@ -238,7 +239,7 @@ DecryptCfb<alcp::cipher::CipherKeyLen::eKey128Bit,
 template<>
 alc_error_t
 DecryptCfb<alcp::cipher::CipherKeyLen::eKey192Bit,
-           alcp::utils::CpuCipherFeatures::eVaes256>(const Uint8* pSrc,
+           alcp::utils::CpuArchLevel::eZen3>(const Uint8* pSrc,
                                                      Uint8*       pDest,
                                                      Uint64       len,
                                                      const Uint8* pKey,
@@ -254,7 +255,7 @@ DecryptCfb<alcp::cipher::CipherKeyLen::eKey192Bit,
 template<>
 alc_error_t
 DecryptCfb<alcp::cipher::CipherKeyLen::eKey256Bit,
-           alcp::utils::CpuCipherFeatures::eVaes256>(const Uint8* pSrc,
+           alcp::utils::CpuArchLevel::eZen3>(const Uint8* pSrc,
                                                      Uint8*       pDest,
                                                      Uint64       len,
                                                      const Uint8* pKey,

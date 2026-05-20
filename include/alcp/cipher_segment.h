@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -36,7 +36,7 @@ EXTERN_C_BEGIN
  * @defgroup cipher Cipher API
  * @brief
  * Cipher is a cryptographic technique used to
- * secure information by transforming message into a cryptic form that can
+ * secure information by transforming a message into a cryptic form that can
  * only be read by those with the key to decipher it.
  *  @{
  */
@@ -44,17 +44,15 @@ EXTERN_C_BEGIN
 /**
  * @brief  Cipher Segment init.
  * @parblock <br> &nbsp;
- * <b>This API can be called after @ref alcp_cipher_request is
+ * <b>This API can be called after @ref alcp_cipher_segment_request is
  * called.</b>
  * @endparblock
  * @param [in] pCipherHandle Session handle for cipher operation
  * @param[in] pKey  Key
  * @param[in] keyLen  key Length in bits
  * @param[in] pIv  IV/Nonce
- * @param[in] ivLen  iv Length in bits
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE then an error has occurred and handle will be invalid
- * for future operations
+ * @param[in] ivLen  IV length in bytes
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_cipher_segment_init(const alc_cipher_handle_p pCipherHandle,
@@ -77,7 +75,7 @@ alcp_cipher_segment_init(const alc_cipher_handle_p pCipherHandle,
  * @param [in]    keyLen           key length in bits
  * @param [out]   pCipherHandle    Library populated session handle for future
  * cipher operations.
- * @return   &nbsp; Error Code for the API called.
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_cipher_segment_request(const alc_cipher_mode_t cipherMode,
@@ -105,7 +103,7 @@ alcp_cipher_segment_request(const alc_cipher_mode_t cipherMode,
  * @param[out]   pCipherText   Pointer to Cipher Text
  * @param[in]    currPlainTextLen Length of the given plaintext
  * @param[in]    startBlockNum Start block number of given plaintext
- * @return   &nbsp; Error Code for the API called.
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_cipher_segment_encrypt_xts(const alc_cipher_handle_p pCipherHandle,
@@ -119,7 +117,7 @@ alcp_cipher_segment_encrypt_xts(const alc_cipher_handle_p pCipherHandle,
  * provided handle.
  * @parblock <br> &nbsp;
  * <b>This XTS specific API should be called only after @ref
- * alcp_cipher_segment_init. API is meant to be used with XTS mode.</b>
+ * alcp_cipher_segment_request and alcp_cipher_segment_init. API is meant to be used with XTS mode.</b>
  * @endparblock
  * @note    Error needs to be checked for each call,
  *           valid only if @ref alcp_is_error (ret) is false
@@ -130,11 +128,11 @@ alcp_cipher_segment_encrypt_xts(const alc_cipher_handle_p pCipherHandle,
  *
  * @param[in]    pCipherHandle    Session handle for future encrypt decrypt
  * operation
- * @param[out]    pPlainText    Pointer to Plain Text
  * @param[in]    pCipherText   Pointer to Cipher Text
- * @param[in]    startBlockNum    Start block number of given plaintext
+ * @param[out]   pPlainText    Pointer to Plain Text
  * @param[in]    currCipherTextLen    Length of the given Cipher Text
- * @return   &nbsp; Error Code for the API called.
+ * @param[in]    startBlockNum    Start block number of given plaintext
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_cipher_segment_decrypt_xts(const alc_cipher_handle_p pCipherHandle,
@@ -144,11 +142,11 @@ alcp_cipher_segment_decrypt_xts(const alc_cipher_handle_p pCipherHandle,
                                 Uint64                    startBlockNum);
 
 /**
- * @brief       Release resources allocated by alcp_cipher_request.
+ * @brief       Release resources allocated by alcp_cipher_segment_request.
  * @parblock <br> &nbsp;
  * <b>This API is called to free the session resources</b>
  * @endparblock
- * @note       alcp_cipher_finish to be called at the end of the transaction.
+ * @note       alcp_cipher_segment_finish to be called at the end of the transaction.
  * Context will be unusable after this call.
  *
  * @param[in]    pCipherHandle    Session handle for completed encrypt/decrypt

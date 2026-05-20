@@ -33,6 +33,7 @@
 #include "alcp/digest/md5.hh"
 #include "alcp/digest/sha1.hh"
 #include "alcp/digest/sha2.hh"
+#include "alcp/digest/sha2_mb.hh"
 #include "alcp/digest/sha3.hh"
 #include "alcp/digest/sha512.hh"
 
@@ -89,6 +90,36 @@ __sha_finalize_wrapper(void* pDigest, Uint8* pBuf, Uint64 len)
 
 template<typename DIGESTTYPE>
 static alc_error_t
+__sha_flush_wrapper(void*         pDigest,
+                    const Uint8** ppMsgBuf,
+                    const Uint64  numBuffers,
+                    const Uint64  msgLen)
+{
+    alc_error_t e = ALC_ERROR_NONE;
+
+    auto ap = static_cast<DIGESTTYPE*>(pDigest);
+    e       = ap->flush(ppMsgBuf, numBuffers, msgLen);
+
+    return e;
+}
+
+template<typename DIGESTTYPE>
+static alc_error_t
+__sha_dequeue_wrapper(void*        pDigest,
+                      Uint8**      ppDstBuf,
+                      const Uint64 numBuffers,
+                      const Uint64 digestLen)
+{
+    alc_error_t e = ALC_ERROR_NONE;
+
+    auto ap = static_cast<DIGESTTYPE*>(pDigest);
+    e       = ap->dequeue(ppDstBuf, numBuffers, digestLen);
+
+    return e;
+}
+
+template<typename DIGESTTYPE>
+static alc_error_t
 __sha_shakeSqueeze_wrapper(void* pDigest, Uint8* pBuff, Uint64 len)
 {
     alc_error_t e = ALC_ERROR_NONE;
@@ -132,20 +163,32 @@ template<typename ALGONAME>
 static alc_error_t
 __build_sha(Context& ctx)
 {
-    alc_error_t err = ALC_ERROR_NONE;
+    alc_error_t err  = ALC_ERROR_NONE;
+    auto        algo = new ALGONAME();
+    ctx.m_digest     = static_cast<void*>(algo);
 
-    auto algo     = new ALGONAME();
-    ctx.m_digest  = static_cast<void*>(algo);
-    ctx.init      = __sha_init_wrapper<ALGONAME>;
-    ctx.update    = __sha_update_wrapper<ALGONAME>;
-    ctx.duplicate = __build_with_copy_sha<ALGONAME>;
-    ctx.finalize  = __sha_finalize_wrapper<ALGONAME>;
-    //   ctx.finalize = __digest_func_wrapper<ALGONAME,
-    //   &ALGONAME::finalize>;
+    ctx.init   = __sha_init_wrapper<ALGONAME>;
     ctx.finish = __sha_dtor<ALGONAME>;
 
-    // shakeSqueeze are not implemented for SHA2
+    /* SHA-2 does not have a XOF interface */
     ctx.shakeSqueeze = nullptr;
+
+    if constexpr (std::is_same<ALGONAME, Sha224MB>::value
+                  || std::is_same<ALGONAME, Sha256MB>::value) {
+        ctx.flush        = __sha_flush_wrapper<ALGONAME>;
+        ctx.dequeue      = __sha_dequeue_wrapper<ALGONAME>;
+        ctx.update       = nullptr;
+        ctx.duplicate    = nullptr;
+        ctx.finalize     = nullptr;
+        ctx.shakeSqueeze = nullptr; /* SHA-2 does not have a XOF interface */
+    } else {
+        ctx.update       = __sha_update_wrapper<ALGONAME>;
+        ctx.duplicate    = __build_with_copy_sha<ALGONAME>;
+        ctx.finalize     = __sha_finalize_wrapper<ALGONAME>;
+        ctx.shakeSqueeze = nullptr; /* SHA-2 does not have a XOF interface */
+        ctx.flush        = nullptr;
+        ctx.dequeue      = nullptr;
+    }
 
     return err;
 }
@@ -181,6 +224,12 @@ class Sha2Builder
                 break;
             case ALC_SHA2_512_224:
                 __build_sha<Sha512_224>(rCtx);
+                break;
+            case ALC_MB_SHA2_224:
+                __build_sha<Sha224MB>(rCtx);
+                break;
+            case ALC_MB_SHA2_256:
+                __build_sha<Sha256MB>(rCtx);
                 break;
             default:
                 err = ALC_ERROR_NOT_SUPPORTED;
@@ -239,6 +288,8 @@ DigestBuilder::Build(alc_digest_mode_t mode, Context& rCtx)
         case ALC_SHA2_512:
         case ALC_SHA2_512_224:
         case ALC_SHA2_512_256:
+        case ALC_MB_SHA2_224:
+        case ALC_MB_SHA2_256:
             err = Sha2Builder::Build(mode, rCtx);
             break;
 

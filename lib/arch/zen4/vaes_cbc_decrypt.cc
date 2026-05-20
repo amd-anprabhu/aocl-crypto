@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -31,10 +31,10 @@
 #include <cstdint>
 #include <immintrin.h>
 
-#include "alcp/cipher/aes.hh"
 #include "alcp/cipher/aesni.hh"
 #include "avx512.hh"
 
+#include "../zen3/vaes.hh"
 #include "vaes_avx512.hh"
 #include "vaes_avx512_core.hh"
 
@@ -46,298 +46,344 @@ template<void AesEncNoLoad_1x512(__m512i& a, const sKeys& keys),
              __m512i& a, __m512i& b, __m512i& c, __m512i& d, const sKeys& keys),
          void alcp_load_key_zmm(const __m128i pkey128[], sKeys& keys),
          void alcp_clear_keys_zmm(sKeys& keys)>
-alc_error_t inline DecryptCbc(const Uint8* pCipherText, // ptr to ciphertext
-                              Uint8*       pPlainText,  // ptr to plaintext
-                              Uint64       len,     // message length in bytes
-                              const Uint8* pKey,    // ptr to Key
-                              int          nRounds, // No. of rounds
-                              Uint8*       pIv // ptr to Initialization Vector
-)
+alc_error_t inline DecryptCbc(const Uint8* pCipherText,
+                              Uint8*       pPlainText,
+                              Uint64       len,
+                              const Uint8* pKey,
+                              int          nRounds,
+                              Uint8*       pIv)
 {
-    alc_error_t err      = ALC_ERROR_NONE;
-    Uint64      blocks   = len / Rijndael::cBlockSize;
-    Uint64      res      = len - (blocks * Rijndael::cBlockSize);
-    auto        pkey128  = reinterpret_cast<const __m128i*>(pKey);
-    auto        pa_128   = reinterpret_cast<const __m128i*>(pCipherText);
-    auto        pb_128   = pa_128;
-    auto        pOut_512 = reinterpret_cast<__m512i*>(pPlainText);
+    if (len == 0) {
+        return ALC_ERROR_NONE;
+    }
 
-    // pa_128 will lead while pb_128 will lag behind (1 block) due to IV
-    // taken as first block to XOR
+    // Fast path for 1-3 blocks: use 128-bit AES-NI to avoid ZMM key
+    // load/clear overhead (~22-30 ZMM register ops saved per call)
+    if (len < 64) {
+        auto       p_in  = reinterpret_cast<const __m128i*>(pCipherText);
+        auto       p_out = reinterpret_cast<__m128i*>(pPlainText);
+        const auto pkey  = reinterpret_cast<const __m128i*>(pKey);
+        __m128i    iv    = _mm_loadu_si128(reinterpret_cast<const __m128i*>(pIv));
 
-    __m512i a1, a2, a3, a4;
-    __m512i b1, b2, b3, b4;
+        while (len >= 16) {
+            __m128i ct = _mm_loadu_si128(p_in);
+            __m128i block = ct;
+            aesni::AesDecrypt(&block, pkey, nRounds);
+            block = _mm_xor_si128(block, iv);
+            _mm_storeu_si128(p_out, block);
+            iv = ct;
+            p_in++;
+            p_out++;
+            len -= 16;
+        }
+
+#ifdef AES_MULTI_UPDATE
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(pIv), iv);
+#endif
+        return ALC_ERROR_NONE;
+    }
+
+    // Tier 2: VAES-256 on-the-fly for 4-8 blocks (64-128 bytes).
+    // Broadcasts round keys per-round via _mm256_broadcastsi128_si256,
+    // avoiding the ~22 ZMM register ops of key load/clear overhead.
+    if (len <= 128) {
+        auto       p_in  = reinterpret_cast<const __m128i*>(pCipherText);
+        auto       p_out = reinterpret_cast<__m128i*>(pPlainText);
+        const auto pkey  = reinterpret_cast<const __m128i*>(pKey);
+
+#ifdef AES_MULTI_UPDATE
+        __m128i last_ct = _mm_loadu_si128(p_in + (len / 16 - 1));
+#endif
+
+        // IV pair: [original_iv (lower 128), ct0 (upper 128)]
+        __m256i iv256 = _mm256_inserti128_si256(
+            _mm256_castsi128_si256(
+                _mm_loadu_si128(reinterpret_cast<const __m128i*>(pIv))),
+            _mm_loadu_si128(p_in),
+            1);
+
+        __m256i c1, c2;
+
+        // 8-block batch (4 x __m256i = 128 bytes); exact match only
+        if (len == 128) {
+            __m256i c3, c4;
+            c1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p_in));
+            c2 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p_in + 2));
+            c3 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p_in + 4));
+            c4 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p_in + 6));
+
+            __m256i iv2 = _mm256_loadu_si256(
+                reinterpret_cast<const __m256i*>(p_in + 1));
+            __m256i iv3 = _mm256_loadu_si256(
+                reinterpret_cast<const __m256i*>(p_in + 3));
+            __m256i iv4 = _mm256_loadu_si256(
+                reinterpret_cast<const __m256i*>(p_in + 5));
+
+            vaes::AesDecrypt(&c1, &c2, &c3, &c4, pkey, nRounds);
+
+            c1 = _mm256_xor_si256(c1, iv256);
+            c2 = _mm256_xor_si256(c2, iv2);
+            c3 = _mm256_xor_si256(c3, iv3);
+            c4 = _mm256_xor_si256(c4, iv4);
+
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out), c1);
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out + 2), c2);
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out + 4), c3);
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out + 6), c4);
+
+#ifdef AES_MULTI_UPDATE
+            _mm_storeu_si128(reinterpret_cast<__m128i*>(pIv), last_ct);
+#endif
+            return ALC_ERROR_NONE;
+        }
+
+        // 4-block batch (2 x __m256i = 64 bytes)
+        if (len >= 64) {
+            c1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p_in));
+            c2 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p_in + 2));
+            __m256i iv2 = _mm256_loadu_si256(
+                reinterpret_cast<const __m256i*>(p_in + 1));
+
+            vaes::AesDecrypt(&c1, &c2, pkey, nRounds);
+
+            c1 = _mm256_xor_si256(c1, iv256);
+            c2 = _mm256_xor_si256(c2, iv2);
+
+            len -= 64;
+            if (len >= 32) {
+                iv256 = _mm256_loadu_si256(
+                    reinterpret_cast<const __m256i*>(p_in + 3));
+            } else if (len >= 16) {
+                iv256 = _mm256_inserti128_si256(
+                    _mm256_castsi128_si256(_mm_loadu_si128(p_in + 3)),
+                    _mm_loadu_si128(p_in + 4),
+                    1);
+            }
+
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out), c1);
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out + 2), c2);
+
+            p_in += 4;
+            p_out += 4;
+        }
+
+        // 2-block batch (1 x __m256i = 32 bytes)
+        if (len >= 32) {
+            c1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(p_in));
+
+            vaes::AesDecrypt(&c1, pkey, nRounds);
+            c1 = _mm256_xor_si256(c1, iv256);
+
+            len -= 32;
+            if (len >= 16) {
+                iv256 = _mm256_inserti128_si256(
+                    _mm256_castsi128_si256(_mm_loadu_si128(p_in + 1)),
+                    _mm_loadu_si128(p_in + 2),
+                    1);
+            }
+
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(p_out), c1);
+
+            p_in += 2;
+            p_out += 2;
+        }
+
+        // Remaining single block
+        if (len >= 16) {
+            __m128i ct    = _mm_loadu_si128(p_in);
+            __m128i block = ct;
+            aesni::AesDecrypt(&block, pkey, nRounds);
+            block = _mm_xor_si128(block, _mm256_castsi256_si128(iv256));
+            _mm_storeu_si128(p_out, block);
+        }
+
+#ifdef AES_MULTI_UPDATE
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(pIv), last_ct);
+#endif
+        return ALC_ERROR_NONE;
+    }
+
+    // Tier 3: VAES-512 with pre-loaded ZMM keys for 9+ blocks (144+ bytes)
+    auto pIn  = reinterpret_cast<const __m128i*>(pCipherText);
+    auto pOut = reinterpret_cast<__m512i*>(pPlainText);
+
+    __m512i cblock1, cblock2, cblock3, cblock4;
+    __m512i iv1, iv2, iv3, iv4;
 
     sKeys keys;
-    alcp_load_key_zmm(pkey128, keys);
+    alcp_load_key_zmm(reinterpret_cast<const __m128i*>(pKey), keys);
 
-    // This variable will represent the state of whether IV has been used to
-    // process the first block. If done, this will be set to zero after.
-    Int32 isIvUsed = 0;
+    // Initialize iv1 with IV
+    iv1 = alcp_loadu_128((const __m512i*)pIv);
 
-    if (blocks >= 4) {
-        // Load IV into b1 to process 1st block.
-        b1          = alcp_loadu_128((const __m512i*)pIv);
-        b2          = _mm512_loadu_si512(pb_128); // pb_128 is pCipherText
-        __m512i idx = _mm512_set_epi64(5, 4, 3, 2, 1, 0, 0, 0);
-        b2          = _mm512_permutexvar_epi64(idx, b2);
-        b1          = _mm512_mask_blend_epi64(252, b1, b2); // pack iv and b2
+    // Permute index for IV packing: shift 512-bit right by 128 bits
+    const __m512i cShiftIdx = _mm512_set_epi64(5, 4, 3, 2, 1, 0, 0, 0);
 
-        // loop on 16 blocks
-        for (; blocks >= 16; blocks -= 16) {
-            if (isIvUsed) {
-#ifndef AES_CBC_INPLACE_BUFFER
-                // If the buffer is not inplace, load the next IV from the
-                // previous ciphertext directly since it was not overwritten in
-                // the last iteration.
-                b1 = _mm512_loadu_si512(pb_128);
-#endif
-                pb_128 += 4;
+    // Process first 4+ blocks with special IV packing: iv1 = [IV, c0, c1, c2]
+    {
+        // Pack IV with first 3 ciphertext blocks
+        __m512i shifted_ct = _mm512_loadu_si512(pIn);
+        shifted_ct = _mm512_permutexvar_epi64(cShiftIdx, shifted_ct);
+        iv1  = _mm512_mask_blend_epi64(0xFC, iv1, shifted_ct);
 
+        // Process 16-block batches (256 bytes each)
+        for (; len >= 256; len -= 256) {
+            cblock1 = _mm512_loadu_si512(pIn);
+            cblock2 = _mm512_loadu_si512(pIn + 4);
+            cblock3 = _mm512_loadu_si512(pIn + 8);
+            cblock4 = _mm512_loadu_si512(pIn + 12);
+
+            iv2 = _mm512_loadu_si512(pIn + 3);
+            iv3 = _mm512_loadu_si512(pIn + 7);
+            iv4 = _mm512_loadu_si512(pIn + 11);
+
+            AesEncNoLoad_4x512(cblock1, cblock2, cblock3, cblock4, keys);
+            cblock1 = alcp_xor(cblock1, iv1);
+            cblock2 = alcp_xor(cblock2, iv2);
+            cblock3 = alcp_xor(cblock3, iv3);
+            cblock4 = alcp_xor(cblock4, iv4);
+
+            // Pre-load iv1 before stores (inplace-safe: input not yet
+            // overwritten). Use overlapping 512-bit load when 4+ blocks
+            // follow, giving [CT15, CT16, CT17, CT18] directly.
+            // Otherwise 128-bit load of last block for tail path.
+            if (len - 256 >= 64) {
+                iv1 = _mm512_loadu_si512((__m512i*)(pIn + 15));
             } else {
-                pb_128 += 3;
+                iv1 = alcp_loadu_128((__m512i*)(pIn + 15));
             }
 
-            a1 = _mm512_loadu_si512(pa_128);
-            a2 = _mm512_loadu_si512(pa_128 + 4);
-            a3 = _mm512_loadu_si512(pa_128 + 8);
-            a4 = _mm512_loadu_si512(pa_128 + 12);
+            alcp_storeu(pOut, cblock1);
+            alcp_storeu(pOut + 1, cblock2);
+            alcp_storeu(pOut + 2, cblock3);
+            alcp_storeu(pOut + 3, cblock4);
 
-            b2 = _mm512_loadu_si512(pb_128);
-            b3 = _mm512_loadu_si512(pb_128 + 4);
-            b4 = _mm512_loadu_si512(pb_128 + 8);
-            pb_128 += 12;
-
-            AesEncNoLoad_4x512(a1, a2, a3, a4, keys);
-            a1 = alcp_xor(a1, b1);
-            a2 = alcp_xor(a2, b2);
-            a3 = alcp_xor(a3, b3);
-            a4 = alcp_xor(a4, b4);
-
-            isIvUsed = 1;
-
-#ifdef AES_CBC_INPLACE_BUFFER
-            // Load the next IV from the ciphertext buffer before writing the
-            // plaintext to the output buffer to ensure IV is not corrupted when
-            // buffers are inplace.
-            if (blocks - 16 >= 4) { // Load next IV only if there is some
-                                    // ciphertext left to be decrypted.
-                b1 = _mm512_loadu_si512(pb_128);
-            }
-#endif
-            // Store decrypted blocks.
-            alcp_storeu(pOut_512, a1);
-            alcp_storeu(pOut_512 + 1, a2);
-            alcp_storeu(pOut_512 + 2, a3);
-            alcp_storeu(pOut_512 + 3, a4);
-
-            pa_128 += 16;
-            pOut_512 += 4;
+            pIn += 16;
+            pOut += 4;
         }
 
-        // Input data still exists?
-        if ((blocks != 0) | (res != 0)) {
-            // Loop on 8 blocks
-            if (blocks >= 8) {
-                if (isIvUsed) {
-#ifndef AES_CBC_INPLACE_BUFFER
-                    // If the buffer is not inplace, load the next IV from the
-                    // previous ciphertext directly since it was not overwritten
-                    // in the last iteration.
-                    b1 = _mm512_loadu_si512(pb_128);
-#endif
-                    pb_128 += 4;
+        // Process 8 blocks (128 bytes)
+        if (len >= 128) {
+            cblock1 = _mm512_loadu_si512(pIn);
+            cblock2 = _mm512_loadu_si512(pIn + 4);
+            iv2 = _mm512_loadu_si512(pIn + 3);
 
-                } else {
-                    pb_128 += 3;
-                }
-                isIvUsed = 1;
+            AesEncNoLoad_2x512(cblock1, cblock2, keys);
+            cblock1 = alcp_xor(cblock1, iv1);
+            cblock2 = alcp_xor(cblock2, iv2);
 
-                a1 = _mm512_loadu_si512(pa_128);
-                a2 = _mm512_loadu_si512(pa_128 + 4);
-                b2 = _mm512_loadu_si512(pb_128);
-                pb_128 += 4;
-                AesEncNoLoad_2x512(a1, a2, keys);
-                a1 = alcp_xor(a1, b1);
-                a2 = alcp_xor(a2, b2);
-
-                blocks -= 8;
-#ifdef AES_CBC_INPLACE_BUFFER
-                // Load the next IV from the ciphertext buffer before writing
-                // the plaintext to the output buffer to ensure IV is not
-                // corrupted when buffers are inplace.
-                if (blocks >= 4) { // Load next IV only if there are at least 4 blocks
-                    b1 = _mm512_loadu_si512(pb_128);
-                } else if (blocks > 0 || res != 0) {
-                    // For remaining blocks < 4, load only what we need
-                    b1 = alcp_loadu_128((__m512i*)pb_128);
-                }
-#endif
-                // Store decrypted blocks.
-                alcp_storeu(pOut_512, a1);
-                alcp_storeu(pOut_512 + 1, a2);
-
-                pa_128 += 8;
-                pOut_512 += 2;
+            len -= 128;
+            if (len >= 64) {
+                iv1 = _mm512_loadu_si512((__m512i*)(pIn + 7));
+            } else {
+                iv1 = alcp_loadu_128((__m512i*)(pIn + 7));
             }
 
-            // Loop on 4 blocks
-            if (blocks >= 4) {
-                if (isIvUsed) {
-#ifndef AES_CBC_INPLACE_BUFFER
-                    // If the buffer is not inplace, load the next IV from the
-                    // previous ciphertext directly since it was not overwritten
-                    // in the last iteration.
-                    b1 = _mm512_loadu_si512(pb_128);
-#endif
-                    pb_128 += 4;
+            alcp_storeu(pOut, cblock1);
+            alcp_storeu(pOut + 1, cblock2);
 
-                } else {
-                    pb_128 += 3;
-                }
-                isIvUsed = 1;
-                a1       = _mm512_loadu_si512(pa_128);
-                AesEncNoLoad_1x512(a1, keys);
-                a1 = alcp_xor(a1, b1);
-
-                blocks -= 4;
-#ifdef AES_CBC_INPLACE_BUFFER
-                // Load the next IV from the ciphertext buffer before writing
-                // the plaintext to the output buffer to ensure IV is not
-                // corrupted when buffers are inplace.
-                if (blocks > 0
-                    || res != 0) { // Load next IV only if there is some
-                                   // ciphertext left to be decrypted.
-                    b1 = alcp_loadu_128((__m512i*)pb_128);
-                }
-#endif
-                // Store decrypted blocks.
-                alcp_storeu(pOut_512, a1);
-
-                pa_128 += 4;
-                pOut_512 += 1;
-            }
-
-            auto p_out_128 = reinterpret_cast<__m128i*>(pOut_512);
-            // Loop on a block/bytes
-            len = (blocks * Rijndael::cBlockSize) + res;
-#ifdef AES_CBC_INPLACE_BUFFER
-            // Check if buffers are actually inplace (same memory location)
-            bool is_inplace = (pCipherText == pPlainText);
-#endif
-            while (len) {
-                // Create mask to load bytes
-                // FIXME: Convert this to a equation
-                Uint64 current_factor = len > 16 ? 16 : len;
-                Uint64 mask           = (1 << current_factor) - 1;
-                // Mask load bytes
-                a1 = _mm512_setzero_si512();
-                a1 = _mm512_mask_loadu_epi8(a1, mask, pa_128);
-
-#ifdef AES_CBC_INPLACE_BUFFER
-                // In inplace mode, save the IV for the next block before overwriting current block
-                __m512i next_iv;
-                bool has_next = (len - current_factor) > 0;
-                if (is_inplace && has_next) {
-                    // Load the current ciphertext block as IV for next iteration
-                    next_iv = alcp_loadu_128((__m512i*)pa_128);
-                }
-#endif
-
-                if (isIvUsed) {
-#ifdef AES_CBC_INPLACE_BUFFER
-                    if (!is_inplace) {
-                        // Non-inplace case: load IV from pb_128
-                        b1 = alcp_loadu_128((__m512i*)(pb_128));
-                    }
-                    // In inplace case, b1 is already set from previous iteration or pre-loaded
-#else
-                    b1 = alcp_loadu_128((__m512i*)(pb_128));
-#endif
-                }
-                pb_128 += 1;
-                isIvUsed = 1;
-
-                AesEncNoLoad_1x512(a1, keys);
-
-                a1 = alcp_xor(a1, b1);
-                // Store decrypted block.
-                _mm512_mask_storeu_epi8((__m512i*)p_out_128, mask, a1);
-
-#ifdef AES_CBC_INPLACE_BUFFER
-                // Update IV for next iteration in inplace mode
-                if (is_inplace && has_next) {
-                    b1 = next_iv;
-                }
-#endif
-
-                pa_128++;
-                p_out_128++;
-                len -= current_factor;
-            }
+            pIn += 8;
+            pOut += 2;
         }
-    } else {
-        b1             = alcp_loadu_128((const __m512i*)pIv);
-        auto p_out_128 = reinterpret_cast<__m128i*>(pOut_512);
-        while (len) {
-            if (isIvUsed) {
-                b1 = alcp_loadu_128((__m512i*)pb_128);
-                pb_128++;
+
+        // Process 4 blocks (64 bytes)
+        if (len >= 64) {
+            cblock1 = _mm512_loadu_si512(pIn);
+
+            AesEncNoLoad_1x512(cblock1, keys);
+            cblock1 = alcp_xor(cblock1, iv1);
+
+            len -= 64;
+
+            if (__builtin_expect(len == 0, 0)) {
+#ifdef AES_MULTI_UPDATE
+                _mm_storeu_si128(
+                    reinterpret_cast<__m128i*>(pIv),
+                    _mm_loadu_si128(
+                        reinterpret_cast<const __m128i*>(pIn + 3)));
+#endif
+                alcp_storeu(pOut, cblock1);
+                alcp_clear_keys_zmm(keys);
+                return ALC_ERROR_NONE;
             }
-            isIvUsed = 1;
 
-            // Create mask to load bytes
-            // FIXME: Convert this to a equation
-            Uint64 current_factor = len > 16 ? 16 : len;
-            Uint64 mask           = (1 << current_factor) - 1;
-            // Mask load bytes
-            a1 = _mm512_setzero_si512();
-            a1 = _mm512_mask_loadu_epi8(a1, mask, pa_128);
-
-            AesEncNoLoad_1x512(a1, keys);
-            a1 = alcp_xor(a1, b1);
-            // Store decrypted block.
-            _mm512_mask_storeu_epi8((__m512i*)p_out_128, mask, a1);
-
-            pa_128++;
-            p_out_128++;
-            len -= current_factor;
+            iv1 = alcp_loadu_128((__m512i*)(pIn + 3));
+            alcp_storeu(pOut, cblock1);
+            pIn += 4;
+            pOut += 1;
         }
     }
 
-#ifdef AES_MULTI_UPDATE
-    // IV is no longer needed hence we can write the old ciphertext back to
-    // IV
-    alcp_storeu_128(reinterpret_cast<__m512i*>(pIv),
-                    alcp_loadu_128((const __m512i*)(pb_128)));
-#endif
-
+    // Clear ZMM keys before switching to 128-bit AES-NI for the tail
     alcp_clear_keys_zmm(keys);
-    return err;
+
+    // Process remaining 1-3 blocks with 128-bit AES-NI
+    auto       p_tail_in  = pIn;
+    auto       p_tail_out = reinterpret_cast<__m128i*>(pOut);
+    const auto pkey       = reinterpret_cast<const __m128i*>(pKey);
+    __m128i    iv         = _mm512_castsi512_si128(iv1);
+
+    while (len >= 16) {
+        __m128i ct    = _mm_loadu_si128(p_tail_in);
+        __m128i block = ct;
+        aesni::AesDecrypt(&block, pkey, nRounds);
+        block = _mm_xor_si128(block, iv);
+        _mm_storeu_si128(p_tail_out, block);
+        iv = ct;
+        p_tail_in++;
+        p_tail_out++;
+        len -= 16;
+    }
+
+#ifdef AES_MULTI_UPDATE
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(pIv), iv);
+#endif
+    return ALC_ERROR_NONE;
 }
 
 } // namespace alcp::cipher::vaes512
 
 namespace alcp::cipher {
 
-template<alcp::cipher::CipherKeyLen T, alcp::utils::CpuCipherFeatures arch>
+template<alcp::cipher::CipherKeyLen T, alcp::utils::CpuArchLevel arch>
 alc_error_t
 tDecryptCbc(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv)
 {
     using namespace vaes512;
-    return DecryptCbc<AesDecryptNoLoad_1x512Rounds10,
-                      AesDecryptNoLoad_2x512Rounds10,
-                      AesDecryptNoLoad_4x512Rounds10,
-                      alcp_load_key_zmm_10rounds,
-                      alcp_clear_keys_zmm_10rounds>(
-        pSrc, pDest, len, pKey, 10, pIv);
+    constexpr int nRounds = static_cast<int>(T) / 32 + 6;
+    if constexpr (nRounds == 10) {
+        return DecryptCbc<AesDecryptNoLoad_1x512Rounds10,
+                          AesDecryptNoLoad_2x512Rounds10,
+                          AesDecryptNoLoad_4x512Rounds10,
+                          alcp_load_key_zmm_10rounds,
+                          alcp_clear_keys_zmm_10rounds>(
+            pSrc, pDest, len, pKey, nRounds, pIv);
+    } else if constexpr (nRounds == 12) {
+        return DecryptCbc<AesDecryptNoLoad_1x512Rounds12,
+                          AesDecryptNoLoad_2x512Rounds12,
+                          AesDecryptNoLoad_4x512Rounds12,
+                          alcp_load_key_zmm_12rounds,
+                          alcp_clear_keys_zmm_12rounds>(
+            pSrc, pDest, len, pKey, nRounds, pIv);
+    } else if constexpr (nRounds == 14) {
+        return DecryptCbc<AesDecryptNoLoad_1x512Rounds14,
+                          AesDecryptNoLoad_2x512Rounds14,
+                          AesDecryptNoLoad_4x512Rounds14,
+                          alcp_load_key_zmm_14rounds,
+                          alcp_clear_keys_zmm_14rounds>(
+            pSrc, pDest, len, pKey, nRounds, pIv);
+    } else {
+        static_assert(nRounds >= 10 && nRounds <= 14,
+                      "Unsupported AES key length");
+        return ALC_ERROR_NOT_PERMITTED;
+    }
 }
 
 template<>
 alc_error_t
 tDecryptCbc<alcp::cipher::CipherKeyLen::eKey128Bit,
-            alcp::utils::CpuCipherFeatures::eVaes512>(
+            alcp::utils::CpuArchLevel::eZen4>(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv)
 {
     using namespace vaes512;
@@ -352,7 +398,7 @@ tDecryptCbc<alcp::cipher::CipherKeyLen::eKey128Bit,
 template<>
 alc_error_t
 tDecryptCbc<alcp::cipher::CipherKeyLen::eKey192Bit,
-            alcp::utils::CpuCipherFeatures::eVaes512>(
+            alcp::utils::CpuArchLevel::eZen4>(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv)
 {
     using namespace vaes512;
@@ -367,7 +413,7 @@ tDecryptCbc<alcp::cipher::CipherKeyLen::eKey192Bit,
 template<>
 alc_error_t
 tDecryptCbc<alcp::cipher::CipherKeyLen::eKey256Bit,
-            alcp::utils::CpuCipherFeatures::eVaes512>(
+            alcp::utils::CpuArchLevel::eZen4>(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv)
 {
     using namespace vaes512;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -92,6 +92,14 @@ class Sha2 final : public IDigest
      *                   enough to hold the digest
      */
     ALCP_API_EXPORT alc_error_t finalize(Uint8* pBuf, Uint64 size) override;
+
+    /**
+     * \brief    Get the current hash state
+     *
+     * \param    state    Array to copy the hash state to (must be at least 8
+     * Uint32s)
+     */
+    ALCP_API_EXPORT void get_state(Uint32 state[cHashSizeWords]) const;
 
   private:
     alc_error_t processChunk(const Uint8* pSrc, Uint64 len);

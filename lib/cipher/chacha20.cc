@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,41 +28,10 @@
 
 #include "alcp/cipher/chacha20.hh"
 #include "alcp/cipher/chacha20_zen4.hh"
+#include "alcp/cipher/chacha20_avx2.hh"
 #include "chacha20_inplace.cc.inc"
 
 namespace alcp::cipher {
-
-#define CHACHA_CRYPT_WRAPPER_FUNC(CLASS_NAME, WRAPPER_FUNC, FUNC_NAME)         \
-    alc_error_t CLASS_NAME::WRAPPER_FUNC(                                      \
-        const Uint8* pInput, Uint8* pOutput, Uint64 len, Uint64* outlen)       \
-    {                                                                          \
-        alc_error_t err = ALC_ERROR_NONE;                                      \
-                                                                               \
-        if (outlen == nullptr) {                                               \
-            return ALC_ERROR_INVALID_ARG;                                      \
-        }                                                                      \
-        *outlen = 0;                                                           \
-                                                                               \
-        Uint64 blocks   = len / cMBlockSize;                                   \
-        int    remBytes = len - (blocks * cMBlockSize);                        \
-        err             = FUNC_NAME(m_key,                                     \
-                        cMKeylen,                                  \
-                        m_iv,                                      \
-                        cMIvlen,                                   \
-                        pInput,                                    \
-                        pOutput,                                   \
-                        blocks,                                    \
-                        remBytes);                                 \
-                                                                               \
-        /* ChaCha20 is a stream cipher: output length equals input length on   \
-         * success */                                                          \
-        if (err == ALC_ERROR_NONE) {                                           \
-            *outlen = len;                                                     \
-        }                                                                      \
-                                                                               \
-        /*err                  = FUNC_NAME(pInput, len, pOutput);*/            \
-        return err;                                                            \
-    }
 
 alc_error_t
 ChaCha20::init(const Uint8* pKey,
@@ -72,14 +41,16 @@ ChaCha20::init(const Uint8* pKey,
 {
     alc_error_t err = ALC_ERROR_NONE;
 
-    if (pKey != NULL && keyLen != 0) {
+    // Validate and set key -- let setKey reject null/bad length
+    if (keyLen != 0 || pKey != nullptr) {
         err = setKey(pKey, keyLen);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
     }
 
-    if (pIv != NULL && ivLen != 0) {
+    // Validate and set IV -- let setIv reject null/bad length
+    if (pIv != nullptr) {
         err = setIv(pIv, ivLen);
     }
 
@@ -101,33 +72,175 @@ ChaCha20::validateIv(const Uint8 iv[], Uint64 iVlen)
 alc_error_t
 ChaCha20::setKey(const Uint8 key[], Uint64 keylen)
 {
-    alc_error_t err = this->validateKey(key, keylen);
+    alc_error_t err = validateKey(key, keylen);
     if (alcp_is_error(err)) {
         return err;
     }
-    err = utils::SecureCopy<Uint8>(m_key, cMKeylen, key, keylen / 8);
+    
+    // Store key via KeyManager
+    err = m_keyManager.setKey(key, keylen);
+    if (err == ALC_ERROR_NONE) {
+        m_stateManager.onKeySet();
+    }
     return err;
 }
 
 alc_error_t
 ChaCha20::setIv(const Uint8 iv[], Uint64 ivlen)
 {
-    alc_error_t err = this->validateIv(iv, ivlen);
+    alc_error_t err = validateIv(iv, ivlen);
     if (alcp_is_error(err)) {
         return err;
     }
-    err = utils::SecureCopy<Uint8>(m_iv, cMIvlen, iv, ivlen);
+    
+    // Store IV via IvManager
+    err = m_ivManager.setIv(iv, ivlen);
+    if (err == ALC_ERROR_NONE) {
+        m_stateManager.onIvSet();
+    }
     return err;
 }
 
-namespace vaes512 {
-    CHACHA_CRYPT_WRAPPER_FUNC(ChaCha256, encrypt, zen4::ProcessInput);
-    CHACHA_CRYPT_WRAPPER_FUNC(ChaCha256, decrypt, zen4::ProcessInput);
-} // namespace vaes512
+// Template specializations for ChaCha256T encrypt/decrypt
 
-namespace ref {
-    CHACHA_CRYPT_WRAPPER_FUNC(ChaCha256, encrypt, ProcessInput);
-    CHACHA_CRYPT_WRAPPER_FUNC(ChaCha256, decrypt, ProcessInput);
-} // namespace ref
+template<>
+alc_error_t
+ChaCha256T<CpuArchLevel::eZen4>::encrypt(const Uint8* pInput,
+                                                  Uint8*       pOutput,
+                                                  Uint64       len,
+                                                  Uint64*      outlen)
+{
+    alc_error_t err = ALC_ERROR_NONE;
+
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen = 0;
+
+    Uint64 blocks   = len / cMBlockSize;
+    int    remBytes = len - (blocks * cMBlockSize);
+    err             = zen4::ProcessInput(getKey(),
+                             getIv(),
+                             pInput,
+                             pOutput,
+                             blocks,
+                             remBytes);
+
+    if (err == ALC_ERROR_NONE) {
+        *outlen = len;
+    }
+    return err;
+}
+
+template<>
+alc_error_t
+ChaCha256T<CpuArchLevel::eZen4>::decrypt(const Uint8* pInput,
+                                                  Uint8*       pOutput,
+                                                  Uint64       len,
+                                                  Uint64*      outlen)
+{
+    // ChaCha20 encryption and decryption are identical operations
+    return encrypt(pInput, pOutput, len, outlen);
+}
+
+template<>
+alc_error_t
+ChaCha256T<CpuArchLevel::eZen>::encrypt(const Uint8* pInput,
+                                                  Uint8*       pOutput,
+                                                  Uint64       len,
+                                                  Uint64*      outlen)
+{
+    alc_error_t err = ALC_ERROR_NONE;
+
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen = 0;
+
+    Uint64 blocks   = len / cMBlockSize;
+    int    remBytes = len - (blocks * cMBlockSize);
+    err             = avx2::ProcessInput(getKey(),
+                             getIv(),
+                             pInput,
+                             pOutput,
+                             blocks,
+                             remBytes);
+
+    if (err == ALC_ERROR_NONE) {
+        *outlen = len;
+    }
+    return err;
+}
+
+template<>
+alc_error_t
+ChaCha256T<CpuArchLevel::eZen>::decrypt(const Uint8* pInput,
+                                                  Uint8*       pOutput,
+                                                  Uint64       len,
+                                                  Uint64*      outlen)
+{
+    // ChaCha20 encryption and decryption are identical operations
+    return encrypt(pInput, pOutput, len, outlen);
+}
+
+template<>
+alc_error_t
+ChaCha256T<CpuArchLevel::eReference>::encrypt(const Uint8* pInput,
+                                                    Uint8*       pOutput,
+                                                    Uint64       len,
+                                                    Uint64*      outlen)
+{
+    alc_error_t err = ALC_ERROR_NONE;
+
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen = 0;
+
+    Uint64 blocks   = len / cMBlockSize;
+    int    remBytes = len - (blocks * cMBlockSize);
+    err             = ProcessInput(getKey(),
+                       cMKeylen,
+                       getIv(),
+                       cMIvlen,
+                       pInput,
+                       pOutput,
+                       blocks,
+                       remBytes);
+
+    if (err == ALC_ERROR_NONE) {
+        *outlen = len;
+    }
+    return err;
+}
+
+template<>
+alc_error_t
+ChaCha256T<CpuArchLevel::eReference>::decrypt(const Uint8* pInput,
+                                                    Uint8*       pOutput,
+                                                    Uint64       len,
+                                                    Uint64*      outlen)
+{
+    // ChaCha20 encryption and decryption are identical operations
+    return encrypt(pInput, pOutput, len, outlen);
+}
 
 } // namespace alcp::cipher

@@ -3,7 +3,7 @@
 ### Following software should be installed prior to build AOCL CRYPTOGRAPHY
 
 - MS Visual Studio (2019 or greater)
-- Clang 15.0 or above
+- Clang 14.0 or above
 - Cmake 3.26 or greater
 - Git
 - Ninja(Alternative to Visual Studio Build System)
@@ -11,7 +11,7 @@
 ### Environment Setup:
 
 1. Install visual Studio with workload: *Desktop development with c++*
-	- Enable Clang/cl tools(required) & Address Santizer(if require)
+	- Enable Clang/cl tools(required) & Address Sanitizer(if required)
 2. If using LLVM/Clang as external toolset:
 	- Install LLVM
 	- Install plugin: *llvm2019.vsix* :https://marketplace.visualstudio.com/items?itemName=MarekAniola.mangh-llvm2019
@@ -177,7 +177,10 @@ These are flags to enable/disable optional features as required.
 2. To enable multi update feature for all supported ciphers append `-DALCP_ENABLE_CIPHER_MULTI_UPDATE=ON` to build flags. 
 3. To Enable CCM multi update feature append flag `-DALCP_ENABLE_CCM_MULTI_UPDATE=ON` to build flags. 
 4. To Enable OFB multi update feature append flag `-DALCP_ENABLE_OFB_MULTI_UPDATE=ON` to build flags.
-5. To Enable CBC in-place buffer support append flag `-DALCP_ENABLE_CBC_INPLACE_BUFFER=ON` to build flags.
+
+### System RNG
+
+On Windows, AOCL-Cryptography uses `ProcessPrng` (from `bcryptprimitives.dll`) for system random number generation when available (Windows 10 20H1+). On older Windows versions, it automatically falls back to `BCryptGenRandom` (CNG API, available since Windows Vista). The fallback is resolved once at runtime with no per-call overhead. Linking against `bcrypt.lib` is handled automatically by CMake.
 
 ### Enabling compat libs
 
@@ -207,7 +210,7 @@ After running all the above commands you should see a openssl-compat.dll in \lib
 Enabling IPP-Crypto
 ```
 PS> cd aocl-crypto/build
-PS> cmake --DAOCL_COMPAT_LIBS=ipp ../
+PS> cmake -DAOCL_COMPAT_LIBS=ipp ../
 PS> cmake --build build --config=release
 ```
 

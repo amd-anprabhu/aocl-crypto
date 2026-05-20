@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -27,6 +27,7 @@
  */
 
 #include "alcp/digest/sha2.hh"
+#include "alcp/digest/sha2_mb.hh"
 #include "gtest/gtest.h"
 
 namespace {
@@ -172,6 +173,152 @@ TEST(Sha256Test, object_copy_test)
     }
     std::string hash_string = ss.str(), hash_string_dup = ss_dup.str();
     EXPECT_TRUE(hash_string == hash_string_dup);
+}
+
+TEST_P(Sha256Test, multibuffer_digest_generate)
+{
+    const auto [plaintext, digest]             = GetParam().second;
+    std::unique_ptr<Sha256MB> sha256           = std::make_unique<Sha256MB>();
+    Uint8                     hash[DigestSize] = { 0 };
+    std::stringstream         ss;
+
+    const Uint8* pp_src[16];
+    Uint8*       pp_dst[16];
+    std::fill_n(pp_src, 16, (const Uint8*)plaintext.c_str());
+    std::fill_n(pp_dst, 16, (Uint8*)hash);
+
+    sha256->init();
+    ASSERT_EQ(sha256->flush(pp_src, 16, plaintext.size()), ALC_ERROR_NONE);
+    ASSERT_EQ(sha256->dequeue(pp_dst, 16, ALC_DIGEST_LEN_256 / 8),
+              ALC_ERROR_NONE);
+
+    ss << std::hex << std::setfill('0');
+    for (Uint16 i = 0; i < DigestSize; ++i)
+        ss << std::setw(2) << static_cast<unsigned>(hash[i]);
+
+    std::string hash_string = ss.str();
+    EXPECT_TRUE(hash_string == digest);
+}
+
+TEST(Sha256Test, multibuffer_zero_size_update)
+{
+    std::unique_ptr<Sha256MB> sha256 = std::make_unique<Sha256MB>();
+
+    const Uint8* empty = reinterpret_cast<const Uint8*>("");
+    Uint8        hash[DigestSize]{};
+    const Uint8* pp_src[16];
+    Uint8*       pp_dst[16];
+
+    std::fill_n(pp_src, 16, empty);
+    std::fill_n(pp_dst, 16, (Uint8*)hash);
+
+    sha256->init();
+    EXPECT_EQ(sha256->flush(pp_src, 16, 0), ALC_ERROR_NONE);
+    EXPECT_EQ(sha256->dequeue(pp_dst, 16, ALC_DIGEST_LEN_256 / 8),
+              ALC_ERROR_NONE);
+}
+
+TEST(Sha256Test, multibuffer_dequeue_without_flush)
+{
+    std::unique_ptr<Sha256MB> sha256 = std::make_unique<Sha256MB>();
+
+    Uint8  hash[DigestSize]{};
+    Uint8* pp_dst[16];
+    std::fill_n(pp_dst, 16, (Uint8*)hash);
+
+    sha256->init();
+    EXPECT_EQ(sha256->dequeue(pp_dst, 16, ALC_DIGEST_LEN_256 / 8),
+              ALC_ERROR_INVALID_ARG);
+}
+
+TEST(Sha256Test, multibuffer_invalid_input)
+{
+    std::unique_ptr<Sha256MB> sha256 = std::make_unique<Sha256MB>();
+
+    const Uint8* pp_src[16];
+    std::fill_n(pp_src, 16, nullptr);
+
+    sha256->init();
+    EXPECT_EQ(sha256->flush(pp_src, 16, 0), ALC_ERROR_INVALID_DATA);
+}
+
+TEST(Sha256Test, multibuffer_invalid_digest_length)
+{
+    std::unique_ptr<Sha256MB> sha256 = std::make_unique<Sha256MB>();
+
+    const Uint8* msg = reinterpret_cast<const Uint8*>("abc");
+    const Uint8* pp_src[16];
+    Uint8        hash[DigestSize]{};
+    Uint8*       pp_dst[16];
+
+    std::fill_n(pp_src, 16, msg);
+    std::fill_n(pp_dst, 16, (Uint8*)hash);
+
+    auto wrong_digest_len = ALC_DIGEST_LEN_160 / 8;
+
+    sha256->init();
+    EXPECT_EQ(sha256->flush(
+                  pp_src, 16, std::strlen(reinterpret_cast<const char*>(msg))),
+              ALC_ERROR_NONE);
+    EXPECT_EQ(sha256->dequeue(pp_dst, 16, wrong_digest_len),
+              ALC_ERROR_INVALID_ARG);
+}
+
+TEST(Sha256Test, multibuffer_buffers_missmatch)
+{
+    std::unique_ptr<Sha256MB> sha256 = std::make_unique<Sha256MB>();
+
+    const Uint8* msg = reinterpret_cast<const Uint8*>("abc");
+    const Uint8* pp_src[16];
+    Uint8        hash[DigestSize]{};
+    Uint8*       pp_dst[32];
+
+    std::fill_n(pp_src, 16, msg);
+    std::fill_n(pp_dst, 32, (Uint8*)hash);
+
+    sha256->init();
+    EXPECT_EQ(sha256->flush(
+                  pp_src, 16, std::strlen(reinterpret_cast<const char*>(msg))),
+              ALC_ERROR_NONE);
+    EXPECT_EQ(sha256->dequeue(pp_dst, 0, ALC_DIGEST_LEN_256 / 8),
+              ALC_ERROR_INVALID_ARG);
+    EXPECT_EQ(sha256->dequeue(pp_dst, 32, ALC_DIGEST_LEN_256 / 8),
+              ALC_ERROR_INVALID_ARG);
+    EXPECT_EQ(sha256->dequeue(pp_dst, 8, ALC_DIGEST_LEN_256 / 8),
+              ALC_ERROR_NONE);
+}
+
+TEST(Sha256Test, multibuffer_invalid_digest)
+{
+    std::unique_ptr<Sha256MB> sha256 = std::make_unique<Sha256MB>();
+
+    const Uint8* msg = reinterpret_cast<const Uint8*>("abc");
+    const Uint8* pp_src[16];
+    Uint8*       pp_dst[32];
+
+    std::fill_n(pp_src, 16, msg);
+    std::fill_n(pp_dst, 32, nullptr);
+
+    sha256->init();
+    EXPECT_EQ(sha256->flush(
+                  pp_src, 16, std::strlen(reinterpret_cast<const char*>(msg))),
+              ALC_ERROR_NONE);
+    EXPECT_EQ(sha256->dequeue(pp_dst, 16, ALC_DIGEST_LEN_256 / 8),
+              ALC_ERROR_INVALID_DATA);
+}
+
+TEST(Sha256Test, multibuffer_max_input_size)
+{
+    std::unique_ptr<Sha256MB> sha256 = std::make_unique<Sha256MB>();
+
+    const Uint8* msg = reinterpret_cast<const Uint8*>("abc");
+    const Uint8* pp_src[16];
+    std::fill_n(pp_src, 16, msg);
+
+    sha256->init();
+    EXPECT_EQ(sha256->flush(pp_src, 16, UINT64_MAX / 8), ALC_ERROR_INVALID_ARG);
+    EXPECT_EQ(sha256->flush(pp_src, 16, UINT64_MAX / 8 + 64),
+              ALC_ERROR_INVALID_ARG);
 }
 
 } // namespace

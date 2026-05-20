@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -30,7 +30,6 @@
 // steps are also shown as in the documentation as part of the code for future
 // matching and references
 #include "alcp/rng/drbg_ctr.hh"
-#include "alcp/cipher/aes.hh"
 #include "alcp/utils/bignum.hh"
 #include "alcp/utils/copy.hh"
 
@@ -265,11 +264,11 @@ CtrDrbg::Impl::instantiate(const std::vector<Uint8>& cEntropyInput,
                            const std::vector<Uint8>& cNonce,
                            const std::vector<Uint8>& cPersonalizationString)
 {
-    instantiate(&cEntropyInput[0],
+    instantiate(cEntropyInput.data(),
                 cEntropyInput.size(),
-                &cNonce[0],
+                cNonce.data(),
                 cNonce.size(),
-                &cPersonalizationString[0],
+                cPersonalizationString.data(),
                 cPersonalizationString.size());
 }
 
@@ -297,9 +296,9 @@ void
 CtrDrbg::Impl::generate(const std::vector<Uint8>& cAdditionalInput,
                         std::vector<Uint8>&       output)
 {
-    generate(&cAdditionalInput[0],
+    generate(cAdditionalInput.data(),
              cAdditionalInput.size(),
-             &output[0],
+             output.data(),
              output.size());
 }
 

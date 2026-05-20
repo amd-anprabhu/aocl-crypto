@@ -102,7 +102,7 @@ built or running.
     - CMake (3.26 or later)
     - GCC (11.0 or later)
     - Git (2.30.2 or later)
-    - OpenSSL ( 3.1.3 or later )
+    - OpenSSL ( 3.1.3 through 3.5.x )
     - Make ( 4.0 or later )
     - 7zip ( 15.0 or later )
   - Optional Dependancies
@@ -176,9 +176,9 @@ On Windows VC compiler (latest version as of writing VS2019) is used.
 Code will honor multiple operating systems, including Linux and Windows to start
 with.
 
-Library will be provided as a static archive (libalcrypto.a on Linux and
-alcrypto.lib on Windows) as well as a dynamic version (libalcrypto.so on
-Linux and alcrypto.dll on Windows)
+Library will be provided as a static archive (libalcp.a on Linux and
+alcp.lib on Windows) as well as a dynamic version (libalcp.so on
+Linux and alcp.dll on Windows)
 
 For build system we have opted for industry standard CMake (version >=3.18.4),
 and for testing 'Gtest' (Google Test) framework is used.
@@ -375,4 +375,3 @@ Detailed Subsystem Design
 Device offloading
         #include design/devices.md
 -->
-

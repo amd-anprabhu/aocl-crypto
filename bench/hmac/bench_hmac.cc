@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,7 +33,7 @@
 int
 main(int argc, char** argv)
 {
-    parseArgs(&argc, argv);
+    parseBenchArgs(&argc, argv);
 #ifndef USE_IPP
     if (useipp) {
         std::cout << RED << "Error IPP not found defaulting to ALCP" << RESET

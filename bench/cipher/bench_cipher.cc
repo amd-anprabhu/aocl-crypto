@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -29,6 +29,7 @@
 #include "benchmarks_cipher.hh"
 #include "cipher/cipher.hh"
 #include "gbench_base.hh"
+#include <alcp/cipher_segment.h>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -309,6 +310,7 @@ CipherMultibufferBench(benchmark::State& state,
 
     std::vector<const Uint8*> input_buffer_pointers(numBuffers);
     std::vector<Uint8*>       output_buffer_pointers(numBuffers);
+    std::vector<Uint64>       bufferLengths(numBuffers, blockSize);
     for (Uint64 i = 0; i < numBuffers; ++i) {
         input_buffer_pointers[i]  = vec_in[i].data();
         output_buffer_pointers[i] = vec_out[i].data();
@@ -326,12 +328,12 @@ CipherMultibufferBench(benchmark::State& state,
     #ifndef MULTI_INIT_BENCH
     for (auto _ : state) {
     #endif
-        if (!p_cb->flush(input_buffer_pointers.data(), numBuffers, blockSize)) {
+        if (!p_cb->flush(input_buffer_pointers.data(), bufferLengths.data(), numBuffers)) {
             state.SkipWithError("BENCH_FLUSH_FAILURE");
         }
 
         if (!p_cb->dequeue(
-                output_buffer_pointers.data(), numBuffers, blockSize)) {
+                output_buffer_pointers.data(), numBuffers, bufferLengths.data())) {
             state.SkipWithError("BENCH_DEQUEUE_FAILURE");
         }
     }
@@ -695,6 +697,130 @@ BENCH_AES_DECRYPT_XTS_256(benchmark::State& state)
         CipherBench(state, state.range(0), DECRYPT, ALC_AES_MODE_XTS, 256));
 }
 
+/**
+ * @brief Benchmark for AES-XTS 256 using segment API with TweakBlockCalculate
+ * 
+ * This benchmark specifically tests the TweakBlockCalculate codepath by using
+ * the segment encrypt API with varying startBlockNum values, forcing the
+ * tweak block calculation on each iteration.
+ */
+int
+CipherXtsSegmentBench(benchmark::State& state,
+                      Uint64            blockSize,
+                      encrypt_t         enc,
+                      size_t            keylen)
+{
+    // Allocate buffers
+    std::vector<Uint8> vec_in(blockSize, 0x01);
+    std::vector<Uint8> vec_out(blockSize, 0x21);
+
+    // Setup keys and IV
+    // XTS requires key buffer to contain: [encryption_key || tweak_key]
+    // For XTS-256: 32 bytes enc key + 32 bytes tweak key = 64 bytes total
+    std::vector<Uint8> key(keylen / 4);
+    // Encryption key
+    for (size_t i = 0; i < keylen / 8; i++) key[i] = 0xAA;
+    // Tweak key (must be different from encryption key)
+    for (size_t i = keylen / 8; i < keylen / 4; i++) key[i] = 0xBB;
+
+    alignas(16) Uint8 iv[16] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                                  0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F };
+
+    // Allocate cipher handle
+    alc_error_t err;
+    Uint64      size = alcp_cipher_context_size();
+    std::vector<Uint8> context(size);
+    alc_cipher_handle_t handle;
+    handle.ch_context = context.data();
+
+    // Request and initialize cipher
+    err = alcp_cipher_segment_request(ALC_AES_MODE_XTS, keylen, &handle);
+    if (alcp_is_error(err)) {
+        state.SkipWithError("XTS_SEGMENT: REQUEST_FAILURE");
+        return -1;
+    }
+
+    // For segment init:
+    // - key buffer contains [enc_key || tweak_key] (64 bytes for XTS-256)
+    // - keyLen is ONLY the encryption key length in bits (256 for XTS-256)
+    // - ivLen is in bytes (XTS requires exactly 16 bytes)
+    err = alcp_cipher_segment_init(&handle, key.data(), keylen, iv, 16);
+    if (alcp_is_error(err)) {
+        state.SkipWithError("XTS_SEGMENT: INIT_FAILURE");
+        alcp_cipher_segment_finish(&handle);
+        return -1;
+    }
+
+    // Use varying block numbers to trigger TweakBlockCalculate
+    // This simulates random access patterns which force recalculation
+    Uint64 startBlockNum = 0;
+    const Uint64 blockJump = 256; // Jump ahead to force TweakBlockCalculate
+
+    for (auto _ : state) {
+        // Increment startBlockNum to force TweakBlockCalculate on each iteration
+        startBlockNum += blockJump;
+
+        if (enc) {
+            err = alcp_cipher_segment_encrypt_xts(&handle,
+                                                  vec_in.data(),
+                                                  vec_out.data(),
+                                                  blockSize,
+                                                  startBlockNum);
+            if (alcp_is_error(err)) {
+                state.SkipWithError("XTS_SEGMENT: ENCRYPT_FAILURE");
+                break;
+            }
+        } else {
+            err = alcp_cipher_segment_decrypt_xts(&handle,
+                                                  vec_in.data(),
+                                                  vec_out.data(),
+                                                  blockSize,
+                                                  startBlockNum);
+            if (alcp_is_error(err)) {
+                state.SkipWithError("XTS_SEGMENT: DECRYPT_FAILURE");
+                break;
+            }
+        }
+    }
+
+    alcp_cipher_segment_finish(&handle);
+
+    state.counters["Speed(Bytes/s)"] = benchmark::Counter(
+        state.iterations() * blockSize, benchmark::Counter::kIsRate);
+    state.counters["BlockSize(Bytes)"] = blockSize;
+    state.counters["BlockJump"] = blockJump;
+
+    return 0;
+}
+
+static void
+BENCH_AES_ENCRYPT_XTS_SEGMENT_128(benchmark::State& state)
+{
+    benchmark::DoNotOptimize(
+        CipherXtsSegmentBench(state, state.range(0), ENCRYPT, 128));
+}
+
+static void
+BENCH_AES_ENCRYPT_XTS_SEGMENT_256(benchmark::State& state)
+{
+    benchmark::DoNotOptimize(
+        CipherXtsSegmentBench(state, state.range(0), ENCRYPT, 256));
+}
+
+static void
+BENCH_AES_DECRYPT_XTS_SEGMENT_128(benchmark::State& state)
+{
+    benchmark::DoNotOptimize(
+        CipherXtsSegmentBench(state, state.range(0), DECRYPT, 128));
+}
+
+static void
+BENCH_AES_DECRYPT_XTS_SEGMENT_256(benchmark::State& state)
+{
+    benchmark::DoNotOptimize(
+        CipherXtsSegmentBench(state, state.range(0), DECRYPT, 256));
+}
+
 static void
 BENCH_AES_DECRYPT_CCM_256(benchmark::State& state)
 {
@@ -787,7 +913,7 @@ AddBenchmarks()
 {
     /* check if custom block size is provided by user */
     if (block_size != 0) {
-        std::cout << "Custom block size selected:" << block_size << std::endl;
+        std::cerr << "Custom block size selected:" << block_size << std::endl;
         blocksizes.resize(1);
         blocksizes[0] = block_size;
     }
@@ -853,6 +979,12 @@ AddBenchmarks()
     BENCHMARK(BENCH_AES_ENCRYPT_XTS_256)->ArgsProduct({ blocksizes });
     BENCHMARK(BENCH_AES_DECRYPT_XTS_256)->ArgsProduct({ blocksizes });
 
+    // XTS Segment API benchmarks
+    BENCHMARK(BENCH_AES_ENCRYPT_XTS_SEGMENT_128)->ArgsProduct({ blocksizes });
+    BENCHMARK(BENCH_AES_DECRYPT_XTS_SEGMENT_128)->ArgsProduct({ blocksizes });
+    BENCHMARK(BENCH_AES_ENCRYPT_XTS_SEGMENT_256)->ArgsProduct({ blocksizes });
+    BENCHMARK(BENCH_AES_DECRYPT_XTS_SEGMENT_256)->ArgsProduct({ blocksizes });
+
     /* Benchmark of AEAD Ciphers */
     // SIV Benchmarks
     BENCHMARK(BENCH_AES_ENCRYPT_SIV_128)->ArgsProduct({ blocksizes });
@@ -891,7 +1023,7 @@ AddBenchmarks()
 int
 main(int argc, char** argv)
 {
-    parseArgs(&argc, argv);
+    parseBenchArgs(&argc, argv);
 #ifndef USE_IPP
     if (useipp) {
         alcp::testing::utils::printErrors(

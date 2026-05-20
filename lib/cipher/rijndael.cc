@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -29,12 +29,11 @@
 #include "alcp/error.h"
 
 #include "alcp/base.hh"
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/cipher/cipher_wrapper.hh"
 #include "alcp/utils/bits.hh"
 #include "alcp/utils/constants.hh"
 #include "alcp/utils/copy.hh"
-#include "alcp/utils/cpuid.hh"
 
 #include <map>
 
@@ -591,7 +590,10 @@ Rijndael::expandKeys(const Uint8* pUserKey) noexcept
     pEncKey = m_enc_key;
     pDecKey = m_dec_key;
 
-    if (CpuId::cpuHasAesni()) {
+    // Use cached cipher feature for AESNI check
+    static CpuArchLevel cipherFeature =
+        CpuId::getCachedArchLevel(AlgorithmType::eCipher);
+    if (cipherFeature >= CpuArchLevel::eZen) {
         aesni::ExpandKeys(key, pEncKey, pDecKey, m_nrounds);
         return;
     }
@@ -648,17 +650,13 @@ Rijndael::expandKeys(const Uint8* pUserKey) noexcept
 void
 Rijndael::initRijndael(const Uint8* pKey, const Uint64 keyLen)
 {
-    setKeyLen(keyLen);
-    setKey(pKey);
-    setUp();
+    setKey(pKey, static_cast<int>(keyLen));
 }
 
 void
 Rijndael::initRijndael(const Uint8* pKey, Uint8* pExpKey, const Uint64 keyLen)
 {
-    setKeyLen(keyLen);
-    setKey(pKey, pExpKey, keyLen);
-    setUp();
+    setKey(pKey, pExpKey, static_cast<int>(keyLen));
 }
 
 Rijndael::Rijndael()

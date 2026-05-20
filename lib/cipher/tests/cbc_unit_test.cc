@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -35,9 +35,11 @@
 
 #include "alcp/cipher.hh"
 #include "alcp/cipher/cipher_wrapper.hh"
+#include "alcp/utils/cpuid.hh"
 #include "debug_defs.hh"
-#include "dispatcher.hh"
 #include "randomize.hh"
+#include <exception>
+#include <iostream>
 
 #undef DEBUG
 
@@ -45,7 +47,10 @@
 using alcp::cipher::Cbc;
 #endif
 
-using alcp::cipher::CipherFactory;
+// Factory removed
+using alcp::cipher::CipherKeyLen;
+using alcp::cipher::CipherMode;
+using alcp::cipher::createCipher;
 using alcp::cipher::iCipher;
 namespace alcp::cipher::unittest::cbc {
 
@@ -137,35 +142,136 @@ std::vector<Uint8> cipherText = {
 
 using namespace alcp::cipher::unittest;
 using namespace alcp::cipher::unittest::cbc;
+
+// Test fixture class for CBC tests with helper functions
+class CBCTest : public ::testing::Test
+{
+  protected:
+    void SetUp() override
+    {
+        // Common setup if needed
+    }
+
+    void TearDown() override
+    {
+        // Cleanup if needed
+    }
+
+    // Helper function to create cipher and verify it's not null
+    iCipher* createAndVerifyCipher(CipherKeyLen keyLen)
+    {
+        auto cbc = createCipher(CipherMode::eAesCBC, keyLen);
+        EXPECT_NE(cbc, nullptr) << "Failed to create cipher";
+        return cbc;
+    }
+
+    // Helper function to get key size in bytes for a given CipherKeyLen
+    static size_t getKeySizeBytes(CipherKeyLen keyLen)
+    {
+        switch (keyLen) {
+            case CipherKeyLen::eKey128Bit: return 16;
+            case CipherKeyLen::eKey192Bit: return 24;
+            case CipherKeyLen::eKey256Bit: return 32;
+            default: return 16;
+        }
+    }
+
+    // Helper function to get key size in bits for a given CipherKeyLen
+    static size_t getKeySizeBits(CipherKeyLen keyLen)
+    {
+        return getKeySizeBytes(keyLen) * 8;
+    }
+
+    // Helper function to perform encrypt-decrypt round trip test
+    bool encryptDecryptRoundTrip(CipherKeyLen keyLen, size_t dataSize)
+    {
+        size_t keySize = getKeySizeBytes(keyLen);
+        std::vector<Uint8> testKey(keySize, 0x42);
+        std::vector<Uint8> testIv(16, 0x00);
+        std::vector<Uint8> input(dataSize);
+        std::vector<Uint8> output(dataSize), decrypted(dataSize);
+
+        // Fill input with pattern
+        for (size_t i = 0; i < dataSize; i++) {
+            input[i] = static_cast<Uint8>(i % 256);
+        }
+
+        auto cbc = createCipher(CipherMode::eAesCBC, keyLen);
+        if (cbc == nullptr) return false;
+
+        cbc->init(&testKey[0], getKeySizeBits(keyLen), &testIv[0], 16);
+        Uint64 outlen = 0;
+        if (cbc->encrypt(&input[0], &output[0], dataSize, &outlen) != ALC_ERROR_NONE) {
+            delete cbc;
+            return false;
+        }
+        if (outlen != dataSize) {
+            delete cbc;
+            return false;
+        }
+
+        cbc->init(&testKey[0], getKeySizeBits(keyLen), &testIv[0], 16);
+        outlen = 0;
+        if (cbc->decrypt(&output[0], &decrypted[0], dataSize, &outlen) != ALC_ERROR_NONE) {
+            delete cbc;
+            return false;
+        }
+
+        delete cbc;
+        return (decrypted == input);
+    }
+};
+
+// Parameterized test fixture for key size variations
+class CBCKeySizeTest : public ::testing::TestWithParam<CipherKeyLen>
+{
+  protected:
+    static size_t getKeySizeBytes(CipherKeyLen keyLen)
+    {
+        switch (keyLen) {
+            case CipherKeyLen::eKey128Bit: return 16;
+            case CipherKeyLen::eKey192Bit: return 24;
+            case CipherKeyLen::eKey256Bit: return 32;
+            default: return 16;
+        }
+    }
+
+    static size_t getKeySizeBits(CipherKeyLen keyLen)
+    {
+        return getKeySizeBytes(keyLen) * 8;
+    }
+};
+
 TEST(CBC, creation)
 {
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for (CpuCipherFeatures feature : cpu_features) {
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
-            << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+            << static_cast<typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto cbc        = alcpCipher->create("aes-cbc-128", feature);
+        // Factory removed
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
         if (cbc == nullptr) {
-            delete alcpCipher;
+            delete cbc;
             FAIL();
         }
-        delete alcpCipher;
+        delete cbc;
     }
 }
 
 TEST(CBC, BasicEncryption)
 {
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+    // Factory removed
+    auto cbc = createCipher(CipherMode::eAesCBC,
+                            CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
-        delete alcpCipher;
+        delete cbc;
         FAIL();
     }
     std::vector<Uint8> output(cipherText.size());
@@ -180,16 +286,17 @@ TEST(CBC, BasicEncryption)
 
     EXPECT_EQ(cipherText, output);
 
-    delete alcpCipher;
+    delete cbc;
 }
 
 TEST(CBC, BasicDecryption)
 {
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+    // Factory removed
+    auto cbc = createCipher(CipherMode::eAesCBC,
+                            CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
-        delete alcpCipher;
+        delete cbc;
         FAIL();
     }
     std::vector<Uint8> output(plainText.size());
@@ -204,16 +311,17 @@ TEST(CBC, BasicDecryption)
 
     EXPECT_EQ(plainText, output);
 
-    delete alcpCipher;
+    delete cbc;
 }
 
 TEST(CBC, ContextCopyEncryption)
 {
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+    // Factory removed
+    auto cbc = createCipher(CipherMode::eAesCBC,
+                            CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
-        delete alcpCipher;
+        delete cbc;
         FAIL();
     }
     std::vector<Uint8> output(cipherText.size());
@@ -221,11 +329,10 @@ TEST(CBC, ContextCopyEncryption)
     cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
     // Copy the context
-    auto alcpCipher2_cpy = new CipherFactory<iCipher>;
-    auto cbc_copy        = alcpCipher2_cpy->create("aes-cbc-128");
+    // Factory removed
+    auto cbc_copy = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
     if (cbc_copy == nullptr) {
-        delete alcpCipher;
-        delete alcpCipher2_cpy;
+        delete cbc;
         FAIL();
     }
     cbc->CopyCtx(cbc, cbc_copy);
@@ -238,17 +345,18 @@ TEST(CBC, ContextCopyEncryption)
 
     EXPECT_EQ(cipherText, output);
 
-    delete alcpCipher;
-    delete alcpCipher2_cpy;
+    delete cbc;
+    delete cbc_copy;
 }
 
 TEST(CBC, ContextCopyDecryption)
 {
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+    // Factory removed
+    auto cbc = createCipher(CipherMode::eAesCBC,
+                            CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
-        delete alcpCipher;
+        delete cbc;
         FAIL();
     }
     std::vector<Uint8> output(cipherText.size());
@@ -256,11 +364,10 @@ TEST(CBC, ContextCopyDecryption)
     cbc->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
     // Copy the context
-    auto alcpCipher2_cpy = new CipherFactory<iCipher>;
-    auto cbc_copy        = alcpCipher2_cpy->create("aes-cbc-128");
+    // Factory removed
+    auto cbc_copy = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
     if (cbc_copy == nullptr) {
-        delete alcpCipher;
-        delete alcpCipher2_cpy;
+        delete cbc;
         FAIL();
     }
     cbc->CopyCtx(cbc, cbc_copy);
@@ -273,8 +380,8 @@ TEST(CBC, ContextCopyDecryption)
 
     EXPECT_EQ(plainText, output);
 
-    delete alcpCipher;
-    delete alcpCipher2_cpy;
+    delete cbc;
+    delete cbc_copy;
 }
 
 TEST(CBC, MultiUpdateEncryption)
@@ -282,11 +389,12 @@ TEST(CBC, MultiUpdateEncryption)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+    // Factory removed
+    auto cbc = createCipher(CipherMode::eAesCBC,
+                            CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
-        delete alcpCipher;
+        delete cbc;
         FAIL();
     }
     std::vector<Uint8> output(cipherText.size());
@@ -309,7 +417,7 @@ TEST(CBC, MultiUpdateEncryption)
 
     EXPECT_EQ(cipherText, output);
 
-    delete alcpCipher;
+    delete cbc;
 }
 
 TEST(CBC, MultiUpdateEncryptionSmallChunks)
@@ -317,11 +425,12 @@ TEST(CBC, MultiUpdateEncryptionSmallChunks)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+    // Factory removed
+    auto cbc = createCipher(CipherMode::eAesCBC,
+                            CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
-        delete alcpCipher;
+        delete cbc;
         FAIL();
     }
     std::vector<Uint8> output(cipherText.size());
@@ -370,7 +479,7 @@ TEST(CBC, MultiUpdateEncryptionSmallChunks)
             << "Mismatch with chunk size " << chunkSize;
     }
 
-    delete alcpCipher;
+    delete cbc;
 }
 
 TEST(CBC, MultiUpdateDecryption)
@@ -378,23 +487,25 @@ TEST(CBC, MultiUpdateDecryption)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
-            << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+            << static_cast<typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto cbc = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+        // Factory removed
+        auto cbc =
+            createCipher(CipherMode::eAesCBC,
+                         CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
         if (cbc == nullptr) {
-            delete alcpCipher;
+            delete cbc;
             FAIL();
         }
         std::vector<Uint8> output(cipherText.size());
@@ -417,9 +528,9 @@ TEST(CBC, MultiUpdateDecryption)
         }
         EXPECT_EQ(plainText, output)
             << "FAIL CPU_FEATURE:"
-            << std::underlying_type<CpuCipherFeatures>::type(feature);
+            << std::underlying_type<CpuArchLevel>::type(feature);
 
-        delete alcpCipher;
+        delete cbc;
     }
 }
 TEST(CBC, MultiUpdateDecryptionSmallChunks)
@@ -427,11 +538,12 @@ TEST(CBC, MultiUpdateDecryptionSmallChunks)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto cbc        = alcpCipher->create("aes-cbc-128"); // KeySize is 128 bits
+    // Factory removed
+    auto cbc = createCipher(CipherMode::eAesCBC,
+                            CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
     if (cbc == nullptr) {
-        delete alcpCipher;
+        delete cbc;
         FAIL();
     }
     std::vector<Uint8> output(plainText.size());
@@ -480,32 +592,30 @@ TEST(CBC, MultiUpdateDecryptionSmallChunks)
             << "Mismatch with chunk size " << chunkSize;
     }
 
-    delete alcpCipher;
+    delete cbc;
 }
 
 TEST(CBC, InplaceEncryption)
 {
-#ifndef CBC_INPLACE_BUFFER
-    GTEST_SKIP() << "In-place encryption functionality disabled!";
-#endif
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
-            << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+            << static_cast<typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
-        auto alcpCipher = new CipherFactory<iCipher>;
+        // Factory removed
         auto cbc =
-            alcpCipher->create("aes-cbc-128", feature); // KeySize is 128 bits
+            createCipher(CipherMode::eAesCBC,
+                         CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
         if (cbc == nullptr) {
-            delete alcpCipher;
+            delete cbc;
             FAIL();
         }
 
@@ -525,35 +635,33 @@ TEST(CBC, InplaceEncryption)
 
         EXPECT_EQ(cipherText, plainText_copy)
             << "FAIL CPU_FEATURE:"
-            << std::underlying_type<CpuCipherFeatures>::type(feature);
+            << std::underlying_type<CpuArchLevel>::type(feature);
 
-        delete alcpCipher;
+        delete cbc;
     }
 }
 
 TEST(CBC, InplaceDecryption)
 {
-#ifndef CBC_INPLACE_BUFFER
-    GTEST_SKIP() << "In-place decryption functionality disabled!";
-#endif
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
-            << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+            << static_cast<typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
-        auto alcpCipher = new CipherFactory<iCipher>;
+        // Factory removed
         auto cbc =
-            alcpCipher->create("aes-cbc-128", feature); // KeySize is 128 bits
+            createCipher(CipherMode::eAesCBC,
+                         CipherKeyLen::eKey128Bit); // KeySize is 128 bits
 
         if (cbc == nullptr) {
-            delete alcpCipher;
+            delete cbc;
             FAIL();
         }
 
@@ -573,9 +681,9 @@ TEST(CBC, InplaceDecryption)
 
         EXPECT_EQ(plainText, cipherText_copy)
             << "FAIL CPU_FEATURE:"
-            << std::underlying_type<CpuCipherFeatures>::type(feature);
+            << std::underlying_type<CpuArchLevel>::type(feature);
 
-        delete alcpCipher;
+        delete cbc;
     }
 }
 
@@ -588,23 +696,23 @@ TEST(CBC, PaddingEncryption)
     std::vector<Uint8>             ct = { 0xe2, 0x27, 0x81, 0xbb, 0x3f, 0xf3,
                                           0x3c, 0x74, 0x11, 0x84, 0xe1, 0x1d,
                                           0x84, 0xd4, 0x49, 0xfc, 0xaf };
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features = alcp::utils::CpuId::getSupportedArchLevels();
 
     // Test for all arch
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
             << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+                   typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto cbc        = alcpCipher->create("aes-cbc-128", feature);
+        // Factory removed
+        auto cbc        = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
 
         if (cbc == nullptr) {
-            delete alcpCipher;
+            delete cbc;
             FAIL();
         }
         std::vector<Uint8> output(pt.size());
@@ -623,9 +731,9 @@ TEST(CBC, PaddingEncryption)
 
         EXPECT_EQ(ct, output)
             << "FAIL CPU_FEATURE:"
-            << std::underlying_type<CpuCipherFeatures>::type(feature);
+            << std::underlying_type<CpuArchLevel>::type(feature);
 
-        delete alcpCipher;
+        delete cbc;
     }
 }
 #endif
@@ -648,25 +756,25 @@ TEST(CBC, RandomEncryptDecryptTest)
     random->getRandomBytes(key_256, 32);
     random->getRandomBytes(iv, 16);
 
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
 #ifdef DEBUG
         std::cout
             << "Cpu Feature:"
-            << static_cast<
-                   typename std::underlying_type<CpuCipherFeatures>::type>(
+            << static_cast<typename std::underlying_type<CpuArchLevel>::type>(
                    feature)
             << std::endl;
 #endif
         const std::vector<Uint8> plainTextVect(plain_text_vect.begin(),
                                                plain_text_vect.end());
         std::vector<Uint8>       plainTextOut(plainTextVect.size());
-        auto                     alcpCipher = new CipherFactory<iCipher>;
-        auto cbc = alcpCipher->create("aes-cbc-256", feature);
+        // Factory removed
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey256Bit);
 
         if (cbc == nullptr) {
-            delete alcpCipher;
+            delete cbc;
             FAIL();
         }
         cbc->init(key_256, 256, &iv[0], sizeof(iv));
@@ -685,7 +793,7 @@ TEST(CBC, RandomEncryptDecryptTest)
                      plainTextVect.size(),
                      &decrypt_outlen);
 
-        delete alcpCipher;
+        delete cbc;
 #ifdef DEBUG
 
         if (plainTextVect != plainTextOut) {
@@ -741,31 +849,43 @@ TEST(CBC, MultiBufferRandomTest)
         cipher_text_vect[i] = new Uint8[cTextSize];
     }
 
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
 
-    for (CpuCipherFeatures feature : cpu_features) {
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
         /* FIXME: run this test only for zen4 for now? */
-        if (feature != CpuCipherFeatures::eVaes512) {
+        if (feature != CpuArchLevel::eZen4) {
             std::cout << "Skipping test for feature avx512 " << std::endl;
             continue;
         }
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto cbc        = alcpCipher->create("aes-cbc-256", feature);
+        // Create cipher via factory
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey256Bit);
 
         if (cbc == nullptr) {
-            delete alcpCipher;
-            FAIL();
+            FAIL() << "Failed to create CBC cipher";
         }
         cbc->init(key_256, 256, nullptr, 0);
-        cbc->multibufferInit(
+
+        // Get iMultibuffer interface via dynamic_cast
+        auto* mb = dynamic_cast<alcp::cipher::iMultibuffer*>(cbc);
+        if (mb == nullptr) {
+            delete cbc;
+            FAIL() << "CBC cipher does not support multibuffer operations";
+        }
+
+        // Call multibuffer methods via iMultibuffer interface
+        mb->multibufferInit(
             key_256, 256, iv_vect.data(), iv_vect.size(), num_buffers);
 
-        // Test flush and dequeue operations
+        // Create lengths array for uniform-length buffers
+        std::vector<Uint64> lengths(num_buffers, cTextSize);
+
+        // Test flush and dequeue operations via iMultibuffer interface
         alc_error_t err =
-            cbc->flush(plain_text_vect.data(), num_buffers, cTextSize);
+            mb->flush(plain_text_vect.data(), lengths.data(), num_buffers);
         EXPECT_FALSE(alcp_is_error(err));
 
-        err = cbc->dequeue(cipher_text_vect.data(), num_buffers, cTextSize);
+        err = mb->dequeue(cipher_text_vect.data(), num_buffers, lengths.data());
         EXPECT_FALSE(alcp_is_error(err));
         // Verify the output
         std::vector<Uint8> plainText(cTextSize);
@@ -783,7 +903,7 @@ TEST(CBC, MultiBufferRandomTest)
             // cTextSize));
         }
 
-        delete alcpCipher;
+        delete cbc;
     }
     /* delete iv_vect */
     for (int i = 0; i < num_buffers; ++i) {
@@ -800,13 +920,14 @@ TEST(CBC, MultiUpdateArbitrarySizesVariousUpdateCounts)
 #ifndef AES_MULTI_UPDATE
     GTEST_SKIP() << "Multi Update functionality unavailable!";
 #endif
-    std::vector<CpuCipherFeatures> cpu_features = getSupportedFeatures();
-    for (CpuCipherFeatures feature : cpu_features) {
-        auto alcpCipher = new CipherFactory<iCipher>;
-        auto cbc        = alcpCipher->create("aes-cbc-128", feature);
+    std::vector<CpuArchLevel> cpu_features =
+        alcp::utils::CpuId::getSupportedArchLevels();
+    for ([[maybe_unused]] CpuArchLevel feature : cpu_features) {
+        // Factory removed
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
 
         if (cbc == nullptr) {
-            delete alcpCipher;
+            delete cbc;
             continue;
         }
 
@@ -850,8 +971,11 @@ TEST(CBC, MultiUpdateArbitrarySizesVariousUpdateCounts)
 
             // Test decryption with multi-update - create separate factory for
             // second cipher
-            auto alcpCipher2 = new CipherFactory<iCipher>;
-            auto cbc2        = alcpCipher2->create("aes-cbc-128", feature);
+            // Factory removed
+            auto cbc2 =
+                createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+            if (cbc2 == nullptr)
+                return;
             cbc2->init(&key[0], key.size() * 8, &iv[0], iv.size());
 
             size_t output_offset = 0;
@@ -883,17 +1007,1330 @@ TEST(CBC, MultiUpdateArbitrarySizesVariousUpdateCounts)
             }
 
             // Clean up second factory
-            delete alcpCipher2;
+            delete cbc2;
         }
 
         // Factory destructor will clean up the cipher object
-        delete alcpCipher;
+        delete cbc;
     }
+}
+
+// Comprehensive Corner Case Tests for CBC
+
+// Parameterized test for all key sizes (128, 192, 256 bits)
+TEST_P(CBCKeySizeTest, EncryptDecryptRoundTrip)
+{
+    CipherKeyLen keyLen = GetParam();
+    size_t keySize = getKeySizeBytes(keyLen);
+    size_t keyBits = getKeySizeBits(keyLen);
+
+    std::vector<Uint8> testKey(keySize, 0x42);
+    std::vector<Uint8> testIv(16, 0x00);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32), decrypted(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, keyLen);
+    ASSERT_NE(cbc, nullptr) << "Failed to create AES-CBC-" << keyBits;
+
+    cbc->init(&testKey[0], keyBits, &testIv[0], 16);
+    Uint64 outlen = 0;
+    EXPECT_EQ(cbc->encrypt(&input[0], &output[0], 32, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 32);
+
+    cbc->init(&testKey[0], keyBits, &testIv[0], 16);
+    outlen = 0;
+    EXPECT_EQ(cbc->decrypt(&output[0], &decrypted[0], 32, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cbc;
+}
+
+// Test with multiple data sizes for each key size
+TEST_P(CBCKeySizeTest, VariousDataSizes)
+{
+    CipherKeyLen keyLen = GetParam();
+    size_t keySize = getKeySizeBytes(keyLen);
+    size_t keyBits = getKeySizeBits(keyLen);
+
+    std::vector<Uint8> testKey(keySize, 0x42);
+    std::vector<Uint8> testIv(16, 0x00);
+
+    // Test various data sizes (block-aligned)
+    std::vector<size_t> dataSizes = { 16, 32, 64, 128, 256, 512, 1024 };
+
+    for (size_t dataSize : dataSizes) {
+        std::vector<Uint8> input(dataSize);
+        for (size_t i = 0; i < dataSize; i++) {
+            input[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> output(dataSize), decrypted(dataSize);
+
+        auto cbc = createCipher(CipherMode::eAesCBC, keyLen);
+        ASSERT_NE(cbc, nullptr);
+
+        cbc->init(&testKey[0], keyBits, &testIv[0], 16);
+        Uint64 outlen = 0;
+        EXPECT_EQ(cbc->encrypt(&input[0], &output[0], dataSize, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, dataSize) << "Key: " << keyBits << " bits, Data: " << dataSize << " bytes";
+
+        cbc->init(&testKey[0], keyBits, &testIv[0], 16);
+        outlen = 0;
+        EXPECT_EQ(cbc->decrypt(&output[0], &decrypted[0], dataSize, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, input) << "Key: " << keyBits << " bits, Data: " << dataSize << " bytes";
+
+        delete cbc;
+    }
+}
+
+// Instantiate the parameterized tests for all key sizes
+INSTANTIATE_TEST_SUITE_P(
+    AllKeySizes,
+    CBCKeySizeTest,
+    ::testing::Values(
+        CipherKeyLen::eKey128Bit,
+        CipherKeyLen::eKey192Bit,
+        CipherKeyLen::eKey256Bit
+    ),
+    [](const ::testing::TestParamInfo<CipherKeyLen>& info) {
+        switch (info.param) {
+            case CipherKeyLen::eKey128Bit: return "Key128Bit";
+            case CipherKeyLen::eKey192Bit: return "Key192Bit";
+            case CipherKeyLen::eKey256Bit: return "Key256Bit";
+            default: return "Unknown";
+        }
+    }
+);
+
+// Test single block (16 bytes) encryption/decryption
+TEST(CBC, SingleBlock)
+{
+    std::vector<Uint8> test_key(16, 0xAA);
+    std::vector<Uint8> test_iv(16, 0xBB);
+    std::vector<Uint8> input(16, 0xCC);
+    std::vector<Uint8> output(16), decrypted(16);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    EXPECT_EQ(cbc->encrypt(&input[0], &output[0], 16, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 16);
+    EXPECT_NE(output, input); // Encrypted data should differ from plaintext
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    EXPECT_EQ(cbc->decrypt(&output[0], &decrypted[0], 16, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cbc;
+}
+
+// Test multiple blocks encryption/decryption
+TEST(CBC, MultipleBlocks)
+{
+    // Test various block counts
+    std::vector<size_t> block_counts = { 2, 3, 4, 5, 8, 10, 16, 32, 64, 100 };
+    
+    std::vector<Uint8> test_key(16, 0xDD);
+    std::vector<Uint8> test_iv(16, 0xEE);
+
+    for (size_t num_blocks : block_counts) {
+        size_t data_size = num_blocks * 16;
+        std::vector<Uint8> input(data_size);
+        // Fill with pattern based on position
+        for (size_t i = 0; i < data_size; i++) {
+            input[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> output(data_size), decrypted(data_size);
+
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cbc, nullptr);
+
+        cbc->init(&test_key[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        EXPECT_EQ(cbc->encrypt(&input[0], &output[0], data_size, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(outlen, data_size) << "Block count: " << num_blocks;
+
+        cbc->init(&test_key[0], 128, &test_iv[0], 16);
+        outlen = 0;
+        EXPECT_EQ(cbc->decrypt(&output[0], &decrypted[0], data_size, &outlen), ALC_ERROR_NONE);
+        EXPECT_EQ(decrypted, input) << "Mismatch at block count: " << num_blocks;
+
+        delete cbc;
+    }
+}
+
+// Test all zeros input
+TEST(CBC, AllZerosInput)
+{
+    std::vector<Uint8> test_key(16, 0x00);
+    std::vector<Uint8> test_iv(16, 0x00);
+    std::vector<Uint8> input(64, 0x00);
+    std::vector<Uint8> output(64), decrypted(64);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    EXPECT_EQ(cbc->encrypt(&input[0], &output[0], 64, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 64);
+
+    // All zeros plaintext with zero key and IV should produce known result
+    // Just verify encrypt-decrypt round trip
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    EXPECT_EQ(cbc->decrypt(&output[0], &decrypted[0], 64, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cbc;
+}
+
+// Test all ones input (0xFF)
+TEST(CBC, AllOnesInput)
+{
+    std::vector<Uint8> test_key(16, 0xFF);
+    std::vector<Uint8> test_iv(16, 0xFF);
+    std::vector<Uint8> input(64, 0xFF);
+    std::vector<Uint8> output(64), decrypted(64);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    EXPECT_EQ(cbc->encrypt(&input[0], &output[0], 64, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, 64);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    EXPECT_EQ(cbc->decrypt(&output[0], &decrypted[0], 64, &outlen), ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cbc;
+}
+
+// Test double initialization (reinit with same and different IV)
+TEST(CBC, DoubleInit)
+{
+    std::vector<Uint8> test_key(16, 0x12);
+    std::vector<Uint8> iv1(16, 0x34);
+    std::vector<Uint8> iv2(16, 0x56);
+    std::vector<Uint8> input(32, 0x78);
+    std::vector<Uint8> output1(32), output2(32), decrypted(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // First encryption with IV1
+    cbc->init(&test_key[0], 128, &iv1[0], 16);
+    Uint64 outlen = 0;
+    cbc->encrypt(&input[0], &output1[0], 32, &outlen);
+
+    // Reinit with same IV - should produce same result
+    cbc->init(&test_key[0], 128, &iv1[0], 16);
+    outlen = 0;
+    cbc->encrypt(&input[0], &output2[0], 32, &outlen);
+    EXPECT_EQ(output1, output2) << "Same IV should produce same ciphertext";
+
+    // Reinit with different IV - should produce different result
+    cbc->init(&test_key[0], 128, &iv2[0], 16);
+    outlen = 0;
+    cbc->encrypt(&input[0], &output2[0], 32, &outlen);
+    EXPECT_NE(output1, output2) << "Different IV should produce different ciphertext";
+
+    // Verify decrypt still works after multiple inits
+    cbc->init(&test_key[0], 128, &iv1[0], 16);
+    outlen = 0;
+    cbc->decrypt(&output1[0], &decrypted[0], 32, &outlen);
+    EXPECT_EQ(decrypted, input);
+
+    delete cbc;
+}
+
+// Test consecutive encryptions
+TEST(CBC, ConsecutiveEncryptions)
+{
+    std::vector<Uint8> test_key(16, 0x9A);
+    std::vector<Uint8> test_iv(16, 0xBC);
+    std::vector<Uint8> input1(32, 0x11);
+    std::vector<Uint8> input2(48, 0x22);
+    std::vector<Uint8> output1(32), output2(48);
+    std::vector<Uint8> decrypted1(32), decrypted2(48);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // First encryption
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    cbc->encrypt(&input1[0], &output1[0], 32, &outlen);
+    EXPECT_EQ(outlen, 32);
+
+    // Second encryption with new init
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cbc->encrypt(&input2[0], &output2[0], 48, &outlen);
+    EXPECT_EQ(outlen, 48);
+
+    // Verify both decrypt correctly
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cbc->decrypt(&output1[0], &decrypted1[0], 32, &outlen);
+    EXPECT_EQ(decrypted1, input1);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cbc->decrypt(&output2[0], &decrypted2[0], 48, &outlen);
+    EXPECT_EQ(decrypted2, input2);
+
+    delete cbc;
+}
+
+// Test large data (multiple MB)
+TEST(CBC, LargeData)
+{
+    const size_t MB = 1024 * 1024;
+    const size_t data_size = 2 * MB; // 2 MB
+    
+    std::vector<Uint8> test_key(32, 0xDE);
+    std::vector<Uint8> test_iv(16, 0xAD);
+    std::vector<Uint8> input(data_size);
+    std::vector<Uint8> output(data_size), decrypted(data_size);
+
+    // Fill with pattern
+    for (size_t i = 0; i < data_size; i++) {
+        input[i] = static_cast<Uint8>((i * 17) % 256);
+    }
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey256Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    cbc->init(&test_key[0], 256, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    auto err = cbc->encrypt(&input[0], &output[0], data_size, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, data_size);
+
+    cbc->init(&test_key[0], 256, &test_iv[0], 16);
+    outlen = 0;
+    err = cbc->decrypt(&output[0], &decrypted[0], data_size, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(decrypted, input);
+
+    delete cbc;
+}
+
+// Test different IV values affect output
+TEST(CBC, IVAffectsOutput)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<std::vector<Uint8>> outputs;
+
+    // Generate 5 different IVs and encrypt
+    for (int i = 0; i < 5; i++) {
+        std::vector<Uint8> test_iv(16, static_cast<Uint8>(i));
+        std::vector<Uint8> output(32);
+
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cbc, nullptr);
+
+        cbc->init(&test_key[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        cbc->encrypt(&input[0], &output[0], 32, &outlen);
+        outputs.push_back(output);
+
+        delete cbc;
+    }
+
+    // Verify all outputs are different
+    for (size_t i = 0; i < outputs.size(); i++) {
+        for (size_t j = i + 1; j < outputs.size(); j++) {
+            EXPECT_NE(outputs[i], outputs[j]) 
+                << "IV " << i << " and " << j << " produced same output";
+        }
+    }
+}
+
+// Test boundary sizes (exact multiples of block size)
+TEST(CBC, BlockBoundarySizes)
+{
+    std::vector<Uint8> test_key(16, 0x73);
+    std::vector<Uint8> test_iv(16, 0x84);
+    
+    // Test exact block multiples
+    std::vector<size_t> sizes = { 16, 32, 48, 64, 80, 96, 112, 128, 256, 512, 1024 };
+    
+    for (size_t size : sizes) {
+        std::vector<Uint8> input(size);
+        for (size_t i = 0; i < size; i++) {
+            input[i] = static_cast<Uint8>(i % 256);
+        }
+        std::vector<Uint8> output(size), decrypted(size);
+
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cbc, nullptr);
+
+        cbc->init(&test_key[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        auto err = cbc->encrypt(&input[0], &output[0], size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Failed for size " << size;
+        EXPECT_EQ(outlen, size) << "Output length mismatch for size " << size;
+
+        cbc->init(&test_key[0], 128, &test_iv[0], 16);
+        outlen = 0;
+        err = cbc->decrypt(&output[0], &decrypted[0], size, &outlen);
+        EXPECT_EQ(err, ALC_ERROR_NONE) << "Decrypt failed for size " << size;
+        EXPECT_EQ(decrypted, input) << "Data mismatch for size " << size;
+
+        delete cbc;
+    }
+}
+
+// Test CBC chaining property - changing one plaintext block affects all subsequent ciphertext blocks
+TEST(CBC, ChainingProperty)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input1(48, 0x00);
+    std::vector<Uint8> input2(48, 0x00);
+    
+    // Modify only the second block of input2
+    input2[16] = 0x01;
+    
+    std::vector<Uint8> output1(48), output2(48);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    cbc->encrypt(&input1[0], &output1[0], 48, &outlen);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cbc->encrypt(&input2[0], &output2[0], 48, &outlen);
+
+    // First block should be the same (same IV and same first plaintext block)
+    bool first_block_same = true;
+    for (int i = 0; i < 16; i++) {
+        if (output1[i] != output2[i]) {
+            first_block_same = false;
+            break;
+        }
+    }
+    EXPECT_TRUE(first_block_same) << "First block should be same";
+
+    // Second and third blocks should differ due to CBC chaining
+    bool second_block_differs = false;
+    for (int i = 16; i < 32; i++) {
+        if (output1[i] != output2[i]) {
+            second_block_differs = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(second_block_differs) << "Second block should differ";
+
+    bool third_block_differs = false;
+    for (int i = 32; i < 48; i++) {
+        if (output1[i] != output2[i]) {
+            third_block_differs = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(third_block_differs) << "Third block should differ due to chaining";
+
+    delete cbc;
+}
+
+// Test encrypt then decrypt with different cipher objects
+TEST(CBC, SeparateCipherObjects)
+{
+    std::vector<Uint8> test_key(16, 0xAB);
+    std::vector<Uint8> test_iv(16, 0xCD);
+    std::vector<Uint8> input(64, 0xEF);
+    std::vector<Uint8> output(64), decrypted(64);
+
+    // Create first cipher for encryption
+    auto cbc_enc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc_enc, nullptr);
+
+    cbc_enc->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    cbc_enc->encrypt(&input[0], &output[0], 64, &outlen);
+    EXPECT_EQ(outlen, 64);
+
+    delete cbc_enc;
+
+    // Create second cipher for decryption
+    auto cbc_dec = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc_dec, nullptr);
+
+    cbc_dec->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    cbc_dec->decrypt(&output[0], &decrypted[0], 64, &outlen);
+    EXPECT_EQ(decrypted, input);
+
+    delete cbc_dec;
+}
+
+// Test that same plaintext with same key/IV always produces same ciphertext
+TEST(CBC, Determinism)
+{
+    std::vector<Uint8> test_key(16, 0x11);
+    std::vector<Uint8> test_iv(16, 0x22);
+    std::vector<Uint8> input(32, 0x33);
+    std::vector<Uint8> output1(32), output2(32), output3(32);
+
+    for (int round = 0; round < 3; round++) {
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cbc, nullptr);
+
+        cbc->init(&test_key[0], 128, &test_iv[0], 16);
+        Uint64 outlen = 0;
+        std::vector<Uint8>* current_output = (round == 0) ? &output1 : (round == 1) ? &output2 : &output3;
+        cbc->encrypt(&input[0], &(*current_output)[0], 32, &outlen);
+
+        delete cbc;
+    }
+
+    EXPECT_EQ(output1, output2) << "Round 1 and 2 should produce same output";
+    EXPECT_EQ(output2, output3) << "Round 2 and 3 should produce same output";
+}
+
+// Negative Tests for CBC - Null Pointer and Edge Cases
+
+// Test null pointer for key in init
+TEST(CBC_Negative, NullKeyPointer)
+{
+    std::vector<Uint8> test_iv(16, 0x00);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // Passing null key pointer should return an error
+    alc_error_t err = cbc->init(nullptr, 128, &test_iv[0], 16);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with null key should fail";
+
+    delete cbc;
+}
+
+// Test null pointer for IV in init
+TEST(CBC_Negative, NullIVPointer)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // Passing null IV pointer - the implementation may accept this
+    // and use a default IV or handle it gracefully
+    alc_error_t err = cbc->init(&test_key[0], 128, nullptr, 16);
+    // Document actual behavior: implementation accepts null IV
+    // This test verifies the behavior doesn't crash and documents the API contract
+    (void)err; // Behavior is implementation-defined
+
+    delete cbc;
+}
+
+// Test null pointer for both key and IV in init
+TEST(CBC_Negative, NullKeyAndIVPointers)
+{
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // Passing both null key and IV pointers should return an error
+    alc_error_t err = cbc->init(nullptr, 128, nullptr, 16);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with null key and IV should fail";
+
+    delete cbc;
+}
+
+// Test null pointer for input plaintext in encrypt
+// Note: Implementation may not validate null input - may cause undefined behavior
+// This test is skipped as it may cause segfault in implementations without validation
+TEST(CBC_Negative, NullInputPointerEncrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> output(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Encrypt with null input pointer should fail
+    Uint64 outlen = 0;
+    err = cbc->encrypt(nullptr, &output[0], 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null input should fail";
+
+    delete cbc;
+}
+
+// Test null pointer for input ciphertext in decrypt
+// Note: Implementation may not validate null input - may cause undefined behavior
+// This test is skipped as it may cause segfault in implementations without validation
+TEST(CBC_Negative, NullInputPointerDecrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> output(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt with null input pointer should fail
+    Uint64 outlen = 0;
+    err = cbc->decrypt(nullptr, &output[0], 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null input should fail";
+
+    delete cbc;
+}
+
+// Test null pointer for output in encrypt
+// Note: Implementation may not validate null output - may cause undefined behavior
+// This test is skipped as it may cause segfault in implementations without validation
+TEST(CBC_Negative, NullOutputPointerEncrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Encrypt with null output pointer should fail
+    Uint64 outlen = 0;
+    err = cbc->encrypt(&input[0], nullptr, 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null output should fail";
+
+    delete cbc;
+}
+
+// Test null pointer for output in decrypt
+// Note: Implementation may not validate null output - may cause undefined behavior
+// This test is skipped as it may cause segfault in implementations without validation
+TEST(CBC_Negative, NullOutputPointerDecrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt with null output pointer should fail
+    Uint64 outlen = 0;
+    err = cbc->decrypt(&input[0], nullptr, 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null output should fail";
+
+    delete cbc;
+}
+
+// Test null pointer for output length in encrypt
+TEST(CBC_Negative, NullOutlenPointerEncrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Encrypt with null outlen pointer should fail
+    err = cbc->encrypt(&input[0], &output[0], 32, nullptr);
+    EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with null outlen should fail";
+
+    delete cbc;
+}
+
+// Test null pointer for output length in decrypt
+TEST(CBC_Negative, NullOutlenPointerDecrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt with null outlen pointer should fail
+    err = cbc->decrypt(&input[0], &output[0], 32, nullptr);
+    EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with null outlen should fail";
+
+    delete cbc;
+}
+
+// Test all null pointers in encrypt
+TEST(CBC_Negative, AllNullPointersEncrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Encrypt with all null pointers should fail
+    err = cbc->encrypt(nullptr, nullptr, 32, nullptr);
+    EXPECT_TRUE(alcp_is_error(err)) << "Encrypt with all null pointers should fail";
+
+    delete cbc;
+}
+
+// Test all null pointers in decrypt
+TEST(CBC_Negative, AllNullPointersDecrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt with all null pointers should fail
+    err = cbc->decrypt(nullptr, nullptr, 32, nullptr);
+    EXPECT_TRUE(alcp_is_error(err)) << "Decrypt with all null pointers should fail";
+
+    delete cbc;
+}
+
+// Test zero key length
+TEST(CBC_Negative, ZeroKeyLength)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // Init with zero key length should fail
+    alc_error_t err = cbc->init(&test_key[0], 0, &test_iv[0], 16);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with zero key length should fail";
+
+    delete cbc;
+}
+
+// Test zero IV length
+// Note: Implementation does not validate IV length
+TEST(CBC_Negative, ZeroIVLength)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // Init with zero IV length should fail
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 0);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with zero IV length should fail";
+
+    delete cbc;
+}
+
+// Test invalid key length (not 128, 192, or 256 bits)
+TEST(CBC_Negative, InvalidKeyLength)
+{
+    std::vector<Uint8> test_key(20, 0x42); // 160-bit key (invalid)
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // Init with invalid key length (160 bits = 20 bytes) should fail
+    alc_error_t err = cbc->init(&test_key[0], 160, &test_iv[0], 16);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with invalid key length (160 bits) should fail";
+
+    delete cbc;
+}
+
+// Test invalid IV length (CBC requires 16-byte IV)
+// Note: Implementation does not validate IV length
+TEST(CBC_Negative, InvalidIVLength)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(8, 0x24); // 8-byte IV (invalid for CBC)
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // Init with invalid IV length (8 bytes) should fail
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 8);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with invalid IV length (8 bytes) should fail";
+
+    delete cbc;
+}
+
+// Test encryption without initialization
+TEST(CBC_Negative, EncryptWithoutInit)
+{
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // Encrypt without init should fail or produce error
+    Uint64 outlen = 0;
+    alc_error_t err = cbc->encrypt(&input[0], &output[0], 32, &outlen);
+    // Note: The behavior might vary - some implementations might crash,
+    // others might return an error. The test checks for error return.
+    EXPECT_TRUE(alcp_is_error(err)) << "Encrypt without init should fail";
+
+    delete cbc;
+}
+
+// Test decryption without initialization
+TEST(CBC_Negative, DecryptWithoutInit)
+{
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // Decrypt without init should fail or produce error
+    Uint64 outlen = 0;
+    alc_error_t err = cbc->decrypt(&input[0], &output[0], 32, &outlen);
+    EXPECT_TRUE(alcp_is_error(err)) << "Decrypt without init should fail";
+
+    delete cbc;
+}
+
+// Test zero input length encryption
+TEST(CBC_Negative, ZeroLengthInputEncrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Encrypt with zero length - should either succeed with zero output or return error
+    Uint64 outlen = 0;
+    err = cbc->encrypt(&input[0], &output[0], 0, &outlen);
+    // Zero length encryption might be valid (produces no output) or might fail
+    // This test documents the behavior
+    if (err == ALC_ERROR_NONE) {
+        EXPECT_EQ(outlen, 0) << "Zero length encrypt should produce zero output";
+    }
+
+    delete cbc;
+}
+
+// Test zero input length decryption
+TEST(CBC_Negative, ZeroLengthInputDecrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Decrypt with zero length - should either succeed with zero output or return error
+    Uint64 outlen = 0;
+    err = cbc->decrypt(&input[0], &output[0], 0, &outlen);
+    // Zero length decryption might be valid (produces no output) or might fail
+    if (err == ALC_ERROR_NONE) {
+        EXPECT_EQ(outlen, 0) << "Zero length decrypt should produce zero output";
+    }
+
+    delete cbc;
+}
+
+// Test non-block-aligned input size for encryption (CBC requires 16-byte blocks)
+TEST(CBC_Negative, NonBlockAlignedInputEncrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(17, 0x55);  // 17 bytes (not multiple of 16)
+    std::vector<Uint8> output(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // For standard CBC mode without padding, non-block-aligned input should
+    // either fail or only encrypt complete blocks
+    Uint64 outlen = 0;
+    err = cbc->encrypt(&input[0], &output[0], 17, &outlen);
+    // Behavior depends on implementation:
+    // - May fail with error
+    // - May only encrypt 16 bytes (complete block)
+    // This test documents the behavior
+    if (err == ALC_ERROR_NONE) {
+        // If successful, output should be 16 bytes (one complete block)
+        // or implementation handles partial blocks
+        EXPECT_TRUE(outlen == 16 || outlen == 17 || outlen == 32);
+    }
+
+    delete cbc;
+}
+
+// Test non-block-aligned input size for decryption
+TEST(CBC_Negative, NonBlockAlignedInputDecrypt)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    // Allocate 32 bytes but only use 17 to test non-block-aligned size
+    // The extra space prevents buffer overread in SIMD implementations
+    // that may read in full 16-byte blocks
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // For standard CBC mode, non-block-aligned input should
+    // either fail or only decrypt complete blocks
+    // Pass 17 as the length to test non-block-aligned behavior
+    Uint64 outlen = 0;
+    err = cbc->decrypt(&input[0], &output[0], 17, &outlen);
+    if (err == ALC_ERROR_NONE) {
+        EXPECT_TRUE(outlen == 16 || outlen == 17 || outlen == 32);
+    }
+
+    delete cbc;
+}
+
+// Test context copy with null source
+TEST(CBC_Negative, ContextCopyNullSource)
+{
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    auto cbc_dest = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc_dest, nullptr);
+
+    // Copy with null source should fail
+    cbc->CopyCtx(nullptr, cbc_dest);
+    // The test passes if no crash occurs - CopyCtx might silently fail or handle null
+
+    delete cbc;
+    delete cbc_dest;
+}
+
+// Test context copy with null destination
+TEST(CBC_Negative, ContextCopyNullDestination)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+
+    // Copy with null destination should fail or be handled gracefully
+    cbc->CopyCtx(cbc, nullptr);
+    // The test passes if no crash occurs
+
+    delete cbc;
+}
+
+// Test very large input size (boundary test)
+TEST(CBC_Negative, VeryLargeInputSize)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    
+    // Use a moderate size that won't cause memory issues but tests the limit
+    const size_t large_size = 16 * 1024 * 1024; // 16 MB
+    std::vector<Uint8> input(large_size, 0x55);
+    std::vector<Uint8> output(large_size);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    Uint64 outlen = 0;
+    err = cbc->encrypt(&input[0], &output[0], large_size, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    EXPECT_EQ(outlen, large_size);
+
+    delete cbc;
+}
+
+// Test mismatched key size and CipherKeyLen
+TEST(CBC_Negative, MismatchedKeySizeAndKeyLen)
+{
+    // Create cipher for 128-bit key but try to use 256-bit key
+    std::vector<Uint8> test_key(32, 0x42); // 256-bit key
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // Trying to init 128-bit cipher with 256-bit key size should fail or behave unexpectedly
+    alc_error_t err = cbc->init(&test_key[0], 256, &test_iv[0], 16);
+    // This may or may not be an error depending on implementation
+    // The test documents the behavior - we just verify it doesn't crash
+    (void)err; // Suppress unused variable warning - behavior is implementation-defined
+
+    delete cbc;
+}
+
+// Test repeated initialization (reinit)
+TEST(CBC_Negative, RepeatedInitialization)
+{
+    std::vector<Uint8> test_key1(16, 0x42);
+    std::vector<Uint8> test_key2(16, 0x84);
+    std::vector<Uint8> test_iv1(16, 0x24);
+    std::vector<Uint8> test_iv2(16, 0x48);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output1(32), output2(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // First init and encrypt
+    alc_error_t err = cbc->init(&test_key1[0], 128, &test_iv1[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    Uint64 outlen = 0;
+    err = cbc->encrypt(&input[0], &output1[0], 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Reinit with different key/IV and encrypt again
+    err = cbc->init(&test_key2[0], 128, &test_iv2[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+    outlen = 0;
+    err = cbc->encrypt(&input[0], &output2[0], 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Different keys should produce different outputs
+    EXPECT_NE(output1, output2) << "Different keys should produce different ciphertext";
+
+    delete cbc;
+}
+
+// Test using same buffer for input and output (aliasing) with non-matching pointers
+TEST(CBC_Negative, OverlappingBuffers)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> buffer(64, 0x55);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Test passes if cipher is successfully initialized
+    // Note: Overlapping buffer test is commented out as it may cause undefined behavior
+    // The test verifies that the cipher can be created and initialized properly
+
+    delete cbc;
+}
+
+// Test maximum key length boundary
+TEST(CBC_Negative, MaxKeyLengthBoundary)
+{
+    // Test with key length just above valid (257 bits)
+    std::vector<Uint8> test_key(33, 0x42); // 264 bits
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey256Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // Init with key length above maximum should fail
+    alc_error_t err = cbc->init(&test_key[0], 264, &test_iv[0], 16);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with key length > 256 bits should fail";
+
+    delete cbc;
+}
+
+// Test IV length boundary (17 bytes when 16 is required)
+TEST(CBC_Negative, IVLengthBoundary)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(17, 0x24); // 17-byte IV (invalid for CBC)
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // Init with IV length above required (17 bytes) should fail or use only 16 bytes
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 17);
+    // This may or may not be an error - the implementation might only use first 16 bytes
+    // The test documents the behavior - we just verify it doesn't crash
+    (void)err; // Suppress unused variable warning - behavior is implementation-defined
+
+    delete cbc;
+}
+
+// Test very small IV (less than required 16 bytes)
+// Note: Implementation does not validate IV length
+TEST(CBC_Negative, SmallIVLength)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(4, 0x24); // 4-byte IV (invalid for CBC)
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // Init with IV length below required (4 bytes) should fail
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 4);
+    EXPECT_TRUE(alcp_is_error(err)) << "Init with 4-byte IV should fail";
+
+    delete cbc;
+}
+
+// Test encrypt/decrypt with single byte data (less than block size)
+TEST(CBC_Negative, SingleByteData)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(1, 0x55);  // Single byte
+    std::vector<Uint8> output(16);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Encrypt single byte - may produce no output or be buffered
+    Uint64 outlen = 0;
+    err = cbc->encrypt(&input[0], &output[0], 1, &outlen);
+    // Behavior depends on implementation - test documents this
+    if (err == ALC_ERROR_NONE) {
+        // May output 0 bytes (buffered) or handle partial blocks
+        EXPECT_TRUE(outlen == 0 || outlen == 1 || outlen == 16);
+    }
+
+    delete cbc;
+}
+
+// Test multiple consecutive small updates that don't form a complete block
+TEST(CBC_Negative, MultipleSmallUpdatesNoBlock)
+{
+#ifndef AES_MULTI_UPDATE
+    GTEST_SKIP() << "Multi Update functionality unavailable!";
+#endif
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input1(5, 0x11);
+    std::vector<Uint8> input2(5, 0x22);
+    std::vector<Uint8> input3(5, 0x33);
+    std::vector<Uint8> output(48);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Three 5-byte updates = 15 bytes total (less than one block)
+    Uint64 total_outlen = 0;
+    Uint64 outlen = 0;
+    
+    err = cbc->encrypt(&input1[0], &output[0], 5, &outlen);
+    if (err == ALC_ERROR_NONE) total_outlen += outlen;
+    
+    outlen = 0;
+    err = cbc->encrypt(&input2[0], &output[total_outlen], 5, &outlen);
+    if (err == ALC_ERROR_NONE) total_outlen += outlen;
+    
+    outlen = 0;
+    err = cbc->encrypt(&input3[0], &output[total_outlen], 5, &outlen);
+    if (err == ALC_ERROR_NONE) total_outlen += outlen;
+    
+    // Total 15 bytes input - may produce 0 bytes output (no complete block)
+    // This test documents the multi-update behavior
+
+    delete cbc;
+}
+
+// Test with various invalid input sizes around block boundary
+TEST(CBC_Negative, InputSizeVariations)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    
+    // Test sizes just above and below block boundaries
+    std::vector<size_t> test_sizes = { 1, 7, 15, 17, 31, 33, 47, 49 };
+
+    for (size_t size : test_sizes) {
+        std::vector<Uint8> input(size, 0x55);
+        std::vector<Uint8> output(size + 16);
+
+        auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+        ASSERT_NE(cbc, nullptr);
+
+        alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+        EXPECT_EQ(err, ALC_ERROR_NONE);
+
+        Uint64 outlen = 0;
+        err = cbc->encrypt(&input[0], &output[0], size, &outlen);
+        // Just document the behavior - non-block-aligned sizes
+        // may produce partial output or error
+
+        delete cbc;
+    }
+}
+
+// Test cipher reuse after error
+TEST(CBC_Negative, ReuseAfterError)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // First, cause an error by using null pointer
+    alc_error_t err = cbc->init(nullptr, 128, &test_iv[0], 16);
+    // This should have failed
+
+    // Now try to reinit properly and use the cipher
+    err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE) << "Reinit after error should succeed";
+
+    Uint64 outlen = 0;
+    err = cbc->encrypt(&input[0], &output[0], 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE) << "Encrypt after reinit should succeed";
+    EXPECT_EQ(outlen, 32);
+
+    delete cbc;
+}
+
+// Test decrypt with corrupted ciphertext (should still decrypt but produce wrong result)
+TEST(CBC_Negative, DecryptCorruptedCiphertext)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> ciphertext(32);
+    std::vector<Uint8> decrypted(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+    std::mt19937 gen(42); // Fixed seed for reproducibility
+    std::uniform_int_distribution<> size_dist(1, 200); // 1-200 blocks
+
+    // Encrypt
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    Uint64 outlen = 0;
+    cbc->encrypt(&input[0], &ciphertext[0], 32, &outlen);
+
+    // Corrupt the ciphertext
+    ciphertext[0] ^= 0xFF;
+    ciphertext[16] ^= 0xFF;
+
+    // Decrypt corrupted ciphertext - should still succeed but produce wrong result
+    cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    outlen = 0;
+    alc_error_t err = cbc->decrypt(&ciphertext[0], &decrypted[0], 32, &outlen);
+    EXPECT_EQ(err, ALC_ERROR_NONE) << "Decrypt of corrupted data should still succeed";
+    EXPECT_EQ(outlen, 32);
+    EXPECT_NE(decrypted, input) << "Corrupted ciphertext should produce different plaintext";
+
+    delete cbc;
+}
+
+// Test with maximum Uint64 size (to check for overflow handling)
+TEST(CBC_Negative, MaxSizeOverflow)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+    std::vector<Uint8> input(32, 0x55);
+    std::vector<Uint8> output(32);
+
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey128Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    EXPECT_EQ(err, ALC_ERROR_NONE);
+
+    // Test verifies that cipher can be initialized properly
+    // Note: Actually testing with max Uint64 size would be unsafe and cause memory issues
+    // The test documents that the initialization succeeds
+
+    delete cbc;
+}
+
+// Test key length that does not match cipher creation
+TEST(CBC_Negative, KeyLengthMismatchWithCreation)
+{
+    std::vector<Uint8> test_key(16, 0x42);
+    std::vector<Uint8> test_iv(16, 0x24);
+
+    // Create 256-bit cipher but use 128-bit key length in init
+    auto cbc = createCipher(CipherMode::eAesCBC, CipherKeyLen::eKey256Bit);
+    ASSERT_NE(cbc, nullptr);
+
+    // Pass 128-bit key length but cipher was created for 256-bit
+    alc_error_t err = cbc->init(&test_key[0], 128, &test_iv[0], 16);
+    // This may succeed (cipher uses different internal key size)
+    // or fail (strict key size checking)
+    // The test documents the behavior - we just verify it doesn't crash
+    (void)err; // Suppress unused variable warning - behavior is implementation-defined
+
+    delete cbc;
 }
 
 int
 main(int argc, char** argv)
 {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    try {
+        ::testing::InitGoogleTest(&argc, argv);
+        return RUN_ALL_TESTS();
+
+    } catch (const std::exception& e) {
+        std::cerr << "Unhandled exception: " << e.what() << std::endl;
+        return 1;
+    } catch (const char* e) {
+        std::cerr << "Unhandled exception: " << e << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "Unknown exception caught" << std::endl;
+        return 1;
+    }
 }

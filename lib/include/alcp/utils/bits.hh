@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,7 +33,45 @@
 
 #include <type_traits>
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
+
 namespace alcp::utils {
+
+/**
+ * @brief Count trailing zeros in a 64-bit value
+ * @param value The value to count trailing zeros in (must be non-zero)
+ * @return Number of trailing zero bits (0-63)
+ */
+static inline int
+CountTrailingZeros64(Uint64 value)
+{
+#ifdef _MSC_VER
+    unsigned long index;
+    _BitScanForward64(&index, value);
+    return static_cast<int>(index);
+#else
+    return __builtin_ctzll(value);
+#endif
+}
+
+/**
+ * @brief Count leading zeros in a 64-bit value
+ * @param value The value to count leading zeros in (must be non-zero)
+ * @return Number of leading zero bits (0-63)
+ */
+static inline int
+CountLeadingZeros64(Uint64 value)
+{
+#ifdef _MSC_VER
+    unsigned long index;
+    _BitScanReverse64(&index, value);
+    return static_cast<int>(63 - index);
+#else
+    return __builtin_clzll(value);
+#endif
+}
 
 static inline Uint32
 RotateRight(Uint32 value, Uint32 count)

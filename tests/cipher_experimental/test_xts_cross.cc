@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -346,12 +346,13 @@ using namespace alcp::testing::cipher::xts;
 using alcp::testing::cipher::LibrarySelect;
 using alcp::testing::utils::ArgsMap;
 using alcp::testing::utils::ParamType;
-using alcp::testing::utils::parseArgs;
+using alcp::testing::utils::parseTestArgs;
 
 #if 1
 int
 main(int argc, char** argv)
 {
+    ArgsMap argsMap = parseTestArgs(&argc, argv);
     ::testing::InitGoogleTest(&argc, argv);
 
     std::shared_ptr<alcp::testing::RngBase> rng =
@@ -361,7 +362,6 @@ main(int argc, char** argv)
 
     rng->setSeedMt19937(16663322004200655032ULL);
 
-    ArgsMap argsMap = parseArgs(argc, argv);
     assert(argsMap["USE_OSSL"].paramType == ParamType::TYPE_BOOL);
     assert(argsMap["USE_IPP"].paramType == ParamType::TYPE_BOOL);
     assert(argsMap["OVERRIDE_ALCP"].paramType == ParamType::TYPE_BOOL);

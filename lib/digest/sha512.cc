@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -44,6 +44,8 @@
 
 namespace utils = alcp::utils;
 
+using alcp::utils::AlgorithmType;
+using alcp::utils::CpuArchLevel;
 using alcp::utils::CpuId;
 
 namespace alcp::digest {
@@ -165,25 +167,26 @@ template<alc_digest_len_t digest_len>
 alc_error_t
 Sha2_512<digest_len>::processChunk(const Uint8* pSrc, Uint64 len)
 {
-    static bool has_Avx512 =
-        CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_DQ)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW);
+    static CpuArchLevel archLevel =
+        CpuId::getCachedArchLevel(AlgorithmType::eSha2_512);
 
     /* we need len to be multiple of cChunkSize */
     assert((len & cChunkSizeMask) == 0);
 
-    if (has_Avx512) {
+    switch (archLevel) {
+        case CpuArchLevel::eZen4:
 #ifdef COMPILER_IS_CLANG
-        // For AOCC zen3 kernel performs better than zen4
-        return zen3::ShaUpdate512(m_hash, pSrc, len);
+            // For AOCC zen3 kernel performs better than zen4
+            return zen3::ShaUpdate512(m_hash, pSrc, len);
 #else
-        return zen4::ShaUpdate512(m_hash, pSrc, len);
+            return zen4::ShaUpdate512(m_hash, pSrc, len);
 #endif
-    } else if (CpuId::cpuHasAvx2()) {
-        return zen3::ShaUpdate512(m_hash, pSrc, len);
-    } else if (CpuId::cpuHasSse3()) {
-        return avx2::ShaUpdate512(m_hash, pSrc, len);
+        case CpuArchLevel::eZen3:
+            return zen3::ShaUpdate512(m_hash, pSrc, len);
+        case CpuArchLevel::eZen:
+            return avx2::ShaUpdate512(m_hash, pSrc, len);
+        default:
+            break;
     }
     // Else fall to reference implementation.
 

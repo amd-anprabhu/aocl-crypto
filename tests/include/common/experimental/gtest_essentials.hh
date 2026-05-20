@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -25,6 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#pragma once
+
 #include <iostream>
 #include <map>
 #include <memory>
@@ -32,9 +34,11 @@
 #include <variant>
 #include <vector>
 
+#include "parse_args.hh"
+
 namespace alcp::testing::utils {
 
-int block_size = 0;
+inline int block_size = 0;
 
 enum class ParamType
 {
@@ -60,15 +64,8 @@ struct Param
 using ArgsMap = std::map<std::string, Param>;
 
 ArgsMap
-parseArgs(int argc, char** argv)
+parseTestArgs(int* argc, char** argv)
 {
-    std::string currentArg;
-    std::string temp;
-
-#if 0
-    std::vector<std::string> verbosity_levels = { "0", "1", "2" };
-#endif
-
     ArgsMap argsMap;
 
     argsMap["USE_IPP"].paramType       = ParamType::TYPE_BOOL;
@@ -76,51 +73,22 @@ parseArgs(int argc, char** argv)
     argsMap["USE_ALCP"].paramType      = ParamType::TYPE_BOOL;
     argsMap["OVERRIDE_ALCP"].paramType = ParamType::TYPE_BOOL;
 
-    if (argc > 1) {
-        for (int i = 1; i < argc; i++) {
-            /* read current arg */
-            currentArg = std::string(argv[i]);
-            /* check if help option entered */
-            if ((currentArg == std::string("--help"))
-                || (currentArg == std::string("-h"))) {
-                std::cout << std::endl
-                          << "Additional help for microtests" << std::endl;
-                std::cout << "--verbose or -v <space>  <verbosity level(0/1/2)>"
-                          << std::endl;
-                std::cout << "--use-ipp or -i force IPP use in testing."
-                          << std::endl;
-                std::cout << "--use-ossl or -o force OpenSSL use in testing"
-                          << std::endl;
-                std::cout << "-b <custom block size" << std::endl;
-                exit(-1);
-            } else if ((currentArg == std::string("--blocksize"))
-                       || (currentArg == std::string("-b"))) {
-                /* now extract the verbose level integer */
-                if (((currentArg.find(std::string("--blocksize"))
-                      != currentArg.npos)
-                     || (currentArg.find(std::string("-b")) != currentArg.npos))
-                    && (i + 1 < argc)) {
-                    std::string nextArg = std::string(argv[i + 1]);
-                    // Skip the next iteration
-                    i++;
-                    alcp::testing::utils::block_size = std::stoi(nextArg);
-                }
-            } else if ((currentArg == std::string("--use-ipp"))
-                       || (currentArg == std::string("-i"))) {
+    alcp::bench::args::ParsedArgs parsed;
+    alcp::bench::args::strip_custom_args(argc, argv, parsed);
 
-                argsMap["USE_IPP"].value = true;
-            } else if ((currentArg == std::string("--use-ossl"))
-                       || (currentArg == std::string("-o"))) {
-                argsMap["USE_OSSL"].value = true;
-            } else if ((currentArg == std::string("--use-alcp"))
-                       || (currentArg == std::string("-a"))) {
-                argsMap["USE_ALCP"].value = true;
-            } else if ((currentArg == std::string("--override-alcp"))
-                       || (currentArg == std::string("-oa"))) {
-                argsMap["OVERRIDE_ALCP"].value = true;
-            }
-        }
+    argsMap["USE_IPP"].value       = parsed.use_ipp;
+    argsMap["USE_OSSL"].value      = parsed.use_ossl;
+    argsMap["USE_ALCP"].value      = parsed.use_alcp;
+    argsMap["OVERRIDE_ALCP"].value = parsed.override_alcp;
+
+    if (parsed.block_size != 0) {
+        block_size = parsed.block_size;
     }
+
+    if (parsed.help_requested) {
+        alcp::bench::args::print_test_help();
+    }
+
     return argsMap;
 }
 

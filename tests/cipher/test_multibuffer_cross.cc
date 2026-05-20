@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2025-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -40,9 +40,15 @@
 #endif
 #include "alcp/alcp.h"
 #include "rng_base.hh"
+#include <exception>
+#include <iostream>
 
-using alcp::cipher::CipherFactory;
+// Factory removed
+using alcp::cipher::CipherKeyLen;
+using alcp::cipher::CipherMode;
+using alcp::cipher::createCipher;
 using alcp::cipher::iCipher;
+using alcp::utils::CpuId;
 
 // Parameter structure for parameterized tests
 struct MultibufferTestParams
@@ -141,6 +147,7 @@ class AESMultibufferTest
             mode = ALC_AES_MODE_CFB;
         } else {
             free(handle.ch_context);
+            handle.ch_context = nullptr;
             return expected; // Unsupported mode
         }
 
@@ -148,6 +155,7 @@ class AESMultibufferTest
         err = alcp_cipher_request(mode, key.size() * 8, &handle);
         if (alcp_is_error(err)) {
             free(handle.ch_context);
+            handle.ch_context = nullptr;
             return expected;
         }
 
@@ -157,6 +165,7 @@ class AESMultibufferTest
         if (alcp_is_error(err)) {
             alcp_cipher_finish(&handle);
             free(handle.ch_context);
+            handle.ch_context = nullptr;
             return expected;
         }
 
@@ -171,6 +180,7 @@ class AESMultibufferTest
         if (alcp_is_error(err)) {
             alcp_cipher_finish(&handle);
             free(handle.ch_context);
+            handle.ch_context = nullptr;
             expected.clear(); // Clear on error
             expected.resize(
                 plaintext.size()); // Resize back to original size with zeros
@@ -180,6 +190,7 @@ class AESMultibufferTest
         // Cleanup
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
+        handle.ch_context = nullptr;
 
         return expected;
     }
@@ -207,12 +218,14 @@ TEST_P(AESMultibufferTest, MultibufferEncrypt)
     const int          num_buffers = params.num_buffers;
     const int          block_size  = params.block_size;
 
-    // Check if AVX512 is supported
+    // Check if either AVX512 or AESNI is supported for multi-buffer operations
     bool avx512_supported =
         CpuId::cpuHasAvx512(alcp::utils::Avx512Flags::AVX512_F);
+    bool aesni_supported = CpuId::cpuHasAesni();
 
-    if (!avx512_supported) {
-        GTEST_SKIP() << "AVX512 not supported on this machine";
+    // Skip only if neither AVX512 nor AESNI is available
+    if (!avx512_supported && !aesni_supported) {
+        GTEST_SKIP() << "Neither AVX512 nor AESNI supported on this machine";
     }
 
     // Generate the key once for this test
@@ -261,6 +274,7 @@ TEST_P(AESMultibufferTest, MultibufferEncrypt)
         mode = ALC_AES_MODE_CFB;
     } else {
         free(handle.ch_context);
+        handle.ch_context = nullptr;
         GTEST_SKIP() << "Unsupported cipher mode for multibuffer: "
                      << cipher_type;
     }
@@ -269,6 +283,7 @@ TEST_P(AESMultibufferTest, MultibufferEncrypt)
     err = alcp_cipher_request(mode, key.size() * 8, &handle);
     if (alcp_is_error(err)) {
         free(handle.ch_context);
+        handle.ch_context = nullptr;
         ASSERT_FALSE(alcp_is_error(err)) << "Failed to request cipher context";
     }
 
@@ -277,6 +292,7 @@ TEST_P(AESMultibufferTest, MultibufferEncrypt)
         &handle, key.data(), key.size() * 8, ivs[0].data(), 16);
     if (alcp_is_error(err)) {
         free(handle.ch_context);
+        handle.ch_context = nullptr;
         ASSERT_FALSE(alcp_is_error(err)) << "Failed to initialize cipher";
     }
 
@@ -287,44 +303,55 @@ TEST_P(AESMultibufferTest, MultibufferEncrypt)
         printf("Unsupported on non-avx512 architectures\n");
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
+        handle.ch_context = nullptr;
         GTEST_SKIP() << "Multibuffer not supported on this architecture";
     } else if (alcp_is_error(err)) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
+        handle.ch_context = nullptr;
         ASSERT_FALSE(alcp_is_error(err))
             << "multibufferInit failed for " << num_buffers << " buffers";
     }
 
+    // Create lengths array for uniform-length buffers
+    std::vector<Uint64> lengths(num_buffers, block_size);
+
     // Flush input data
-    err = alcp_flush(&handle, input_pointers.data(), num_buffers, block_size);
+    err =
+        alcp_flush(&handle, input_pointers.data(), lengths.data(), num_buffers);
     if (err == ALC_ERROR_NOT_SUPPORTED) {
         printf("Unsupported on non-avx512 architectures\n");
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
+        handle.ch_context = nullptr;
         GTEST_SKIP() << "Flush operation not supported on this architecture";
     } else if (alcp_is_error(err)) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
+        handle.ch_context = nullptr;
         ASSERT_FALSE(alcp_is_error(err))
             << "flush failed for " << num_buffers << " buffers";
     }
 
     // Dequeue output data
-    err =
-        alcp_dequeue(&handle, output_pointers.data(), num_buffers, block_size);
+    err = alcp_dequeue(
+        &handle, output_pointers.data(), num_buffers, lengths.data());
     if (err == ALC_ERROR_NO_FALLBACK) {
         printf("Unsupported on non-avx512 architectures\n");
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
+        handle.ch_context = nullptr;
         GTEST_SKIP() << "Dequeue operation not supported on this architecture";
     } else if (err == ALC_ERROR_NOT_SUPPORTED) {
         printf("Unsupported AES mode\n");
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
+        handle.ch_context = nullptr;
         GTEST_SKIP() << "Dequeue operation not supported for this mode";
     } else if (alcp_is_error(err)) {
         alcp_cipher_finish(&handle);
         free(handle.ch_context);
+        handle.ch_context = nullptr;
         ASSERT_FALSE(alcp_is_error(err))
             << "dequeue failed for " << num_buffers << " buffers";
     }
@@ -340,6 +367,7 @@ TEST_P(AESMultibufferTest, MultibufferEncrypt)
     // Cleanup
     alcp_cipher_finish(&handle);
     free(handle.ch_context);
+    handle.ch_context = nullptr;
 }
 
 // Helper function to generate test parameters
@@ -413,6 +441,18 @@ INSTANTIATE_TEST_SUITE_P(
 int
 main(int argc, char** argv)
 {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    try {
+        ::testing::InitGoogleTest(&argc, argv);
+        return RUN_ALL_TESTS();
+
+    } catch (const std::exception& e) {
+        std::cerr << "Unhandled exception: " << e.what() << std::endl;
+        return 1;
+    } catch (const char* e) {
+        std::cerr << "Unhandled exception: " << e << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "Unknown exception caught" << std::endl;
+        return 1;
+    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -165,10 +165,10 @@ namespace framework {
 
         void writeBytes(const std::vector<Uint8>& in)
         {
-            if (!write_mode) {
+            if (!write_mode || in.empty()) {
                 return;
             }
-            oFile->write(reinterpret_cast<const char*>(&in.at(0)), in.size());
+            oFile->write(reinterpret_cast<const char*>(in.data()), in.size());
             oFile->flush();
         }
         ~File()
@@ -275,9 +275,40 @@ namespace framework {
 } // namespace framework
 
 namespace crypto {
-    using alcp::cipher::CipherFactory;
-    using alcp::cipher::iCipher;
+    using namespace alcp::cipher;
     using framework::getPtr;
+
+    // Helper function to parse mode string and create cipher
+    static iCipher* createCipherFromString(const std::string& mode) {
+        // Parse mode string like "aes-cbc-128", "aes-cfb-256", etc.
+        CipherMode cipherMode = CipherMode::eCipherModeNone;
+        CipherKeyLen keyLen = CipherKeyLen::eKey128Bit;
+
+        if (mode.find("cbc") != std::string::npos) {
+            cipherMode = CipherMode::eAesCBC;
+        } else if (mode.find("cfb") != std::string::npos) {
+            cipherMode = CipherMode::eAesCFB;
+        } else if (mode.find("ctr") != std::string::npos) {
+            cipherMode = CipherMode::eAesCTR;
+        } else if (mode.find("ofb") != std::string::npos) {
+            cipherMode = CipherMode::eAesOFB;
+        } else if (mode.find("xts") != std::string::npos) {
+            cipherMode = CipherMode::eAesXTS;
+        } else {
+            return nullptr;
+        }
+
+        if (mode.find("128") != std::string::npos) {
+            keyLen = CipherKeyLen::eKey128Bit;
+        } else if (mode.find("192") != std::string::npos) {
+            keyLen = CipherKeyLen::eKey192Bit;
+        } else if (mode.find("256") != std::string::npos) {
+            keyLen = CipherKeyLen::eKey256Bit;
+        }
+
+        return createCipher(cipherMode, keyLen);
+    }
+
     class ICrypt
     {
       public:
@@ -313,34 +344,34 @@ namespace crypto {
             std::vector<Uint8> out(in.size());
             alc_error_t        err;
 
-            auto alcpCipher = new CipherFactory<iCipher>;
-            auto aead       = alcpCipher->create(mode);
+            auto cipher = createCipherFromString(mode);
 
-            if (aead == nullptr) {
-                assert(aead != nullptr); // To be caught in debugging
-                delete alcpCipher;
+            if (cipher == nullptr) {
+                std::cerr << "Error: Failed to create cipher for mode: " << mode
+                          << " (CPU features not supported?)" << std::endl;
+                assert(cipher != nullptr); // To be caught in debugging
                 return std::vector<Uint8>(0);
             }
 
             err =
-                aead->init(getPtr(key), key.size() * 8, getPtr(iv), iv.size());
+                cipher->init(getPtr(key), key.size() * 8, getPtr(iv), iv.size());
             if (err != ALC_ERROR_NONE) {
-                printf("Error: Unable to Init \n");
-                delete alcpCipher;
+                std::cerr << "Error: Unable to initialize cipher" << std::endl;
+                delete cipher;
                 return std::vector<Uint8>(0);
             }
 
             Uint64 outlen = 0;
-            err = aead->encrypt(getPtr(in), getPtr(out), in.size(), &outlen);
+            err = cipher->encrypt(getPtr(in), getPtr(out), in.size(), &outlen);
             if (err != ALC_ERROR_NONE) {
-                printf("Error: Unable to Encrypt \n");
-                delete alcpCipher;
+                std::cerr << "Error: Unable to encrypt" << std::endl;
+                delete cipher;
                 return std::vector<Uint8>(0);
             }
 
-            err = aead->finish(NULL);
+            err = cipher->finish();
 
-            delete alcpCipher;
+            delete cipher;
             return out;
         }
         std::vector<Uint8> decrypt(std::string&              mode,
@@ -354,34 +385,34 @@ namespace crypto {
             std::vector<Uint8> out(in.size());
 
             alc_error_t err;
-            auto        alcpCipher = new CipherFactory<iCipher>;
-            auto        aead       = alcpCipher->create(mode);
+            auto        cipher = createCipherFromString(mode);
 
-            if (aead == nullptr) {
-                assert(aead != nullptr); // To be caught in debugging
-                delete alcpCipher;
+            if (cipher == nullptr) {
+                std::cerr << "Error: Failed to create cipher for mode: " << mode
+                          << " (CPU features not supported?)" << std::endl;
+                assert(cipher != nullptr); // To be caught in debugging
                 return std::vector<Uint8>(0);
             }
 
             err =
-                aead->init(getPtr(key), key.size() * 8, getPtr(iv), iv.size());
+                cipher->init(getPtr(key), key.size() * 8, getPtr(iv), iv.size());
             if (err != ALC_ERROR_NONE) {
-                printf("Error: Unable to Init \n");
-                delete alcpCipher;
+                std::cerr << "Error: Unable to initialize cipher" << std::endl;
+                delete cipher;
                 return std::vector<Uint8>(0);
             }
 
             Uint64 outlen = 0;
-            err = aead->decrypt(getPtr(in), getPtr(out), in.size(), &outlen);
+            err = cipher->decrypt(getPtr(in), getPtr(out), in.size(), &outlen);
             if (err != ALC_ERROR_NONE) {
-                printf("Error: Unable to Encrypt \n");
-                delete alcpCipher;
+                std::cerr << "Error: Unable to decrypt" << std::endl;
+                delete cipher;
                 return std::vector<Uint8>(0);
             }
 
-            err = aead->finish(NULL);
+            err = cipher->finish();
 
-            delete alcpCipher;
+            delete cipher;
             return out;
         }
         ~Crypt() { std::cout << "Crypt Destructor" << std::endl; }
@@ -532,6 +563,12 @@ main(int argc, char const* argv[])
     if (isDecrypt) {
         Decryptor d(std::make_unique<Crypt>());
         data = d.decrypt(algorithm, data, key, iv);
+    }
+
+    if (data.empty()) {
+        std::cerr << "Error: Encryption/Decryption failed, no output produced"
+                  << std::endl;
+        return -1;
     }
 
     fo.writeBytes(data);

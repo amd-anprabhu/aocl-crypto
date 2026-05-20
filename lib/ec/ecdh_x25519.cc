@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -37,6 +37,8 @@
 
 namespace alcp::ec {
 
+using alcp::utils::AlgorithmType;
+using alcp::utils::CpuArchLevel;
 using alcp::utils::CpuId;
 static constexpr Uint32 KeySize = 32;
 
@@ -59,17 +61,12 @@ Status
 X25519::generatePublicKey(Uint8* pPublicKey, const Uint8* pPrivKey)
 {
 
-    static bool has_adx  = CpuId::cpuHasAdx();
-    static bool has_bmi2 = CpuId::cpuHasBmi2();
-
-    if (!has_adx) {
+    // Check if required instruction sets are available (needs Zen baseline: ADX, AVX2, BMI2)
+    static CpuArchLevel archLevel =
+        CpuId::getCachedArchLevel(AlgorithmType::eX25519);
+    if (archLevel < CpuArchLevel::eZen) {
         return status::NotAvailable(
-            "Not supported due to missing instruction set");
-    }
-
-    if (!has_bmi2) {
-        return status::NotAvailable(
-            "Not supported due to missing instruction set");
+            "Not supported due to missing instruction set (ADX or BMI2)");
     }
 
     // store private key for secret key generation
@@ -112,16 +109,17 @@ X25519::generatePublicKey(Uint8* pPublicKey, const Uint8* pPrivKey)
 
     priv_key_radix32[51] = carry;
 
-    static bool zen2_available = CpuId::cpuIsZen2();
-    static bool zen3_available = CpuId::cpuIsZen3() || CpuId::cpuIsZen4()
-                                 || CpuId::cpuIsZen5();
-
-    if (zen3_available) {
-        zen3::AlcpScalarPubX25519(priv_key_radix32, pPublicKey);
-    } else if (zen2_available) {
-        avx2::AlcpScalarPubX25519(priv_key_radix32, pPublicKey);
-    } else {
-        zen::AlcpScalarPubX25519(priv_key_radix32, pPublicKey);
+    switch (archLevel) {
+        case CpuArchLevel::eZen3:
+        case CpuArchLevel::eZen4:
+            zen3::AlcpScalarPubX25519(priv_key_radix32, pPublicKey);
+            break;
+        case CpuArchLevel::eZen:
+            avx2::AlcpScalarPubX25519(priv_key_radix32, pPublicKey);
+            break;
+        default:
+            zen::AlcpScalarPubX25519(priv_key_radix32, pPublicKey);
+            break;
     }
 
     return StatusOk();
@@ -133,31 +131,30 @@ X25519::computeSecretKey(Uint8*       pSecretKey,
                          Uint64*      pKeyLength)
 {
 
-    static bool has_adx  = CpuId::cpuHasAdx();
-    static bool has_bmi2 = CpuId::cpuHasBmi2();
-
-    if (!has_adx) {
-        return status::NotAvailable("ADX instruction set not supported");
+    // Check if required instruction sets are available (needs Zen baseline: ADX, AVX2, BMI2)
+    static CpuArchLevel archLevel =
+        CpuId::getCachedArchLevel(AlgorithmType::eX25519);
+    if (archLevel < CpuArchLevel::eZen) {
+        return status::NotAvailable(
+            "Not supported due to missing instruction set (ADX or BMI2)");
     }
 
-    if (!has_bmi2) {
-        return status::NotAvailable("MULX instruction set not supported");
-    }
     Status status = validatePublicKey(pPublicKey, KeySize);
     if (!status.ok()) {
         return status;
     }
 
-    static bool zen2_available = CpuId::cpuIsZen2();
-    static bool zen3_available = CpuId::cpuIsZen3() || CpuId::cpuIsZen4()
-                                 || CpuId::cpuIsZen5();
-
-    if (zen3_available) {
-        zen3::alcpScalarMulX25519(pSecretKey, m_PrivKey, pPublicKey);
-    } else if (zen2_available) {
-        avx2::alcpScalarMulX25519(pSecretKey, m_PrivKey, pPublicKey);
-    } else {
-        zen::alcpScalarMulX25519(pSecretKey, m_PrivKey, pPublicKey);
+    switch (archLevel) {
+        case CpuArchLevel::eZen3:
+        case CpuArchLevel::eZen4:
+            zen3::alcpScalarMulX25519(pSecretKey, m_PrivKey, pPublicKey);
+            break;
+        case CpuArchLevel::eZen:
+            avx2::alcpScalarMulX25519(pSecretKey, m_PrivKey, pPublicKey);
+            break;
+        default:
+            zen::alcpScalarMulX25519(pSecretKey, m_PrivKey, pPublicKey);
+            break;
     }
 
     *pKeyLength = KeySize;

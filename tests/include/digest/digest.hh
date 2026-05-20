@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -44,6 +44,10 @@ struct alcp_digest_data_t
         nullptr; /* digest output read from duplicate handle using the squeeze
                     api, only for Shake variants */
     Uint64 m_digest_len = 0;
+
+    const Uint8** m_p_msg    = nullptr;
+    Uint8**       m_p_digest = nullptr;
+    Uint64        m_buffers  = 0;
 };
 
 /* add mapping for SHA mode and length */

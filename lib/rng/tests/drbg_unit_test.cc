@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -50,6 +50,8 @@ using namespace alcp;
 void
 DebugPrintPretty(std::vector<Uint8>& output)
 {
+    std::ios old_state(nullptr);
+    old_state.copyfmt(std::cout);
     std::cout << "{";
     for (size_t i = 0; i < output.size(); i++) {
         std::cout << "0x" << std::hex << std::setfill('0') << std::setw(2)
@@ -62,6 +64,7 @@ DebugPrintPretty(std::vector<Uint8>& output)
         }
     }
     std::cout << "}" << std::endl;
+    std::cout.copyfmt(old_state);
 }
 #else
 void
@@ -389,13 +392,13 @@ TEST(DRBG_Ctr, Generate)
     drbg->randomize(&generated_bytes[0],
                     generated_bytes.size(),
                     100,
-                    &additional_input[0],
+                    additional_input.data(),
                     additional_input.size());
 
     drbg->randomize(&generated_bytes[0],
                     generated_bytes.size(),
                     100,
-                    &additional_input[0],
+                    additional_input.data(),
                     additional_input.size());
 
     ASSERT_EQ(expected_generated_bytes, generated_bytes);

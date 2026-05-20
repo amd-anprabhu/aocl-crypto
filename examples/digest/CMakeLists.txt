@@ -24,7 +24,9 @@
  # POSSIBILITY OF SUCH DAMAGE.
  
 ADD_EXAMPLE(sha2_256_example.c)
+ADD_EXAMPLE(sha2_256_multibuffer.c)
 ADD_EXAMPLE(sha2_224_example.c)
+ADD_EXAMPLE(sha2_224_multibuffer.c)
 ADD_EXAMPLE(sha2_512_example.c)
 ADD_EXAMPLE(sha2_384_example.c)
 ADD_EXAMPLE(sha2_512_224_example.c)

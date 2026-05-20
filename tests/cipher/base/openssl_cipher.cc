@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -369,16 +369,18 @@ OpenSSLCipherBase::context_copy()
 }
 
 bool
-OpenSSLCipherBase::flush(const Uint8** pPlainText, Uint64 numBuffers, Uint64 len)
+OpenSSLCipherBase::flush(const Uint8** pPlainText, const Uint64* pLengths, Uint64 numBuffers)
 {
-    // Default implementation - return success
+    // OpenSSL doesn't support multi-buffer operations
+    // skip implementation without failure- return success
     return true;
 }
 
 bool
-OpenSSLCipherBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, Uint64 len)
+OpenSSLCipherBase::dequeue(Uint8** pCipherText, Uint64 numBuffers, const Uint64* pLengths)
 {
-    // Default implementation - return success
+    // OpenSSL doesn't support multi-buffer operations
+    // skip implementation without failure- return success
     return true;
 }
 
@@ -388,5 +390,5 @@ OpenSSLCipherBase::multibufferInit(const Uint8 * pKey, Uint64 keyLen, const Uint
     // Default implementation - return success
     return true;
 
-} 
+}
 } // namespace alcp::testing

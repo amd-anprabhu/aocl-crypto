@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,62 +28,78 @@
 #pragma once
 
 #include "alcp/cipher.h"
-
-#include <functional>
+#include "alcp/cipher.hh"
 
 namespace alcp::cipher {
 
+/**
+ * @brief Type discriminator for cipher context
+ *
+ * Used to track which interface type is stored in the context,
+ * enabling runtime type safety checks at API boundaries.
+ */
+enum class CipherType : Uint8
+{
+    eNone = 0,       ///< Uninitialized or invalid
+    eCipher,         ///< iCipher* (non-AEAD modes: CBC, CTR, OFB, CFB, XTS, ChaCha20)
+    eCipherAead,     ///< iCipherAead* (AEAD modes: GCM, CCM, SIV, ChaCha20-Poly1305)
+    eCipherSegment   ///< iCipherSegment* (segmented modes: XTS block)
+};
+
+/**
+ * @brief Cipher context structure
+ *
+ * Stores the cipher object pointer along with function pointers for direct calls.
+ * Function pointers take cipher object as first parameter to avoid vtable dispatch.
+ */
 typedef struct Context
 {
-    void* m_cipher         = nullptr;
-    void* m_cipher_factory = nullptr;
+    iCipher*      m_cipher      = nullptr; ///< Cipher pointer
+    iMultibuffer* m_multibuffer = nullptr; ///< Cached multibuffer interface (may be null)
 
-    Uint8 destructed;
+    // Function pointers for direct calls (cipher object passed as first arg)
+    alc_error_t (*encrypt)(void* cipher, const Uint8* pSrc, Uint8* pDst, Uint64 len, Uint64* outLen);
+    alc_error_t (*decrypt)(void* cipher, const Uint8* pSrc, Uint8* pDst, Uint64 len, Uint64* outLen);
+    alc_error_t (*init)(void* cipher, const Uint8* pKey, Uint64 keyLen, const Uint8* pIv, Uint64 ivLen);
+    alc_error_t (*encryptSegment)(void* cipher, const Uint8* pSrc, Uint8* pDst, Uint64 len, Uint64 startBlockNum);
+    alc_error_t (*decryptSegment)(void* cipher, const Uint8* pSrc, Uint8* pDst, Uint64 len, Uint64 startBlockNum);
+    alc_error_t (*setAad)(void* cipher, const Uint8* pAad, Uint64 aadLen);
+    alc_error_t (*getTag)(void* cipher, Uint8* pTag, Uint64 tagLen);
+    alc_error_t (*setTagLength)(void* cipher, Uint64 tagLen);
+    alc_error_t (*setPlainTextLength)(void* cipher, Uint64 plainTextLength);
 
-    // sw methods
-    alc_error_t (*decrypt)(const Uint8* pSrc, Uint8* pDst, Uint64 len);
-
-    alc_error_t (*encrypt)(const Uint8* pSrt, Uint8* pDrc, Uint64 len);
-
-    alc_error_t (*encryptBlocksXts)(const Uint8* pSrt,
-                                    Uint8*       pDrc,
-                                    Uint64       currPlainTextLen,
-                                    Uint64       startBlockNum);
-
-    alc_error_t (*decryptBlocksXts)(const Uint8* pSrt,
-                                    Uint8*       pDrc,
-                                    Uint64       currCipherTextLen,
-                                    Uint64       startBlockNum);
-
-    alc_error_t (*init)(const Uint8* pKey,
-                        Uint64       keyLen,
-                        const Uint8* pIv,
-                        Uint64       ivLen);
-
-    alc_error_t (*setAad)(const Uint8* pAad, Uint64 aadLen);
-
-    alc_error_t (*getTag)(Uint8* pTag, Uint64 tagLen);
-
-    alc_error_t (*setTagLength)(Uint64 tagLen);
-
-    alc_error_t (*setPlainTextLength)(Uint64 plainTextLength);
-
-    alc_error_t (*finish)(const void*);
+    CipherType   m_cipherType = CipherType::eNone;
+    CipherMode   m_cipherMode = CipherMode::eCipherModeNone;
+    CipherKeyLen m_keyLen     = CipherKeyLen::eKey128Bit;
+    Uint8        destructed   = 0;
 
     Context()
-        : destructed{ 0 }
-        , decrypt{ nullptr }
+        : m_cipher{ nullptr }
+        , m_multibuffer{ nullptr }
         , encrypt{ nullptr }
-        , encryptBlocksXts{ nullptr }
-        , decryptBlocksXts{ nullptr }
+        , decrypt{ nullptr }
         , init{ nullptr }
+        , encryptSegment{ nullptr }
+        , decryptSegment{ nullptr }
         , setAad{ nullptr }
         , getTag{ nullptr }
         , setTagLength{ nullptr }
         , setPlainTextLength{ nullptr }
-        , finish{ nullptr } {};
-
+        , destructed{ 0 }
+    {}
     ~Context() { destructed = 1; }
 } alcp_cipher_ctx_t;
+
+/**
+ * @brief Type validation macro for cipher context
+ *
+ * Returns ALC_ERROR_INVALID_ARG if the context type doesn't match expected type.
+ */
+#define ALCP_CHECK_CIPHER_TYPE(ctx, expected_type)                             \
+    do {                                                                       \
+        if ((ctx)->m_cipherType != (expected_type)) {                          \
+            return ALC_ERROR_INVALID_ARG;                                      \
+        }                                                                      \
+    } while (0)
 
 } // namespace alcp::cipher

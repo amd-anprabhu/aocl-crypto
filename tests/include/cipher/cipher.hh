@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -116,12 +116,22 @@ class CipherBase
     virtual bool decrypt(alcp_dc_ex_t& data)                  = 0;
     virtual bool reset()                                      = 0;
     virtual bool context_copy()                               = 0;
-    virtual bool flush(const Uint8** pPlainText,
-                       Uint64        numBuffers,
-                       Uint64        len)                            = 0;
-    virtual bool dequeue(Uint8** pCipherText,
-                         Uint64  numBuffers,
-                         Uint64  len)                          = 0;
+
+    /**
+     * @brief Multi-buffer flush API
+     * Enqueues plaintext buffers with per-buffer lengths for processing
+     */
+    virtual bool flush(const Uint8**  pPlainText,
+                       const Uint64*  pLengths,
+                       Uint64         numBuffers)                    = 0;
+
+    /**
+     * @brief Multi-buffer dequeue API
+     * Retrieves encrypted ciphertext buffers
+     */
+    virtual bool dequeue(Uint8**       pCipherText,
+                         Uint64        numBuffers,
+                         const Uint64* pLengths)                     = 0;
     virtual bool multibufferInit(const Uint8*  pKey,
                                  Uint64        keyLen,
                                  const Uint8** pIv,
@@ -220,26 +230,26 @@ class CipherTesting
                          int           numBuffers);
 
     /**
-     * @brief Processes input buffers for encryption/decryption.
+     * @brief Enqueue input buffers for encryption/decryption.
      *
      * @param inputPointers - Array of pointers to input buffers
+     * @param lengths - Array of per-buffer lengths in bytes
      * @param numBuffers - Number of buffers
-     * @param bufferSize - Size of each buffer in bytes
      * @return true - If flush succeeds
      * @return false - If flush fails
      */
-    bool flush(const Uint8** inputPointers, int numBuffers, int bufferSize);
+    bool flush(const Uint8** inputPointers, const Uint64* lengths, int numBuffers);
 
     /**
-     * @brief Retrieves processed output buffers.
+     * @brief Retrieve processed output buffers.
      *
      * @param outputPointers - Array of pointers to output buffers
      * @param numBuffers - Number of buffers
-     * @param bufferSize - Size of each buffer in bytes
+     * @param lengths - Array of per-buffer lengths in bytes
      * @return true - If dequeue succeeds
      * @return false - If dequeue fails
      */
-    bool dequeue(Uint8** outputPointers, int numBuffers, int bufferSize);
+    bool dequeue(Uint8** outputPointers, int numBuffers, const Uint64* lengths);
 };
 
 } // namespace alcp::testing

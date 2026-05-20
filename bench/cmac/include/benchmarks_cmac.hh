@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -139,7 +139,7 @@ AddBenchmarks_Cmac()
 {
     /* check if custom block size is provided by user */
     if (block_size != 0) {
-        std::cout << "Custom block size selected:" << block_size << std::endl;
+        std::cerr << "Custom block size selected:" << block_size << std::endl;
         cmac_block_sizes.resize(1);
         cmac_block_sizes[0] = block_size;
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2021-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -47,14 +47,15 @@ EXTERN_C_BEGIN
 /**
  * @brief Stores info regarding the type of MAC used
  *
- * @typedef enum alc_mac_type_t
+ * @enum alc_mac_type
  *
  */
-typedef enum _alc_mac_type
+typedef enum alc_mac_type
 {
-    ALC_MAC_HMAC,
-    ALC_MAC_CMAC,
-    ALC_MAC_POLY1305,
+    ALC_MAC_HMAC, /**< HMAC (Hash-based Message Authentication Code) */
+    ALC_MAC_CMAC, /**< CMAC (Cipher-based Message Authentication Code) */
+    ALC_MAC_POLY1305, /**< Poly1305 one-time authenticator */
+    ALC_MB_MAC_HMAC, /**< Multi-buffer HMAC for parallel processing */
 } alc_mac_type_t;
 
 /**
@@ -81,7 +82,8 @@ typedef struct _alc_hmac_info
  * @struct alc_cmac_info_t
  *
  */
-// NOTE: Mode is currently used for validation, only AES-based CMAC is supported.
+// NOTE: Mode is currently used for validation, only AES-based CMAC is
+// supported.
 typedef struct _alc_cmac_info
 {
     alc_cipher_mode_t ci_mode; /*! Cipher mode (ALC_AES_MODE_CBC) */
@@ -120,8 +122,8 @@ typedef struct alc_mac_handle
 } alc_mac_handle_t, *alc_mac_handle_p, AlcMacHandle;
 
 /**
- * @brief       Gets the size of the context for a session described by
- *              pMacInfo
+ * @brief       Gets the size of the MAC context to be allocated before calling
+ *              @ref alcp_mac_request
  *
  * @parblock <br> &nbsp;
  * <b>This API should be called before @ref alcp_mac_request to identify the
@@ -140,12 +142,10 @@ alcp_mac_context_size(void);
  * @endparblock
  * @note     Error needs to be checked after each call,
  *           valid only if @ref alcp_is_error (ret) is false
- * @param  [in]  macType     MAC type to use
  * @param [out]  pMacHandle  Library populated session handle for future
  * mac operations.
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE then, an error has occurred and handle will be invalid
- * for future operations
+ * @param  [in]  macType     MAC type to use
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_mac_request(alc_mac_handle_p pMacHandle, alc_mac_type_t macType);
@@ -162,9 +162,7 @@ alcp_mac_request(alc_mac_handle_p pMacHandle, alc_mac_type_t macType);
  * @param [in]   size Size of key in bytes
  * @param [in]   info MAC info populated based on the selected MAC type
 
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE then, an error has occurred and handle will be invalid
- for future operations
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_mac_init(alc_mac_handle_p pMacHandle,
@@ -184,9 +182,7 @@ alcp_mac_init(alc_mac_handle_p pMacHandle,
  * @param [in]   pMacHandle  Session handle for MAC operation
  * @param [in]   buff       The chunk of the message to be updated
  * @param [in]   size       Length of input buffer in bytes
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE then an error has occurred and handle will be invalid
- * for future operations
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_mac_update(alc_mac_handle_p pMacHandle, const Uint8* buff, Uint64 size);
@@ -202,11 +198,9 @@ alcp_mac_update(alc_mac_handle_p pMacHandle, const Uint8* buff, Uint64 size);
  *                        valid only if @ref alcp_is_error (ret) is false.
  *
  * @param [in]   pMacHandle  Session handle for MAC operation
- * @param [in]   buff        Output buffer for the MAC
+ * @param [out]   buff        Output buffer for the MAC
  * @param [in]   size        MAC size in bytes
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE then an error has occurred and handle will be invalid
- * for future operations
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_mac_finalize(alc_mac_handle_p pMacHandle, Uint8* buff, Uint64 size);
@@ -223,9 +217,7 @@ alcp_mac_finalize(alc_mac_handle_p pMacHandle, Uint8* buff, Uint64 size);
  *                      the handle.
  *
  * @param [in]   pMacHandle Session handle used for the MAC operations
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE then, an error has occurred and handle will be invalid
- * for future operations
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_mac_finish(alc_mac_handle_p pMacHandle);
@@ -238,10 +230,10 @@ alcp_mac_finish(alc_mac_handle_p pMacHandle);
  * <b>This API is called to reset data so should be called after @ref
  * alcp_mac_request  and before @ref alcp_mac_finish</b>
  * @endparblock
+ * @note     Error needs to be checked for each call,
+ *           valid only if @ref alcp_is_error (ret) is false
  * @param [in]   pMacHandle Session handle for MAC operation
- * @return   &nbsp; Error Code for the API called. If alc_error_t
- * is not ALC_ERROR_NONE, an error has occurred and handle will be invalid for
- * future operations
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_mac_reset(alc_mac_handle_p pMacHandle);
@@ -257,11 +249,82 @@ alcp_mac_reset(alc_mac_handle_p pMacHandle);
  * @param [in]   pSrcHandle   source mac handle
  * @param [out]  pDestHandle  destination mac handle
  *
- * @return       alc_error_t Error code to validate the operation
+ * @return   ALC_ERROR_NONE on success.
  */
 ALCP_API_EXPORT alc_error_t
 alcp_mac_context_copy(const alc_mac_handle_p pSrcHandle,
                       const alc_mac_handle_p pDestHandle);
+
+/**
+ * @brief       Stage multiple message buffers for multi-buffer MAC computation.
+ *
+ * @parblock <br> &nbsp;
+ * <b>This API stages multiple message buffers for parallel HMAC computation.
+ * It must be called after @ref alcp_mac_init and before
+ * @ref alcp_mac_dequeue.</b>
+ *
+ * All input buffers must be the same size (msgLen bytes). This function
+ * records the buffer addresses for later processing by
+ * @ref alcp_mac_dequeue.
+ *
+ * Supported mode: ALC_MB_MAC_HMAC only.
+ * @endparblock
+ *
+ * @note     Error needs to be checked for each call,
+ *           valid only if @ref alcp_is_error (ret) is false
+ *
+ * @pre      @ref alcp_mac_request must be called with ALC_MB_MAC_HMAC,
+ *           followed by @ref alcp_mac_init with the key and HMAC info.
+ *
+ * @param[in] pMacHandle   Session handle for MAC operation
+ * @param[in] ppMsgBuf     Array of pointers to input message buffers
+ * @param[in] numBuffers   Number of input buffers
+ * @param[in] msgLen       Length of each message buffer in bytes;
+ *                         all buffers must be exactly this size
+ *
+ * @return   ALC_ERROR_NONE on success.
+ */
+ALCP_API_EXPORT alc_error_t
+alcp_mac_flush(alc_mac_handle_p pMacHandle,
+               const Uint8**    ppMsgBuf,
+               Uint64           numBuffers,
+               Uint64           msgLen);
+
+/**
+ * @brief       Compute MACs for buffers staged via alcp_mac_flush.
+ *
+ * @parblock <br> &nbsp;
+ * <b>Performs parallel HMAC computation for all buffers previously staged
+ * by @ref alcp_mac_flush and writes each MAC to the corresponding entry
+ * in ppDstBuf.</b>
+ *
+ * Each output buffer must be pre-allocated with sufficient space for the
+ * MAC output. The MAC size is determined by the digest algorithm configured
+ * during @ref alcp_mac_init (e.g., 32 bytes for HMAC-SHA256).
+ *
+ * This API must be called after @ref alcp_mac_flush and before
+ * @ref alcp_mac_finish.
+ * @endparblock
+ *
+ * @note     Error needs to be checked for each call,
+ *           valid only if @ref alcp_is_error (ret) is false
+ *
+ * @pre      @ref alcp_mac_flush must be called before this API.
+ * @pre      @ref alcp_mac_init must be called with ALC_MB_MAC_HMAC before
+ *           using this API, and numBuffers must be greater than 0.
+ *
+ * @param[in]  pMacHandle   Session handle for MAC operation
+ * @param[out] ppDstBuf     Array of pointers to pre-allocated output buffers
+ *                          for computed MACs
+ * @param[in]  numBuffers   Number of output buffers (must match the count
+ *                          provided to @ref alcp_mac_flush)
+ *
+ * @return   ALC_ERROR_NONE on success.
+ */
+ALCP_API_EXPORT alc_error_t
+alcp_mac_dequeue(alc_mac_handle_p pMacHandle,
+                 Uint8**          ppDstBuf,
+                 Uint64           numBuffers);
 
 EXTERN_C_END
 

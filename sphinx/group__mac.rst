@@ -35,11 +35,20 @@ Functions
    :project: crypto
 .. doxygenfunction:: alcp_mac_context_copy
    :project: crypto
-    
+
+Multi-Buffer MAC
+^^^^^^^^^^^^^^^^
+These APIs support multi-buffer MAC processing by enqueueing message buffers
+and later dequeuing the corresponding MAC outputs.
+
+.. doxygenfunction:: alcp_mac_flush
+   :project: crypto
+.. doxygenfunction:: alcp_mac_dequeue
+   :project: crypto
+
 ----
 
-Variables
----------
-.. doxygenvariable:: alc_mac_type_t
+Enumerations
+------------
+.. doxygenenum:: alc_mac_type
    :project: crypto
-    

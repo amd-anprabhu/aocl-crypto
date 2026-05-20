@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -25,7 +25,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include "alcp/cipher/aes.hh"
+#include "alcp/cipher/rijndael.hh"
 #include "alcp/rng/drbg.hh"
 #include "alcp/types.h"
 #include "iostream"
@@ -58,14 +58,26 @@ namespace avx2 {
                                        const Uint64 cKeylen);
 } // namespace avx2
 
-class EncryptAes : public cipher::Aes
+/**
+ * @brief Simple AES encryption wrapper for DRBG CTR mode
+ *
+ * Inherits from Rijndael for key expansion.
+ */
+class EncryptAes : public cipher::Rijndael
 {
   public:
     EncryptAes(Uint32 keyLen_in_bytes)
-        : Aes(keyLen_in_bytes)
+        : Rijndael()
+        , m_keyLenBytes(keyLen_in_bytes)
     {
     }
+
+    Uint32 getKeyLenBytes() const { return m_keyLenBytes; }
+
+  private:
+    Uint32 m_keyLenBytes = 0;
 };
+
 class ALCP_API_EXPORT CtrDrbg : public Drbg
 {
   private:

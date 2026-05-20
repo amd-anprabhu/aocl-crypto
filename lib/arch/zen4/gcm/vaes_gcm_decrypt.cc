@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -45,7 +45,7 @@
 #include <immintrin.h>
 
 #include "../avx512.hh"
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/cipher/aes_gcm.hh"
 #include "alcp/cipher/aesni.hh"
 #include "alcp/cipher/cipher_wrapper.hh"
@@ -66,7 +66,7 @@ template<void AesEncNoLoad_4x512(
          void AesEncNoLoad_1x512(__m512i& a, const sKeys& keys),
          void alcp_load_key_zmm(const __m128i pkey128[], sKeys& keys),
          void alcp_clear_keys_zmm(sKeys& keys)>
-Uint64 inline gcmBlk_512_dec(const __m512i* p_in_x,
+void inline gcmBlk_512_dec(const __m512i* p_in_x,
                              __m512i*       p_out_x,
                              Uint64         blocks,
                              Uint64         updateCounter,
@@ -89,10 +89,15 @@ Uint64 inline gcmBlk_512_dec(const __m512i* p_in_x,
 #endif
 
     /* gcm init + Hash subkey init */
-    const __m256i const_factor_256 =
-        _mm256_set_epi64x(0xC200000000000000, 0x1, 0xC200000000000000, 0x1);
-
-    const __m128i const_factor_128 = _mm_set_epi64x(0xC200000000000000, 0x1);
+    const __m512i const_factor_512 = _mm512_set_epi64(0xC200000000000000ULL,
+                                                      0x1ULL,
+                                                      0xC200000000000000ULL,
+                                                      0x1ULL,
+                                                      0xC200000000000000ULL,
+                                                      0x1ULL,
+                                                      0xC200000000000000ULL,
+                                                      0x1ULL);
+    const __m128i const_factor_128 = _mm512_castsi512_si128(const_factor_512);
 
     const __m512i one_x = alcp_set_epi32(
                       4, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0),
@@ -259,7 +264,7 @@ Uint64 inline gcmBlk_512_dec(const __m512i* p_in_x,
         p_out_x += NUM_PARALLEL_ZMMS;
 
         // compute Ghash
-        getGhash(z0_512, z1_512, z2_512, gHash_512, const_factor_256);
+        getGhash(z0_512, z1_512, z2_512, gHash_512, const_factor_512);
     }
 
     // (4x512) 16 blks aesenc, 16 blks gmul and 1 reductions
@@ -281,7 +286,7 @@ Uint64 inline gcmBlk_512_dec(const __m512i* p_in_x,
               a4,
               reverse_mask_512,
               gHash_512,
-              const_factor_256);
+              const_factor_512);
 
         alcp_xor_4values(b1, b2, b3, b4, a1, a2, a3, a4);
         c1 = alcp_add_epi32(c1, four_x);
@@ -291,7 +296,6 @@ Uint64 inline gcmBlk_512_dec(const __m512i* p_in_x,
         p_out_x += 4;
         blocks -= blockCount_4x512;
     }
-
     // (2x512)=8 blks aesenc, 8 blks gmul and 1 reductions
     if (blocks >= blockCount_2x512) {
         _mm_prefetch(cast_to(p_in_x), _MM_HINT_T0);
@@ -308,7 +312,7 @@ Uint64 inline gcmBlk_512_dec(const __m512i* p_in_x,
               a2,
               reverse_mask_512,
               gHash_512,
-              const_factor_256);
+              const_factor_512);
 
         alcp_xor_2values(b1, b2, a1, a2);
         c1 = alcp_add_epi32(c1, two_x);
@@ -326,7 +330,7 @@ Uint64 inline gcmBlk_512_dec(const __m512i* p_in_x,
               a1,
               reverse_mask_512,
               gHash_512,
-              const_factor_256);
+              const_factor_512);
 
         // re-arrange as per spec
         b1 = alcp_shuffle_epi8(c1, swap_ctr);
@@ -344,70 +348,23 @@ Uint64 inline gcmBlk_512_dec(const __m512i* p_in_x,
     }
 
     gcmCtx->m_gHash_128 = _mm512_castsi512_si128(gHash_512);
-    __m128i c1_128      = _mm512_castsi512_si128(c1);
 
-    /* residual block=1 when factor = 2, load and store only
-     lower half. */
-    __m128i one_lo_128 = _mm_set_epi32(1, 0, 0, 0);
+    // Update counter before residual processing
+    gcmCtx->m_counter_128 = _mm512_castsi512_si128(c1);
 
-    for (; blocks != 0; blocks--) {
-        __m128i a1;
-        __m128i swap_ctr_128 = _mm512_castsi512_si128(swap_ctr);
-
-        a1 = _mm_loadu_si128((__m128i*)p_in_x);
-
-        __m128i ra1         = _mm_shuffle_epi8(a1, gcmCtx->m_reverse_mask_128);
-        gcmCtx->m_gHash_128 = _mm_xor_si128(ra1, gcmCtx->m_gHash_128);
-        aesni::gMul(gcmCtx->m_gHash_128,
-                    gcmCtx->m_hash_subKey_128,
-                    gcmCtx->m_gHash_128,
-                    const_factor_128);
-
-        // re-arrange as per spec
-        __m128i b1 = _mm_shuffle_epi8(c1_128, swap_ctr_128);
-
-        alcp::cipher::aesni::AesEncrypt(&b1, pkey128, nRounds);
-        a1 = _mm_xor_si128(b1, a1);
-
-        // increment counter
-        c1_128 = _mm_add_epi32(c1_128, one_lo_128);
-
-        _mm_storeu_si128((__m128i*)p_out_x, a1);
-        p_in_x  = (__m512i*)(((__uint128_t*)p_in_x) + 1);
-        p_out_x = (__m512i*)(((__uint128_t*)p_out_x) + 1);
-    }
-
-    // remaining bytes
-    if (remBytes) {
-        __m128i a1{}; // remaining bytes handled with 128bit
-        __m128i swap_ctr_128 = _mm512_castsi512_si128(swap_ctr);
-        __m128i b1           = _mm_shuffle_epi8(c1_128, swap_ctr_128);
-
-        alcp::cipher::aesni::AesEncrypt(&b1, pkey128, nRounds);
-
-        Uint64 mask = (static_cast<alcp::Uint64>(1) << remBytes)
-                      - static_cast<alcp::Uint64>(1);
-        a1 = _mm_setzero_si128();
-        a1 = _mm_mask_loadu_epi8(a1, mask, p_in_x);
-
-        __m128i ra1         = _mm_shuffle_epi8(a1, gcmCtx->m_reverse_mask_128);
-        gcmCtx->m_gHash_128 = _mm_xor_si128(ra1, gcmCtx->m_gHash_128);
-        aesni::gMul(gcmCtx->m_gHash_128,
-                    gcmCtx->m_hash_subKey_128,
-                    gcmCtx->m_gHash_128,
-                    const_factor_128);
-
-        a1 = _mm_xor_si128(b1, a1);
-        _mm_mask_storeu_epi8(p_out_x, mask, a1);
-    }
+    // Process residual blocks (<4 blocks) with unified residue handler
+    process_residue<AesEncNoLoad_1x512>(p_in_x,
+                                        p_out_x,
+                                        blocks,
+                                        remBytes,
+                                        keys,
+                                        gcmCtx,
+                                        swap_ctr,
+                                        reverse_mask_512,
+                                        false /* is_encrypt */);
 
     // clear all keys in registers.
     alcp_clear_keys_zmm(keys);
-
-    // Extract the first counter
-    gcmCtx->m_counter_128 = c1_128;
-
-    return blocks;
 }
 
 alc_error_t

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -244,11 +244,11 @@ CipherTesting::multibufferInit(const Uint8*  key,
 
 bool
 CipherTesting::flush(const Uint8** inputPointers,
-                     int           numBuffers,
-                     int           bufferSize)
+                     const Uint64* lengths,
+                     int           numBuffers)
 {
     if (cb != nullptr) {
-        return cb->flush(inputPointers, numBuffers, bufferSize);
+        return cb->flush(inputPointers, lengths, static_cast<Uint64>(numBuffers));
     } else {
         std::cout << "base.hh: CipherTesting: Implementation missing for flush!"
                   << std::endl;
@@ -257,10 +257,10 @@ CipherTesting::flush(const Uint8** inputPointers,
 }
 
 bool
-CipherTesting::dequeue(Uint8** outputPointers, int numBuffers, int bufferSize)
+CipherTesting::dequeue(Uint8** outputPointers, int numBuffers, const Uint64* lengths)
 {
     if (cb != nullptr) {
-        return cb->dequeue(outputPointers, numBuffers, bufferSize);
+        return cb->dequeue(outputPointers, static_cast<Uint64>(numBuffers), lengths);
     } else {
         std::cout
             << "base.hh: CipherTesting: Implementation missing for dequeue!"

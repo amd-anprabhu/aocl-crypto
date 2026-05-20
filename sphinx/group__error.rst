@@ -1,6 +1,6 @@
 Error
 **********
-Error APIs are used to know the failures caused by any other API used.
+Error APIs are used to report failures caused by other API calls.
 
 ----
 
@@ -11,9 +11,14 @@ Functions
 
 ----
 
-Variables
----------
-.. doxygenvariable:: alc_error_generic_t
+Enumerations
+------------
+.. doxygenenum:: alc_error_generic
    :project: crypto
+
+----
+
+Type Definitions
+----------------
 .. doxygenvariable:: alc_error_t
    :project: crypto

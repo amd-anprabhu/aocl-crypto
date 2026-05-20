@@ -1,4 +1,4 @@
- # Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ # Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions are met:
@@ -28,6 +28,7 @@ INCLUDE(${CMAKE_SOURCE_DIR}/cmake/AlcpTests.cmake)
 # Enforcing File Name
 SET(TEST_FILES 
   status_test.cc
+  dispatch_test.cc
   )
 
 ALCP_MODULE("base")

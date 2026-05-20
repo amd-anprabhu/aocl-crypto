@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -35,6 +35,7 @@
 #include "hmac/alc_hmac.hh"
 #include "hmac/gtest_base_hmac.hh"
 #include "hmac/hmac.hh"
+#include <exception>
 
 /* All tests to be added here */
 TEST(HMAC_SHA3, KAT_224)
@@ -79,22 +80,51 @@ TEST(HMAC_SHA2, KAT_512)
     Hmac_KAT(ALC_SHA2_512);
 }
 
+/* HMAC SHA2 Multibuffer tests */
+TEST(HMAC_SHA2_MB, KAT_224)
+{
+    if (useipp || useossl || oa_override)
+        GTEST_SKIP()
+            << "IPP/OSSL doesnt have HMAC SHA224 multibuffer implemented yet";
+    Hmac_KAT(ALC_MB_SHA2_224);
+}
+
+TEST(HMAC_SHA2_MB, KAT_256)
+{
+    if (useipp || useossl || oa_override)
+        GTEST_SKIP()
+            << "IPP/OSSL doesnt have HMAC SHA256 multibuffer implemented yet";
+    Hmac_KAT(ALC_MB_SHA2_256);
+}
+
 int
 main(int argc, char** argv)
 {
-    ::testing::InitGoogleTest(&argc, argv);
-    parseArgs(argc, argv);
+    try {
+        ::testing::InitGoogleTest(&argc, argv);
+        parseTestArgs(argc, argv);
 #ifndef USE_IPP
-    if (useipp)
-        std::cout << RED << "IPP is not available, defaulting to ALCP" << RESET
-                  << std::endl;
+        if (useipp)
+            std::cout << RED << "IPP is not available, defaulting to ALCP"
+                      << RESET << std::endl;
 #endif
 
 #ifndef USE_OSSL
-    if (useossl) {
-        std::cout << RED << "OpenSSL is not available, defaulting to ALCP"
-                  << RESET << std::endl;
-    }
+        if (useossl) {
+            std::cout << RED << "OpenSSL is not available, defaulting to ALCP"
+                      << RESET << std::endl;
+        }
 #endif
-    return RUN_ALL_TESTS();
+        return RUN_ALL_TESTS();
+
+    } catch (const std::exception& e) {
+        std::cerr << "Unhandled exception: " << e.what() << std::endl;
+        return 1;
+    } catch (const char* e) {
+        std::cerr << "Unhandled exception: " << e << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "Unknown exception caught" << std::endl;
+        return 1;
+    }
 }

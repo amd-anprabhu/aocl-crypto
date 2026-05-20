@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,14 +26,12 @@
  *
  */
 
-#include "alcp/cipher/aes.hh"
-//
 #include "alcp/cipher/aes_xts.hh"
 #include "alcp/cipher/cipher_wrapper.hh"
 
-#include "alcp/utils/cpuid.hh"
-
 using alcp::utils::CpuId;
+using alcp::utils::CpuArchLevel;
+using alcp::utils::AlgorithmType;
 
 namespace alcp::cipher {
 
@@ -42,11 +40,16 @@ alc_error_t
 Xts::setIv(const Uint8* pIv, const Uint64 ivLen)
 {
     alc_error_t err{ ALC_ERROR_NONE };
-    utils::CopyBytes(m_xts.m_iv_xts, pIv, ivLen); // Keep a copy of iv
+    
+    // Use IvManager for IV storage
+    err = m_ivManager.setIv(pIv, ivLen);
+    if (err != ALC_ERROR_NONE) {
+        return err;
+    }
 
     // FIXME: In future we need to dispatch it correctly
     aesni::InitializeTweakBlock(
-        pIv, m_xts.m_tweak_block, m_xts.m_pTweak_key, getRounds());
+        pIv, m_xts.m_tweak_block, m_xts.m_tweak_round_key, m_keyManager.getRounds());
 
     m_xts.m_aes_block_id = 0; // Initialized BlockId to 0
 
@@ -61,21 +64,29 @@ Xts::init(const Uint8* pKey,
 {
     alc_error_t err = ALC_ERROR_NONE;
 
-    if (pKey != NULL && keyLen != 0) {
-        err = setKey(pKey, keyLen);
+    // Validate and set key -- let KeyManager reject null/bad length
+    if (keyLen != 0 || pKey != nullptr) {
+        err = m_keyManager.setKey(pKey, keyLen);
         if (err != ALC_ERROR_NONE) {
             return err;
         }
 
-        m_xts.m_pTweak_key = &(m_xts.m_tweak_round_key[0]);
+        // Always expand tweak keys
         expandTweakKeys(pKey + keyLen / 8, keyLen);
 
-        m_isKeySet_aes = 1;
+        m_stateManager.onKeySet();
     }
 
-    if (pIv != NULL && ivLen != 0) {
-        err           = Xts::setIv(pIv, ivLen);
-        m_ivState_aes = 1;
+    // Validate and set IV -- let IvManager reject null/bad length
+    if (pIv == nullptr && ivLen != 0) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pIv != nullptr) {
+        err = Xts::setIv(pIv, ivLen);
+        if (err != ALC_ERROR_NONE) {
+            return err;
+        }
+        m_stateManager.onIvSet();
     }
 
     return err;
@@ -85,16 +96,17 @@ void
 Xts::tweakBlockSet(Uint64 aesBlockId)
 {
     // FIXME: In future we need to dispatch it correctly
-    // m_cipher_key_data.m_xts.m_aes_block_id is the previous block id and
+    // m_xts.m_aes_block_id is the previous block id and
     // aesBlockId is the target block id.
     if ((Int64)aesBlockId > m_xts.m_aes_block_id) {
         aesni::TweakBlockCalculate(m_xts.m_tweak_block,
                                    aesBlockId - m_xts.m_aes_block_id);
     } else if ((Int64)aesBlockId < m_xts.m_aes_block_id) {
-        aesni::InitializeTweakBlock(m_xts.m_iv_xts,
+        // Use IvManager for IV
+        aesni::InitializeTweakBlock(m_ivManager.getIv(),
                                     m_xts.m_tweak_block,
-                                    m_xts.m_pTweak_key,
-                                    getRounds());
+                                    m_xts.m_tweak_round_key,
+                                    m_keyManager.getRounds());
         aesni::TweakBlockCalculate(m_xts.m_tweak_block, aesBlockId);
     }
     m_xts.m_aes_block_id = aesBlockId;
@@ -107,20 +119,23 @@ Xts::expandTweakKeys(const Uint8* pKey, int len)
     Uint8 dummy_key[32] = { 0 };
 
     const Uint8* key = pKey ? pKey : &dummy_key[0];
-    if (CpuId::cpuHasAesni()) {
-        aesni::ExpandTweakKeys(key, m_xts.m_pTweak_key, getRounds());
+    // Use cached cipher feature for AESNI check
+    static CpuArchLevel cipherFeature =
+        CpuId::getCachedArchLevel(AlgorithmType::eCipher);
+    if (cipherFeature >= CpuArchLevel::eZen) {
+        aesni::ExpandTweakKeys(key, m_xts.m_tweak_round_key, m_keyManager.getRounds());
         return;
     }
 
     // Dispatch to Reference Algorithm
 
     Uint32 i;
-    Uint32 nb = Rijndael::cBlockSizeWord, nr = getRounds(),
+    Uint32 nb = Rijndael::cBlockSizeWord, nr = m_keyManager.getRounds(),
            nk          = len / utils::BitsPerByte / utils::BytesPerWord;
     const Uint32* rtbl = utils::s_round_constants;
     Uint32*       p_tweak_key32;
 
-    p_tweak_key32 = reinterpret_cast<Uint32*>(m_xts.m_pTweak_key);
+    p_tweak_key32 = reinterpret_cast<Uint32*>(m_xts.m_tweak_round_key);
 
     for (i = 0; i < nk; i++) {
         p_tweak_key32[i] = MakeWord(
@@ -151,46 +166,28 @@ Xts::expandTweakKeys(const Uint8* pKey, int len)
 /**     iCipher implementation of XTS     **/
 /*******************************************/
 
-// pIv arg to be removed and this is made same as other ciper wrapper func
-// length check to be converted to generic function for all cipher modes
-#define CRYPT_XTS_WRAPPER_FUNC(                                                        \
-    NAMESPACE, CLASS_NAME, WRAPPER_FUNC, FUNC_NAME, PKEY, NUM_ROUNDS)                  \
-    alc_error_t CLASS_NAME##_##NAMESPACE::WRAPPER_FUNC(                                \
-        const Uint8* pinput, Uint8* pOutput, Uint64 len)                               \
-    {                                                                                  \
-        alc_error_t err = ALC_ERROR_NONE;                                              \
-                                                                                       \
-        if (!(m_ivState_aes && m_isKeySet_aes)) {                                      \
-            printf("\nError: Key or Iv not set \n");                                   \
-            return ALC_ERROR_BAD_STATE;                                                \
-        }                                                                              \
-        if (len < 16 || len > (1 << 21)) {                                             \
-            err = ALC_ERROR_INVALID_DATA;                                              \
-            return err;                                                                \
-        }                                                                              \
-        Uint64 blocks_in = len / 16;                                                   \
-        err              = NAMESPACE::FUNC_NAME(                                       \
-            pinput, pOutput, len, PKEY, NUM_ROUNDS, m_xts.m_tweak_block); \
-        m_xts.m_aes_block_id += blocks_in;                                             \
-        return err;                                                                    \
-    };
-
 template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
-XtsT<keyLenBits, arch>::encrypt(const Uint8* pinput,
+XtsT<keyLenBits, arch>::encrypt(const Uint8* pInput,
                                 Uint8*       pOutput,
                                 Uint64       len,
                                 Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
 
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (outlen == nullptr) {
         return ALC_ERROR_INVALID_ARG;
     }
     *outlen = 0;
 
-    if (!(m_ivState_aes && m_isKeySet_aes)) {
+    if (!m_stateManager.isReady()) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
     }
@@ -206,27 +203,27 @@ XtsT<keyLenBits, arch>::encrypt(const Uint8* pinput,
 
     Uint64 blocks_in = len / 16;
 
-    if constexpr (arch == CpuCipherFeatures::eVaes512) {
-        err = vaes512::EncryptXts(pinput,
+    if constexpr (arch == CpuArchLevel::eZen4) {
+        err = vaes512::EncryptXts(pInput,
                                   pOutput,
                                   len,
-                                  m_cipher_key_data.m_enc_key,
-                                  getRounds(),
+                                  m_keyManager.getCipherKeyData().m_enc_key,
+                                  m_keyManager.getRounds(),
                                   m_xts.m_tweak_block);
 
-    } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
-        err = vaes::EncryptXts(pinput,
+    } else if constexpr (arch == CpuArchLevel::eZen3) {
+        err = vaes::EncryptXts(pInput,
                                pOutput,
                                len,
-                               m_cipher_key_data.m_enc_key,
-                               getRounds(),
+                               m_keyManager.getCipherKeyData().m_enc_key,
+                               m_keyManager.getRounds(),
                                m_xts.m_tweak_block);
-    } else if constexpr (arch == CpuCipherFeatures::eAesni) {
-        err = aesni::EncryptXts(pinput,
+    } else if constexpr (arch == CpuArchLevel::eZen) {
+        err = aesni::EncryptXts(pInput,
                                 pOutput,
                                 len,
-                                m_cipher_key_data.m_enc_key,
-                                getRounds(),
+                                m_keyManager.getCipherKeyData().m_enc_key,
+                                m_keyManager.getRounds(),
                                 m_xts.m_tweak_block);
     }
 
@@ -240,21 +237,27 @@ XtsT<keyLenBits, arch>::encrypt(const Uint8* pinput,
 };
 
 template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
-XtsT<keyLenBits, arch>::decrypt(const Uint8* pinput,
+XtsT<keyLenBits, arch>::decrypt(const Uint8* pInput,
                                 Uint8*       pOutput,
                                 Uint64       len,
                                 Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
 
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (outlen == nullptr) {
         return ALC_ERROR_INVALID_ARG;
     }
     *outlen = 0;
 
-    if (!(m_ivState_aes && m_isKeySet_aes)) {
+    if (!m_stateManager.isReady()) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
     }
@@ -269,27 +272,27 @@ XtsT<keyLenBits, arch>::decrypt(const Uint8* pinput,
     }
 
     Uint64 blocks_in = len / 16;
-    if constexpr (arch == CpuCipherFeatures::eVaes512) {
-        err = vaes512::DecryptXts(pinput,
+    if constexpr (arch == CpuArchLevel::eZen4) {
+        err = vaes512::DecryptXts(pInput,
                                   pOutput,
                                   len,
-                                  m_cipher_key_data.m_dec_key,
-                                  getRounds(),
+                                  m_keyManager.getCipherKeyData().m_dec_key,
+                                  m_keyManager.getRounds(),
                                   m_xts.m_tweak_block);
 
-    } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
-        err = vaes::DecryptXts(pinput,
+    } else if constexpr (arch == CpuArchLevel::eZen3) {
+        err = vaes::DecryptXts(pInput,
                                pOutput,
                                len,
-                               m_cipher_key_data.m_dec_key,
-                               getRounds(),
+                               m_keyManager.getCipherKeyData().m_dec_key,
+                               m_keyManager.getRounds(),
                                m_xts.m_tweak_block);
-    } else if constexpr (arch == CpuCipherFeatures::eAesni) {
-        err = aesni::DecryptXts(pinput,
+    } else if constexpr (arch == CpuArchLevel::eZen) {
+        err = aesni::DecryptXts(pInput,
                                 pOutput,
                                 len,
-                                m_cipher_key_data.m_dec_key,
-                                getRounds(),
+                                m_keyManager.getCipherKeyData().m_dec_key,
+                                m_keyManager.getRounds(),
                                 m_xts.m_tweak_block);
     }
 
@@ -302,14 +305,26 @@ XtsT<keyLenBits, arch>::decrypt(const Uint8* pinput,
 /*******************************************/
 
 template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
-XtsBlockT<keyLenBits, arch>::encrypt(const Uint8* pinput,
+XtsBlockT<keyLenBits, arch>::decrypt(const Uint8* pInput,
                                      Uint8*       pOutput,
-                                     Uint64       len)
+                                     Uint64       len,
+                                     Uint64*      outlen)
 {
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen = 0;
+
     alc_error_t err = ALC_ERROR_NONE;
-    if (!(m_ivState_aes && m_isKeySet_aes)) {
+    if (!m_stateManager.isReady()) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
     }
@@ -324,42 +339,57 @@ XtsBlockT<keyLenBits, arch>::encrypt(const Uint8* pinput,
         return ALC_ERROR_NOT_SUPPORTED;
     }
 
-    if constexpr (arch == CpuCipherFeatures::eVaes512) {
-        err = vaes512::EncryptXts(pinput,
+    if constexpr (arch == CpuArchLevel::eZen4) {
+        err = vaes512::DecryptXts(pInput,
                                   pOutput,
                                   len,
-                                  m_cipher_key_data.m_enc_key,
-                                  getRounds(),
+                                  m_keyManager.getCipherKeyData().m_dec_key,
+                                  m_keyManager.getRounds(),
                                   m_xts.m_tweak_block);
-
-    } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
-        err = vaes::EncryptXts(pinput,
+    } else if constexpr (arch == CpuArchLevel::eZen3) {
+        err = vaes::DecryptXts(pInput,
                                pOutput,
                                len,
-                               m_cipher_key_data.m_enc_key,
-                               getRounds(),
+                               m_keyManager.getCipherKeyData().m_dec_key,
+                               m_keyManager.getRounds(),
                                m_xts.m_tweak_block);
-    } else if constexpr (arch == CpuCipherFeatures::eAesni) {
-        err = aesni::EncryptXts(pinput,
+    } else if constexpr (arch == CpuArchLevel::eZen) {
+        err = aesni::DecryptXts(pInput,
                                 pOutput,
                                 len,
-                                m_cipher_key_data.m_enc_key,
-                                getRounds(),
+                                m_keyManager.getCipherKeyData().m_dec_key,
+                                m_keyManager.getRounds(),
                                 m_xts.m_tweak_block);
     }
+
     m_xts.m_aes_block_id += blocks_in;
+    if (err == ALC_ERROR_NONE) {
+        *outlen = len;
+    }
     return err;
 };
 
 template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
-XtsBlockT<keyLenBits, arch>::decrypt(const Uint8* pinput,
+XtsBlockT<keyLenBits, arch>::encrypt(const Uint8* pInput,
                                      Uint8*       pOutput,
-                                     Uint64       len)
+                                     Uint64       len,
+                                     Uint64*      outlen)
 {
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (outlen == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    *outlen = 0;
+
     alc_error_t err = ALC_ERROR_NONE;
-    if (!(m_ivState_aes && m_isKeySet_aes)) {
+    if (!m_stateManager.isReady()) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
     }
@@ -374,69 +404,30 @@ XtsBlockT<keyLenBits, arch>::decrypt(const Uint8* pinput,
         return ALC_ERROR_NOT_SUPPORTED;
     }
 
-    if constexpr (arch == CpuCipherFeatures::eVaes512) {
-        err = vaes512::DecryptXts(pinput,
+    if constexpr (arch == CpuArchLevel::eZen4) {
+        err = vaes512::EncryptXts(pInput,
                                   pOutput,
                                   len,
-                                  m_cipher_key_data.m_dec_key,
-                                  getRounds(),
+                                  m_keyManager.getCipherKeyData().m_enc_key,
+                                  m_keyManager.getRounds(),
                                   m_xts.m_tweak_block);
-    } else if constexpr (arch == CpuCipherFeatures::eVaes256) {
-        err = vaes::DecryptXts(pinput,
+
+    } else if constexpr (arch == CpuArchLevel::eZen3) {
+        err = vaes::EncryptXts(pInput,
                                pOutput,
                                len,
-                               m_cipher_key_data.m_dec_key,
-                               getRounds(),
+                               m_keyManager.getCipherKeyData().m_enc_key,
+                               m_keyManager.getRounds(),
                                m_xts.m_tweak_block);
-    } else if constexpr (arch == CpuCipherFeatures::eAesni) {
-        err = aesni::DecryptXts(pinput,
+    } else if constexpr (arch == CpuArchLevel::eZen) {
+        err = aesni::EncryptXts(pInput,
                                 pOutput,
                                 len,
-                                m_cipher_key_data.m_dec_key,
-                                getRounds(),
+                                m_keyManager.getCipherKeyData().m_enc_key,
+                                m_keyManager.getRounds(),
                                 m_xts.m_tweak_block);
     }
-
     m_xts.m_aes_block_id += blocks_in;
-    return err;
-};
-
-template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
-alc_error_t
-XtsBlockT<keyLenBits, arch>::decrypt(const Uint8* pinput,
-                                     Uint8*       pOutput,
-                                     Uint64       len,
-                                     Uint64*      outlen)
-{
-    if (outlen == nullptr) {
-        return ALC_ERROR_INVALID_ARG;
-    }
-    *outlen = 0;
-
-    // Delegate to the 3-arg decrypt to avoid code duplication
-    alc_error_t err = decrypt(pinput, pOutput, len);
-    if (err == ALC_ERROR_NONE) {
-        *outlen = len;
-    }
-    return err;
-};
-
-template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
-alc_error_t
-XtsBlockT<keyLenBits, arch>::encrypt(const Uint8* pinput,
-                                     Uint8*       pOutput,
-                                     Uint64       len,
-                                     Uint64*      outlen)
-{
-    if (outlen == nullptr) {
-        return ALC_ERROR_INVALID_ARG;
-    }
-    *outlen = 0;
-
-    // Delegate to the 3-arg encrypt to avoid code duplication
-    alc_error_t err = encrypt(pinput, pOutput, len);
     if (err == ALC_ERROR_NONE) {
         *outlen = len;
     }
@@ -444,61 +435,63 @@ XtsBlockT<keyLenBits, arch>::encrypt(const Uint8* pinput,
 }
 
 template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
-XtsBlockT<keyLenBits, arch>::encryptSegment(const Uint8* pinput,
+XtsBlockT<keyLenBits, arch>::encryptSegment(const Uint8* pInput,
                                             Uint8*       pOutput,
                                             Uint64       len,
                                             Uint64       startBlockNum)
 {
     alc_error_t err = ALC_ERROR_NONE;
+    Uint64      outlen;
     alcp::cipher::Xts::tweakBlockSet(startBlockNum);
-    err = encrypt(pinput, pOutput, len);
+    err = encrypt(pInput, pOutput, len, &outlen);
     return err;
 }
 
 template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+         alcp::utils::CpuArchLevel arch>
 alc_error_t
-XtsBlockT<keyLenBits, arch>::decryptSegment(const Uint8* pinput,
+XtsBlockT<keyLenBits, arch>::decryptSegment(const Uint8* pInput,
                                             Uint8*       pOutput,
                                             Uint64       len,
                                             Uint64       startBlockNum)
 {
     alc_error_t err = ALC_ERROR_NONE;
+    Uint64      outlen;
     alcp::cipher::Xts::tweakBlockSet(startBlockNum);
-    err = decrypt(pinput, pOutput, len);
+    err = decrypt(pInput, pOutput, len, &outlen);
     return err;
 }
 
 template class XtsT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                    CpuCipherFeatures::eVaes512>;
+                    CpuArchLevel::eZen4>;
 template class XtsT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                    CpuCipherFeatures::eVaes512>;
+                    CpuArchLevel::eZen4>;
 
 template class XtsT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                    CpuCipherFeatures::eVaes256>;
+                    CpuArchLevel::eZen3>;
 template class XtsT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                    CpuCipherFeatures::eVaes256>;
+                    CpuArchLevel::eZen3>;
 
 template class XtsT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                    CpuCipherFeatures::eAesni>;
+                    CpuArchLevel::eZen>;
 template class XtsT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                    CpuCipherFeatures::eAesni>;
+                    CpuArchLevel::eZen>;
 
 template class XtsBlockT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                         CpuCipherFeatures::eVaes512>;
+                         CpuArchLevel::eZen4>;
 template class XtsBlockT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                         CpuCipherFeatures::eVaes512>;
+                         CpuArchLevel::eZen4>;
 
 template class XtsBlockT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                         CpuCipherFeatures::eVaes256>;
+                         CpuArchLevel::eZen3>;
 template class XtsBlockT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                         CpuCipherFeatures::eVaes256>;
+                         CpuArchLevel::eZen3>;
 
 template class XtsBlockT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                         CpuCipherFeatures::eAesni>;
+                         CpuArchLevel::eZen>;
 template class XtsBlockT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                         CpuCipherFeatures::eAesni>;
+                         CpuArchLevel::eZen>;
 
 } // namespace alcp::cipher

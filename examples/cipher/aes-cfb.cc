@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2024-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -54,8 +54,7 @@ main()
 
     memset(inputText, 10, dataLen);
 
-    auto alcpCipher = new CipherFactory<iCipher>;
-    auto aesmode    = alcpCipher->create("aes-cfb-192");
+    auto aesmode = createCipher(CipherMode::eAesCFB, CipherKeyLen::eKey192Bit);
     if (aesmode == nullptr) {
         printf("\n cipher create failed");
         err = ALC_ERROR_GENERIC;
@@ -96,14 +95,15 @@ main()
     }
     printf("\nInput and decrypted output match\n");
 
-    err = aesmode->finish(NULL);
+    err = aesmode->finish();
     if (err != ALC_ERROR_NONE) {
         printf("\n cipher finish failed");
         goto dealloc;
     }
 
 dealloc:
-    delete alcpCipher;
+    if (aesmode != nullptr)
+        delete aesmode;
     delete[] inputText;
     delete[] cipherText;
     delete[] outputText;

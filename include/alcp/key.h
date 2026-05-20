@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2021-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -41,22 +41,22 @@
 /**
  * @brief Stores length of key
  *
- * @typedef enum   alc_key_len_t
+ * @enum   alc_key_len_t
  */
 typedef enum alc_key_len
 {
-    ALC_KEY_LEN_128 = 128,
-    ALC_KEY_LEN_192 = 192,
-    ALC_KEY_LEN_256 = 256,
-    ALC_KEY_LEN_384 = 384,
-    ALC_KEY_LEN_512 = 512,
+    ALC_KEY_LEN_128 = 128, /**< 128-bit key length */
+    ALC_KEY_LEN_192 = 192, /**< 192-bit key length */
+    ALC_KEY_LEN_256 = 256, /**< 256-bit key length */
+    ALC_KEY_LEN_384 = 384, /**< 384-bit key length */
+    ALC_KEY_LEN_512 = 512, /**< 512-bit key length */
 
-    ALC_KEY_LEN_1024 = 1024,
-    ALC_KEY_LEN_2048 = 2048,
-    ALC_KEY_LEN_4096 = 4096,
+    ALC_KEY_LEN_1024 = 1024, /**< 1024-bit key length */
+    ALC_KEY_LEN_2048 = 2048, /**< 2048-bit key length */
+    ALC_KEY_LEN_4096 = 4096, /**< 4096-bit key length */
 
-    ALC_KEY_LEN_CUSTOM,
-    ALC_KEY_LEN_DEFAULT = ALC_KEY_LEN_128,
+    ALC_KEY_LEN_CUSTOM, /**< Custom key length */
+    ALC_KEY_LEN_DEFAULT = ALC_KEY_LEN_128, /**< Default key length (128-bit) */
 } alc_key_len_t;
 
 #endif /* _ALCP_KEY_H_ */

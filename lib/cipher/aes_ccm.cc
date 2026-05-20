@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -50,55 +50,65 @@ ctrInc(Uint8 ctr[])
     }
 }
 
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-Ccm::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv, Uint64 ivLen)
+CcmT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv, Uint64 ivLen)
 {
+    alc_error_t err = ALC_ERROR_NONE;
     int t = m_tagLen;
     int q = 15 - ivLen;
 
-    // ptr keys for pKey and pIv done in Aes:init
-    // init can be called separately for setKey and setIv
-    alc_error_t err = Aes::init(pKey, keyLen, pIv, ivLen);
-    if (alcp_is_error(err)) {
-        return err;
-    }
-    if (pKey != nullptr) {
+    // Validate and set key -- let KeyManager reject null/bad length
+    if (keyLen != 0 || pKey != nullptr) {
+        err = m_keyManager.setKey(pKey, keyLen);
+        if (err != ALC_ERROR_NONE) {
+            return err;
+        }
 
-        const Uint8* p_keys  = getEncryptKeys();
-        const Uint32 cRounds = m_nrounds;
-        m_ccm_data.key       = p_keys;
-        m_ccm_data.rounds    = cRounds;
+        // CCM-specific: Update ccm_data key pointers
+        m_ccm_data.key    = m_keyManager.getEncryptKeys();
+        m_ccm_data.rounds = m_keyManager.getRounds();
+
+        m_stateManager.onKeySet();
     }
 
+    // Validate and set IV -- let IvManager reject null/bad length
+    if (pIv == nullptr && ivLen != 0) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pIv != nullptr) {
 #ifdef CCM_MULTI_UPDATE
-    if (ivLen != 0 && (m_is_plaintext_len_set == false)) {
-        return ALC_ERROR_BAD_STATE;
-    }
+        if (m_is_plaintext_len_set == false) {
+            return ALC_ERROR_BAD_STATE;
+        }
 #endif
-    if (ivLen != 0 && m_tagLen != 0) {
         if (ivLen < 7 || ivLen > 13) {
-            // s = status::InvalidValue(
-            //     "IV length needs to be between 7 and 13 both not
-            //     included!");
             return ALC_ERROR_INVALID_SIZE;
         }
-        // Initialize ccm_data
-        memset(m_ccm_data.cmac, 0, 16);
-        memset(m_ccm_data.nonce, 0, 16);
-        // 15 = n + q where n is size of nonce (iv) and q is the size of
-        // size in bytes of size in bytes of plaintext. Basically size of
-        // the variable which can store size of plaintext. This size can be
-        // fixed to a max of q = 15 - n.
-        std::fill(
-            m_ccm_data.nonce, m_ccm_data.nonce + sizeof(m_ccm_data.nonce), 0);
-        std::fill(
-            m_ccm_data.cmac, m_ccm_data.cmac + sizeof(m_ccm_data.cmac), 0);
-        m_ccm_data.nonce[0] = (static_cast<Uint8>(q - 1) & 7)
-                              | static_cast<Uint8>(((t - 2) / 2) & 7) << 3;
+
+        err = m_ivManager.setIv(pIv, ivLen);
+        if (err != ALC_ERROR_NONE) {
+            return err;
+        }
+
+        if (m_tagLen != 0) {
+            // Initialize ccm_data
+            memset(m_ccm_data.cmac, 0, 16);
+            memset(m_ccm_data.nonce, 0, 16);
+            // 15 = n + q where n is size of nonce (iv) and q is the size of
+            // size in bytes of size in bytes of plaintext.
+            std::fill(
+                m_ccm_data.nonce, m_ccm_data.nonce + sizeof(m_ccm_data.nonce), 0);
+            std::fill(
+                m_ccm_data.cmac, m_ccm_data.cmac + sizeof(m_ccm_data.cmac), 0);
+            m_ccm_data.nonce[0] = (static_cast<Uint8>(q - 1) & 7)
+                                  | static_cast<Uint8>(((t - 2) / 2) & 7) << 3;
 
 #ifdef CCM_MULTI_UPDATE
-        setIv(&(m_ccm_data), pIv, ivLen, m_plainTextLength);
+            setIvInternal(&(m_ccm_data), pIv, ivLen, m_plainTextLength);
 #endif
+        }
+        m_stateManager.onIvSet();
     }
     m_ccm_data.blocks = 0;
     return ALC_ERROR_NONE;
@@ -110,7 +120,6 @@ copyTag(ccm_data_t* ctx, Uint8 ptag[], Uint64 tagLen)
     // Retrieve the tag length
 
     if (ptag == nullptr) {
-        // InvalidValue("Null Pointer is not expected!")
         return ALC_ERROR_INVALID_ARG;
     }
     unsigned int t = (ctx->nonce[0] >> 3) & 7;
@@ -118,8 +127,6 @@ copyTag(ccm_data_t* ctx, Uint8 ptag[], Uint64 tagLen)
     t *= 2;
     t += 2;
     if (tagLen != t) {
-        // InvalidValue(
-        //     "Tag length is not what we agreed upon during start!");
         return ALC_ERROR_INVALID_ARG;
     }
     utils::CopyBytes(ptag, ctx->cmac, t);
@@ -128,34 +135,30 @@ copyTag(ccm_data_t* ctx, Uint8 ptag[], Uint64 tagLen)
     return ALC_ERROR_NONE;
 }
 
-// FIXME: nRounds needs to be constexpr to be more efficient
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-Ccm::cryptUpdate(const Uint8 pInput[],
-                 Uint8       pOutput[],
-                 Uint64      dataLen,
-                 bool        isEncrypt)
+CcmT<keyLenBits, arch>::cryptUpdate(const Uint8 pInput[],
+                                   Uint8       pOutput[],
+                                   Uint64      dataLen,
+                                   bool        isEncrypt)
 {
 
 #ifdef CCM_MULTI_UPDATE
     if (!m_ccm_data.key) {
-        // InvalidValue : Key has to be set before update
         return ALC_ERROR_BAD_STATE;
     }
 #endif
     alc_error_t err = ALC_ERROR_NONE;
     if ((pInput == NULL) || (pOutput == NULL)) {
-        // InvalidValue: "Input or Output Null Pointer!"
         return ALC_ERROR_INVALID_ARG;
     }
 
 #ifndef CCM_MULTI_UPDATE
-    const Uint8* p_keys  = getEncryptKeys();
-    const Uint32 cRounds = m_nrounds;
-    m_ccm_data.key       = p_keys;
-    m_ccm_data.rounds    = cRounds;
+    m_ccm_data.key    = m_keyManager.getEncryptKeys();
+    m_ccm_data.rounds = m_keyManager.getRounds();
 
     // Below Operations has to be done in order
-    err = setIv(&m_ccm_data, m_iv_aes, m_ivLen_aes, dataLen);
+    err = setIvInternal(&m_ccm_data, m_ivManager.getIv(), m_ivManager.getIvLen(), dataLen);
 #endif
     // Accelerate with AESNI
     if (m_updatedLength == 0) {
@@ -169,11 +172,9 @@ Ccm::cryptUpdate(const Uint8 pInput[],
             aesni::ccm::Encrypt(&m_ccm_data, pInput, pOutput, dataLen);
         switch (ccm_err) {
             case CCM_ERROR::LEN_MISMATCH:
-                // EncryptFailed("Length of plainText mismatch!")
                 err = ALC_ERROR_INVALID_DATA;
                 break;
             case CCM_ERROR::DATA_OVERFLOW:
-                // EncryptFailed("Overload of plaintext. Please reduce it!"
                 err = ALC_ERROR_INVALID_DATA;
                 break;
             default:
@@ -183,7 +184,6 @@ Ccm::cryptUpdate(const Uint8 pInput[],
         CCM_ERROR ccm_err =
             aesni::ccm::Decrypt(&m_ccm_data, pInput, pOutput, dataLen);
         switch (ccm_err) {
-            // DecryptFailed("Length of plainText mismatch!")
             case CCM_ERROR::LEN_MISMATCH:
                 err = ALC_ERROR_INVALID_DATA;
                 break;
@@ -206,11 +206,12 @@ Ccm::cryptUpdate(const Uint8 pInput[],
     return err;
 }
 
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-Ccm::setIv(ccm_data_t* ccm_data,
-           const Uint8 pIv[],
-           Uint64      ivLen,
-           Uint64      dataLen)
+CcmT<keyLenBits, arch>::setIvInternal(ccm_data_t* ccm_data,
+                                     const Uint8 pIv[],
+                                     Uint64      ivLen,
+                                     Uint64      dataLen)
 {
     unsigned int q;
     Uint64       len = dataLen;
@@ -219,14 +220,12 @@ Ccm::setIv(ccm_data_t* ccm_data,
 #endif
 
     if (ccm_data == nullptr || pIv == nullptr) {
-        // InvalidValue("Null Pointer is not expected!")
         return ALC_ERROR_INVALID_ARG;
     }
 
     q = ccm_data->nonce[0] & 7;
 
     if (ivLen < (14 - q)) {
-        // InvalidValue("Length of nonce is too small!")
         return ALC_ERROR_INVALID_ARG;
     }
 
@@ -247,17 +246,15 @@ Ccm::setIv(ccm_data_t* ccm_data,
     ccm_data->nonce[0] &= ~0x40; /* clear Adata flag */
     utils::CopyBytes(&ccm_data->nonce[1], pIv, 14 - q);
 
-    m_ivState_aes = 1;
-    // EXITG();
     return ALC_ERROR_NONE;
 }
 
-// Auth class definitions
+// Auth methods
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-CcmHash::setTagLength(Uint64 tagLen)
+CcmT<keyLenBits, arch>::setTagLength(Uint64 tagLen)
 {
     if (tagLen < 4 || tagLen > 16) {
-        // InvalidValue("Length of tag should be 4 < len < 16 ");
         return ALC_ERROR_INVALID_ARG;
     }
     // Stored to verify in the getTagLength API
@@ -265,8 +262,9 @@ CcmHash::setTagLength(Uint64 tagLen)
     return ALC_ERROR_NONE;
 }
 
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-CcmHash::setPlainTextLength(Uint64 len)
+CcmT<keyLenBits, arch>::setPlainTextLength(Uint64 len)
 {
     m_plainTextLength      = len;
     m_updatedLength        = 0;
@@ -274,9 +272,13 @@ CcmHash::setPlainTextLength(Uint64 len)
     return ALC_ERROR_NONE;
 }
 
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-CcmHash::setAad(const Uint8* pInput, Uint64 aadLen)
+CcmT<keyLenBits, arch>::setAad(const Uint8* pInput, Uint64 aadLen)
 {
+    if (pInput == nullptr && aadLen > 0) {
+        return ALC_ERROR_INVALID_ARG;
+    }
 
     m_additionalData    = pInput;
     m_additionalDataLen = aadLen;
@@ -284,25 +286,22 @@ CcmHash::setAad(const Uint8* pInput, Uint64 aadLen)
     return ALC_ERROR_NONE;
 }
 
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-CcmHash::getTag(Uint8* pOutput, Uint64 tagLen)
+CcmT<keyLenBits, arch>::getTag(Uint8* pOutput, Uint64 tagLen)
 {
     alc_error_t err = ALC_ERROR_NONE;
 #ifdef CCM_MULTI_UPDATE
     // Check if total updated data so far has exceeded the preestablished
-    // plaintext Length. This check is here rather than in encrypt/decrypt
-    // to allow multiupdate calls in benchmarking.
+    // plaintext Length.
     if (m_updatedLength > m_plainTextLength) {
         return ALC_ERROR_INVALID_DATA;
     }
     if (tagLen < 4 || tagLen > 16 || tagLen == 0) {
-        // InvalidValue("Tag length is not what we agreed upon during start!")
         return ALC_ERROR_INVALID_ARG;
     }
     // If tagLen is 0 that means something seriously went south
     if (m_tagLen == 0) {
-        // InvalidValue("Tag length is unknown!, need to agree on tag before
-        // hand!")
         return ALC_ERROR_BAD_STATE;
 
     } else {
@@ -312,45 +311,44 @@ CcmHash::getTag(Uint8* pOutput, Uint64 tagLen)
     return err;
 #else
     if (tagLen < 4 || tagLen > 16 || tagLen == 0) {
-        // InvalidValue("Tag length is not what we agreed upon during start!")
         return ALC_ERROR_INVALID_ARG;
     }
     // If tagLen is 0 that means something seriously went south
     if (m_tagLen != 0) {
         err = copyTag(&m_ccm_data, pOutput, tagLen);
     } else {
-        // InvalidValue("Tag length is unknown!, need to agree on tag before
-        // hand!")
         return ALC_ERROR_BAD_STATE;
     }
     return err;
 #endif
 }
 
-// Aead class definitions
-
-// aesni member functions
-
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+// Encrypt/Decrypt methods
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 CcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
-                                Uint8*       pOutput,
-                                Uint64       len,
-                                Uint64*      outlen)
+                               Uint8*       pOutput,
+                               Uint64       len,
+                               Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
-    m_isEnc_aes     = ALCP_ENC;
 
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (outlen == nullptr) {
         return ALC_ERROR_INVALID_ARG;
     }
     *outlen = 0;
 
-    if (!(m_ivState_aes && m_isKeySet_aes)) {
+    if (!m_stateManager.isReady()) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
     }
-    err = Ccm::cryptUpdate(pInput, pOutput, len, 1);
+    err = cryptUpdate(pInput, pOutput, len, 1);
 
     // AEAD modes: output length equals input length on success
     if (err == ALC_ERROR_NONE) {
@@ -360,26 +358,31 @@ CcmT<keyLenBits, arch>::encrypt(const Uint8* pInput,
     return err;
 }
 
-template<CipherKeyLen keyLenBits, CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 CcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
-                                Uint8*       pOutput,
-                                Uint64       len,
-                                Uint64*      outlen)
+                               Uint8*       pOutput,
+                               Uint64       len,
+                               Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
-    m_isEnc_aes     = ALCP_DEC;
 
+    if (pInput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pOutput == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
     if (outlen == nullptr) {
         return ALC_ERROR_INVALID_ARG;
     }
     *outlen = 0;
 
-    if (!(m_ivState_aes && m_isKeySet_aes)) {
+    if (!m_stateManager.isReady()) {
         printf("\nError: Key or Iv not set \n");
         return ALC_ERROR_BAD_STATE;
     }
-    err = Ccm::cryptUpdate(pInput, pOutput, len, 0);
+    err = cryptUpdate(pInput, pOutput, len, 0);
 
     // AEAD modes: output length equals input length on success
     if (err == ALC_ERROR_NONE) {
@@ -389,11 +392,9 @@ CcmT<keyLenBits, arch>::decrypt(const Uint8* pInput,
     return err;
 }
 
-template class CcmT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                    CpuCipherFeatures::eAesni>;
-template class CcmT<alcp::cipher::CipherKeyLen::eKey192Bit,
-                    CpuCipherFeatures::eAesni>;
-template class CcmT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                    CpuCipherFeatures::eAesni>;
+// Explicit template instantiations
+template class CcmT<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen>;
+template class CcmT<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen>;
+template class CcmT<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen>;
 
 } // namespace alcp::cipher

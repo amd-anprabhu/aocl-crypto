@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -111,16 +111,20 @@ alcp_cipher_request(const alc_cipher_mode_t mode,
 
     ALCP_ZERO_LEN_ERR_RET(keyLen);
 
-    auto alcpCipher       = new CipherFactory<iCipher>;
-    ctx->m_cipher_factory = static_cast<void*>(alcpCipher);
+    // Store mode and keyLen for later use (e.g., context copy)
+    ctx->m_cipherMode = getCipherMode(mode);
+    ctx->m_keyLen     = getKeyLen(keyLen);
 
-    auto aead = alcpCipher->create(getCipherMode(mode), getKeyLen(keyLen));
+    // Direct cipher creation (no factory)
+    auto cipher = createCipher(ctx->m_cipherMode, ctx->m_keyLen);
 
-    if (aead == nullptr) {
+    if (cipher == nullptr) {
         printf("\n cipher algo create failed");
         return ALC_ERROR_GENERIC;
     }
-    ctx->m_cipher = static_cast<void*>(aead);
+    ctx->m_cipher      = cipher;
+    ctx->m_cipherType  = CipherType::eCipher;
+    ctx->m_multibuffer = dynamic_cast<iMultibuffer*>(cipher); // Cache for reuse
 
     return err;
 }
@@ -145,21 +149,17 @@ alcp_cipher_encrypt(const alc_cipher_handle_p pCipherHandle,
     *outlen = 0;
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return ALC_ERROR_BAD_STATE;
-    }
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
-    auto        i   = static_cast<iCipher*>(ctx->m_cipher);
-    alc_error_t err = i->encrypt(pPlainText, pCipherText, len, outlen);
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipher);
 
-    return err;
+    return ctx->m_cipher->encrypt(pPlainText, pCipherText, len, outlen);
 }
 
 alc_error_t
 alcp_flush(const alc_cipher_handle_p pCipherHandle,
            const Uint8**             pPlainText,
-           Uint64                    numBuffers,
-           Uint64                    len)
+                   const Uint64*             pLengths,
+                   Uint64                    numBuffers)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG);
@@ -167,21 +167,24 @@ alcp_flush(const alc_cipher_handle_p pCipherHandle,
 
     ALCP_BAD_PTR_ERR_RET(pCipherHandle);
     ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
+    ALCP_BAD_PTR_ERR_RET(pLengths);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return ALC_ERROR_BAD_STATE;
-    }
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
-    auto i = static_cast<iCipher*>(ctx->m_cipher);
-    return i->flush(pPlainText, numBuffers, len);
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipher);
+
+    // Use cached multibuffer interface pointer
+    if (ctx->m_multibuffer == nullptr) {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+    return ctx->m_multibuffer->flush(pPlainText, pLengths, numBuffers);
 }
 
 alc_error_t
 alcp_dequeue(const alc_cipher_handle_p pCipherHandle,
-             Uint8**                   pCipherText,
-             Uint64                    numBuffers,
-             Uint64                    len)
+                     Uint8**                   pCipherText,
+                     Uint64                    numBuffers,
+                     const Uint64*             pLengths)
 {
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG);
@@ -190,16 +193,17 @@ alcp_dequeue(const alc_cipher_handle_p pCipherHandle,
     ALCP_BAD_PTR_ERR_RET(pCipherHandle);
     ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
     ALCP_BAD_PTR_ERR_RET(pCipherText);
-    ALCP_ZERO_LEN_ERR_RET(len);
+    ALCP_BAD_PTR_ERR_RET(pLengths);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return ALC_ERROR_BAD_STATE;
-    }
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipher);
 
-    auto i = static_cast<iCipher*>(ctx->m_cipher);
-    return i->dequeue(pCipherText, numBuffers, len);
+    // Use cached multibuffer interface pointer
+    if (ctx->m_multibuffer == nullptr) {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
+    return ctx->m_multibuffer->dequeue(pCipherText, numBuffers, pLengths);
 }
 
 alc_error_t
@@ -223,15 +227,10 @@ alcp_cipher_decrypt(const alc_cipher_handle_p pCipherHandle,
     *outlen = 0;
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return ALC_ERROR_BAD_STATE;
-    }
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipher);
 
-    auto        i   = static_cast<iCipher*>(ctx->m_cipher);
-    alc_error_t err = i->decrypt(pCipherText, pPlainText, len, outlen);
-
-    return err;
+    return ctx->m_cipher->decrypt(pCipherText, pPlainText, len, outlen);
 }
 
 alc_error_t
@@ -251,16 +250,17 @@ alcp_multibuffer_init(const alc_cipher_handle_p pCipherHandle,
     ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return ALC_ERROR_BAD_STATE;
-    }
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipher);
 
-    auto i = static_cast<iCipher*>(ctx->m_cipher);
+    // Use cached multibuffer interface pointer
+    if (ctx->m_multibuffer == nullptr) {
+        return ALC_ERROR_NOT_SUPPORTED;
+    }
 
     // init can be called to setKey or setIv or both
     if ((pKey != NULL && keyLen != 0) || (pIv != NULL && ivLen != 0)) {
-        err = i->multibufferInit(pKey, keyLen, pIv, ivLen, numBuffers);
+        err = ctx->m_multibuffer->multibufferInit(pKey, keyLen, pIv, ivLen, numBuffers);
     } else {
         err = ALC_ERROR_INVALID_ARG;
     }
@@ -283,16 +283,12 @@ alcp_cipher_init(const alc_cipher_handle_p pCipherHandle,
     ALCP_BAD_PTR_ERR_RET(pCipherHandle->ch_context);
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return ALC_ERROR_BAD_STATE;
-    }
     ALCP_BAD_PTR_ERR_RET(ctx->m_cipher);
-
-    auto i = static_cast<iCipher*>(ctx->m_cipher);
+    ALCP_CHECK_CIPHER_TYPE(ctx, CipherType::eCipher);
 
     // init can be called to setKey or setIv or both
     if ((pKey != NULL && keyLen != 0) || (pIv != NULL && ivLen != 0)) {
-        err = i->init(pKey, keyLen, pIv, ivLen);
+        err = ctx->m_cipher->init(pKey, keyLen, pIv, ivLen);
     } else {
         err = ALC_ERROR_INVALID_ARG;
     }
@@ -309,17 +305,18 @@ alcp_cipher_finish(const alc_cipher_handle_p pCipherHandle)
         return;
 
     auto ctx = static_cast<Context*>(pCipherHandle->ch_context);
-    if (ctx->destructed == 1) {
-        return;
-    }
-    auto alcpCipher =
-        static_cast<CipherFactory<iCipher>*>(ctx->m_cipher_factory);
 
-    if (alcpCipher != nullptr) {
-        delete alcpCipher;
+    // Validate type before deleting
+    if (ctx->m_cipherType != CipherType::eCipher) {
+        return; // Wrong type, don't delete
     }
 
-    ctx->~Context();
+    // Delete cipher object
+    if (ctx->m_cipher != nullptr) {
+        delete ctx->m_cipher;
+        ctx->m_cipher     = nullptr;
+        ctx->m_cipherType = CipherType::eNone;
+    }
 
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "Cipher finish done");
@@ -343,34 +340,34 @@ alcp_cipher_context_copy(const alc_cipher_handle_p pSrcCipherHandle,
     auto src_ctx = static_cast<Context*>(pSrcCipherHandle->ch_context);
     auto dst_ctx = static_cast<Context*>(pDstCipherHandle->ch_context);
 
+    // Check source cipher is valid
+    ALCP_BAD_PTR_ERR_RET(src_ctx->m_cipher);
+    ALCP_CHECK_CIPHER_TYPE(src_ctx, CipherType::eCipher);
+
     new (dst_ctx) Context;
 
-    auto alcpCipher           = new CipherFactory<iCipher>;
-    dst_ctx->m_cipher_factory = static_cast<void*>(alcpCipher);
+    // Copy mode, keyLen, and type from source context
+    dst_ctx->m_cipherMode = src_ctx->m_cipherMode;
+    dst_ctx->m_keyLen     = src_ctx->m_keyLen;
+    dst_ctx->m_cipherType = src_ctx->m_cipherType;
 
-    auto aead = alcpCipher->create(
-        static_cast<CipherFactory<iCipher>*>(src_ctx->m_cipher_factory)
-            ->m_cipher_mode,
-        static_cast<CipherFactory<iCipher>*>(src_ctx->m_cipher_factory)
-            ->m_keyLen);
+    // Direct cipher creation (no factory)
+    auto cipher = createCipher(dst_ctx->m_cipherMode, dst_ctx->m_keyLen);
 
-    dst_ctx->m_cipher = static_cast<void*>(aead);
+    dst_ctx->m_cipher      = cipher;
+    dst_ctx->m_multibuffer = dynamic_cast<iMultibuffer*>(cipher); // Cache for reuse
 
     if (!dst_ctx->m_cipher) {
+        dst_ctx->m_cipherType = CipherType::eNone;
         return ALC_ERROR_BAD_STATE;
     }
 
-    // Check destruction state
-    if (src_ctx->destructed == 1 || dst_ctx->destructed == 1) {
-        return ALC_ERROR_BAD_STATE;
-    }
     // Validate cipher objects exist
     ALCP_BAD_PTR_ERR_RET(src_ctx->m_cipher);
     ALCP_BAD_PTR_ERR_RET(dst_ctx->m_cipher);
 
-    auto src_cipher = static_cast<iCipher*>(src_ctx->m_cipher);
-    auto dst_cipher = static_cast<iCipher*>(dst_ctx->m_cipher);
-    err             = src_cipher->CopyCtx(src_cipher, dst_cipher);
+    // Use cached pointers for CopyCtx
+    err = src_ctx->m_cipher->CopyCtx(src_ctx->m_cipher, dst_ctx->m_cipher);
 
 #ifdef ALCP_ENABLE_DEBUG_LOGGING
     ALCP_DEBUG_LOG(LOG_DBG, "Cipher context copied successfully");

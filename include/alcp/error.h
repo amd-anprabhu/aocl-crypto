@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2021-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -36,7 +36,7 @@
 /**
  * @defgroup error Error API
  * @brief
- * Error API are used to know the Failure Issues caused by any other API used
+ * Error APIs are used to report failures caused by other API calls.
  * @{
  *
  */
@@ -45,101 +45,101 @@ EXTERN_C_BEGIN
 
 /**
  * @brief Provide the Error Code for the error occurred if any
- * @typedef enum alc_error_generic_t
+ * @enum alc_error_generic
  */
-typedef enum _alc_error_generic
+typedef enum alc_error_generic
 {
     /*
      * All is well
      */
-    ALC_ERROR_NONE = 0UL,
+    ALC_ERROR_NONE = 0UL, /**< No error, operation succeeded */
 
     /*
      * An Error,
      *    but cant be categorized correctly
      */
-    ALC_ERROR_GENERIC,
+    ALC_ERROR_GENERIC, /**< Unclassified error */
 
     /*
      * Not Supported,
      *  Any of Feature, configuration,  Algorithm or  Keysize not supported
      */
-    ALC_ERROR_NOT_SUPPORTED,
+    ALC_ERROR_NOT_SUPPORTED, /**< Feature, algorithm, or key size not supported */
 
     /*
      * Not Permitted,
      *  Operation supported but not permitted by this module/user etc.
      *  Kind of permission Denied situation, could be from the OS
      */
-    ALC_ERROR_NOT_PERMITTED,
+    ALC_ERROR_NOT_PERMITTED, /**< Operation not permitted */
 
     /*
      * Exists,
      *  Something that is already exists is requested to register or replace
      */
-    ALC_ERROR_EXISTS,
+    ALC_ERROR_EXISTS, /**< Resource already exists */
 
     /*
      * Does not Exist,
      *   Requested configuration/algorithm/module/feature  does not exists
      */
-    ALC_ERROR_NOT_EXISTS,
+    ALC_ERROR_NOT_EXISTS, /**< Resource does not exist */
 
     /*
      * Invalid argument
      */
-    ALC_ERROR_INVALID_ARG,
+    ALC_ERROR_INVALID_ARG, /**< Invalid argument provided */
 
     /*
      * Bad Internal State,
      *   Algorithm/context is in bad state due to internal Error
      */
-    ALC_ERROR_BAD_STATE,
+    ALC_ERROR_BAD_STATE, /**< Handle or context in invalid state */
 
     /*
      * No Memory,
      *  Not enough free space available, Unable to allocate memory
      */
-    ALC_ERROR_NO_MEMORY,
+    ALC_ERROR_NO_MEMORY, /**< Memory allocation failed */
 
     /*
      * Data validation failure,
      *   Invalid pointer / Sent data is invalid
      */
-    ALC_ERROR_INVALID_DATA,
+    ALC_ERROR_INVALID_DATA, /**< Invalid or corrupt data */
 
     /*
      * Size Error,
      *   Data/Key size is invalid
      */
-    ALC_ERROR_INVALID_SIZE,
+    ALC_ERROR_INVALID_SIZE, /**< Invalid size parameter */
 
     /*
      * Hardware Error,
      *   not in sane state, or failed during operation
      */
-    ALC_ERROR_HARDWARE_FAILURE,
+    ALC_ERROR_HARDWARE_FAILURE, /**< Hardware operation failed */
 
     /* There is not enough entropy for RNG
         retry needed with more entropy */
-    ALC_ERROR_NO_ENTROPY,
+    ALC_ERROR_NO_ENTROPY, /**< Insufficient entropy available */
 
     /*
      *The Tweak key and Encryption is same
      *for AES-XTS mode
      */
-    ALC_ERROR_DUPLICATE_KEY,
+    ALC_ERROR_DUPLICATE_KEY, /**< Duplicate key detected */
 
     /*
      * Mismatch is tag observed in Decrypt
      */
-    ALC_ERROR_TAG_MISMATCH,
+    ALC_ERROR_TAG_MISMATCH, /**< Authentication tag mismatch */
 
     /*
-     * Algorithm is implimented for specific hardware only
-     * and no fallback implementaion is available
+     * Algorithm is implemented for specific hardware only
+     * and no fallback implementation is available
      */
-    ALC_ERROR_NO_FALLBACK,
+    ALC_ERROR_NO_FALLBACK, /**< Algorithm requires specific hardware with no software fallback */
 
 } alc_error_generic_t;
 
@@ -158,6 +158,7 @@ typedef Uint64 alc_error_t;
  *               previous call.
  *
  * @param [in] err    Actual Error
+ * @return   Non-zero if an error has occurred, 0 otherwise
  */
 ALCP_API_EXPORT Uint8
 alcp_is_error(alc_error_t err);

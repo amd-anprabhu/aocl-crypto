@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -48,6 +48,8 @@ using namespace alcp::testing;
 
 /* Valid block sizes for performance comparison */
 std::vector<Int64> hmac_block_sizes = { 16, 64, 256, 1024, 8192, 16384, 32768 };
+
+std::vector<Int64> hmac_buffer_sizes = { 8, 16, 32 };
 
 void inline Hmac_Bench(benchmark::State& state,
                        alc_mac_info_t    info,
@@ -161,13 +163,77 @@ BENCH_HMAC_SHA3_512(benchmark::State& state)
     Hmac_Bench(state, info, state.range(0), 512);
 }
 
+void inline Hmac_Multibuffer_Bench(benchmark::State& state,
+                                   alc_mac_info_t    info,
+                                   Uint64            block_size,
+                                   Uint64            buffers,
+                                   int               HmacSize)
+{
+    const int        KeySize = 1048;
+    alcp_hmac_data_t data;
+    data.in.m_msg_len   = block_size;
+    data.out.m_hmac_len = HmacSize / 8;
+    data.in.m_buffers   = buffers;
+
+    std::vector<Uint8> Key(KeySize, 0x01);
+    data.in.m_key     = Key.data();
+    data.in.m_key_len = Key.size();
+
+    std::vector<std::vector<Uint8>> vec_msg(
+        buffers, std::vector<Uint8>(block_size, 0x01));
+    std::vector<std::vector<Uint8>> vec_hmac(
+        buffers, std::vector<Uint8>(data.out.m_hmac_len, 0x0));
+
+    std::vector<const Uint8*> msg_buffer_pointers(buffers);
+    std::vector<Uint8*>       hmac_buffer_pointers(buffers);
+    for (Uint64 i = 0; i < buffers; ++i) {
+        msg_buffer_pointers[i]  = vec_msg[i].data();
+        hmac_buffer_pointers[i] = vec_hmac[i].data();
+    }
+    data.in.m_p_msg   = msg_buffer_pointers.data();
+    data.out.m_p_hmac = hmac_buffer_pointers.data();
+
+    AlcpHmacBase ahb;
+    if (!ahb.Init(info, Key)) {
+        state.SkipWithError("Error in hmac init function");
+    }
+
+    for (auto _ : state) {
+        if (!ahb.MacFlush(data)) {
+            state.SkipWithError("Error in running hmac_flush benchmark");
+        }
+        if (!ahb.MacDequeue(data)) {
+            state.SkipWithError("Error in running hmac_dequeue benchmark");
+        }
+    }
+
+    state.counters["Speed(Bytes/s)"] = benchmark::Counter(
+        state.iterations() * block_size * buffers, benchmark::Counter::kIsRate);
+    state.counters["BlockSize(Bytes)"] = block_size;
+    state.counters["NumBuffers"]       = buffers;
+}
+
+static void
+BENCH_HMAC_MULTIBUFFER_SHA2_224(benchmark::State& state)
+{
+    alc_mac_info_t info{ { ALC_MB_SHA2_224 } };
+    Hmac_Multibuffer_Bench(state, info, state.range(0), state.range(1), 224);
+}
+
+static void
+BENCH_HMAC_MULTIBUFFER_SHA2_256(benchmark::State& state)
+{
+    alc_mac_info_t info{ { ALC_MB_SHA2_256 } };
+    Hmac_Multibuffer_Bench(state, info, state.range(0), state.range(1), 256);
+}
+
 /* add benchmarks */
 int
 AddBenchmarks()
 {
     /* check if custom block size is provided by user */
     if (block_size != 0) {
-        std::cout << "Custom block size selected:" << block_size << std::endl;
+        std::cerr << "Custom block size selected:" << block_size << std::endl;
         hmac_block_sizes.resize(1);
         hmac_block_sizes[0] = block_size;
     }
@@ -182,6 +248,14 @@ AddBenchmarks()
         BENCHMARK(BENCH_HMAC_SHA3_256)->ArgsProduct({ hmac_block_sizes });
         BENCHMARK(BENCH_HMAC_SHA3_384)->ArgsProduct({ hmac_block_sizes });
         BENCHMARK(BENCH_HMAC_SHA3_512)->ArgsProduct({ hmac_block_sizes });
+    }
+
+    /* Multibuffer benchmarks - only for ALCP */
+    if (!useipp && !useossl) {
+        BENCHMARK(BENCH_HMAC_MULTIBUFFER_SHA2_224)
+            ->ArgsProduct({ hmac_block_sizes, hmac_buffer_sizes });
+        BENCHMARK(BENCH_HMAC_MULTIBUFFER_SHA2_256)
+            ->ArgsProduct({ hmac_block_sizes, hmac_buffer_sizes });
     }
     return 0;
 }

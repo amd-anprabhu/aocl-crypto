@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,7 +26,7 @@
  *
  */
 
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/cipher/aesni.hh"
 #include "alcp/types.hh"
 #include "avx2.hh"
@@ -244,22 +244,23 @@ EncryptCbc(const Uint8* pSrc,    // ptr to ciphertext
 namespace alcp::cipher {
 // Decrypt Functions
 
-template<alcp::cipher::CipherKeyLen T, alcp::utils::CpuCipherFeatures arch>
+template<alcp::cipher::CipherKeyLen T, alcp::utils::CpuArchLevel arch>
 alc_error_t
 tDecryptCbc(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv)
 {
+    constexpr int nRounds = static_cast<int>(T) / 32 + 6;
     return alcp::cipher::aesni::DecryptCbc<alcp::cipher::aesni::AesDecrypt,
                                            alcp::cipher::aesni::AesDecrypt,
                                            alcp::cipher::aesni::AesDecrypt,
                                            alcp::cipher::aesni::AesDecrypt>(
-        pSrc, pDest, len, pKey, 10, pIv);
+        pSrc, pDest, len, pKey, nRounds, pIv);
 }
 
 template<>
 alc_error_t
 tDecryptCbc<alcp::cipher::CipherKeyLen::eKey128Bit,
-            alcp::utils::CpuCipherFeatures::eAesni>(
+            alcp::utils::CpuArchLevel::eZen>(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv)
 {
     return alcp::cipher::aesni::DecryptCbc<alcp::cipher::aesni::AesDecrypt,
@@ -272,7 +273,7 @@ tDecryptCbc<alcp::cipher::CipherKeyLen::eKey128Bit,
 template<>
 alc_error_t
 tDecryptCbc<alcp::cipher::CipherKeyLen::eKey192Bit,
-            alcp::utils::CpuCipherFeatures::eAesni>(
+            alcp::utils::CpuArchLevel::eZen>(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv)
 {
     return alcp::cipher::aesni::DecryptCbc<alcp::cipher::aesni::AesDecrypt,
@@ -285,7 +286,7 @@ tDecryptCbc<alcp::cipher::CipherKeyLen::eKey192Bit,
 template<>
 alc_error_t
 tDecryptCbc<alcp::cipher::CipherKeyLen::eKey256Bit,
-            alcp::utils::CpuCipherFeatures::eAesni>(
+            alcp::utils::CpuArchLevel::eZen>(
     const Uint8* pSrc, Uint8* pDest, Uint64 len, const Uint8* pKey, Uint8* pIv)
 {
     return alcp::cipher::aesni::DecryptCbc<alcp::cipher::aesni::AesDecrypt,

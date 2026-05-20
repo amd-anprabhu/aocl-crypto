@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -30,7 +30,6 @@
 
 #include <cstdint>
 
-#include "alcp/cipher/aes.hh"
 #include "alcp/cipher/cipher_wrapper.hh"
 #include "alcp/error.h"
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -36,8 +36,8 @@
 #define POLY1305_RADIX_26 false
 
 namespace alcp::mac::poly1305 {
-using utils::CpuArchFeature;
-template<utils::CpuArchFeature feature = CpuArchFeature::eDynamic>
+using utils::CpuArchLevel;
+template<utils::CpuArchLevel archLevel = CpuArchLevel::eDynamic>
 class ALCP_API_EXPORT Poly1305 : public IMac
 {
   private:

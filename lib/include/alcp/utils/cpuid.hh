@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -30,27 +30,124 @@
 
 #include "alcp/alcp.hh"
 #include "config.h"
+#include <cstdint>
 #include <iostream>
 #include <memory>
+#include <vector>
 
 namespace alcp::utils {
 
-enum class CpuCipherFeatures
+/**
+ * @brief Unified CPU architecture level for ISA-based dispatch
+ *
+ * Levels are defined by ISA feature sets and apply to any x86-64 CPU
+ * (AMD or Intel) that supports the required instructions.  The names
+ * use AMD Zen generations as shorthand because the library was first
+ * optimized for those parts, but dispatch is purely ISA-driven.
+ *
+ * For cipher dispatch:
+ *   - eReference: No SIMD optimizations
+ *   - eZen: AESNI-based implementations
+ *   - eZen3: VAES 256-bit implementations
+ *   - eZen4: VAES 512-bit implementations
+ */
+enum class CpuArchLevel
 {
-    eReference = 0,
-    eAesni     = 1,
-    eVaes256   = 2,
-    eVaes512   = 3,
-    eDynamic   = 4
+    eReference = 0, // Fallback, no SIMD optimizations
+    eZen       = 1, // ISA: ADX, AVX2, BMI2, AESNI, SSE3
+    eZen3      = 2, // ISA: adds VAES (256-bit)
+    eZen4      = 3, // ISA: adds AVX512 (F/DQ/BW/IFMA/VL), VAES512
+    eZen5      = 4, // ISA: adds AVX512_VP2INTERSECT
+    eDynamic   = 5, // Runtime dispatch (default)
 };
 
-enum class CpuArchFeature
+inline const char*
+CpuArchLevelToString(CpuArchLevel level)
 {
-    eReference = 0,
-    eAvx2      = 2,
-    eAvx512    = 3,
-    eDynamic   = 4
+    switch (level) {
+        case CpuArchLevel::eZen5:
+            return "Zen5";
+        case CpuArchLevel::eZen4:
+            return "Zen4";
+        case CpuArchLevel::eZen3:
+            return "Zen3";
+        case CpuArchLevel::eZen:
+            return "Zen/Zen2";
+        case CpuArchLevel::eReference:
+            return "Reference";
+        case CpuArchLevel::eDynamic:
+            return "Dynamic";
+        default:
+            return "Unknown";
+    }
+}
+
+/**
+ * @brief CPU capabilities that are orthogonal to architecture level
+ *
+ * Some features don't map cleanly to architecture levels (e.g., SHA-NI
+ * is available on some Zen CPUs but not tied to Zen level). Use this
+ * bitfield to check for specific capabilities.
+ */
+enum class CpuCapability : uint32_t
+{
+    eNone   = 0,
+    eShaNi  = 1 << 0, // SHA-NI instructions (for SHA256)
+    eRdRand = 1 << 1, // Hardware RNG (RDRAND)
+    eRdSeed = 1 << 2, // Hardware RNG seed (RDSEED)
 };
+
+// Bitwise operators for CpuCapability
+inline CpuCapability
+operator|(CpuCapability a, CpuCapability b)
+{
+    return static_cast<CpuCapability>(static_cast<uint32_t>(a)
+                                      | static_cast<uint32_t>(b));
+}
+
+inline CpuCapability
+operator&(CpuCapability a, CpuCapability b)
+{
+    return static_cast<CpuCapability>(static_cast<uint32_t>(a)
+                                      & static_cast<uint32_t>(b));
+}
+
+inline bool
+hasCapability(CpuCapability caps, CpuCapability check)
+{
+    return (static_cast<uint32_t>(caps) & static_cast<uint32_t>(check)) != 0;
+}
+
+/**
+ * @brief Algorithm type for per-algorithm CPU feature requirements
+ *
+ * Different algorithms have different CPU feature requirements for optimal
+ * dispatch. Use this enum with getArchLevel() to get the appropriate
+ * architecture level for a specific algorithm.
+ *
+ * Feature requirements per algorithm:
+ *   - eCipher:   AESNI → VAES → VAES+AVX512
+ *   - eRsa:      ADX+BMI2 → ADX+BMI2 → ADX+BMI2+IFMA
+ *   - ePoly1305: Reference → Reference → AVX512Base
+ *   - eX25519:   ADX+BMI2+AVX2 → VAES → VAES
+ *   - eSha2_256: SHA-NI based (orthogonal to arch level)
+ *   - eSha2_512: AVX2+SSE3 → AVX256 → AVX512
+ *   - eSha3:     AVX2 → AVX2+VAES → AVX512
+ */
+enum class AlgorithmType
+{
+    eCipher,   // AES modes: AESNI → VAES → VAES512
+    eRsa,      // ADX+BMI2 → ADX+BMI2 → ADX+BMI2+IFMA
+    ePoly1305, // Reference → Reference → AVX512Base
+    eX25519,   // ADX+BMI2+AVX2 → VAES → VAES
+    eSha2_256, // SHA-NI based (orthogonal)
+    eSha2_512, // AVX2+SSE3 → AVX256 → AVX512
+    eSha3,     // AVX2 → AVX2+VAES → AVX512
+    eDefault,  // Backward compatibility (current behavior)
+};
+
+// Number of algorithm types (excluding eDefault for caching)
+constexpr int cNumAlgorithmTypes = static_cast<int>(AlgorithmType::eDefault);
 
 enum class Avx512Flags
 {
@@ -61,6 +158,12 @@ enum class Avx512Flags
     AVX512_VL,
 };
 
+/**
+ * @brief CPU Zen version for exact microarchitecture detection
+ *
+ * Used for fine-grained dispatch where different Zen generations
+ * may require different kernel selections (e.g., SHA3 on Zen5+Clang).
+ */
 enum class CpuZenVer
 {
     ZEN  = 0,
@@ -70,166 +173,129 @@ enum class CpuZenVer
     ZEN5 = 4,
 };
 
-// using alci::Cpu;
-// using alci::Uarch;
-
 class ALCP_API_EXPORT CpuId
 {
   public:
     CpuId() {}
     ~CpuId() = default;
 
-    // Genoa functions
     /**
-     * @brief Returns true if CPU has AVX512f Flag
+     * @brief Get the current CPU architecture level for a specific algorithm
+     * @param algo The algorithm type to get architecture level for
+     * @return CpuArchLevel enum value based on detected CPU features
      *
-     * @return true
-     * @return false
+     * Different algorithms have different CPU feature requirements:
+     *   - eCipher:   Requires AESNI/VAES/AVX512
+     *   - eRsa:      Requires ADX+BMI2, IFMA for Zen4
+     *   - ePoly1305: Reference or AVX512Base
+     *   - eX25519:   Requires ADX+BMI2+AVX2, VAES for Zen3+
+     *   - eSha2_512: Requires AVX2/AVX256/AVX512
+     *   - eSha3:     Requires AVX2/VAES/AVX512
+     *   - eDefault:  Uses original blanket check (backward compatible)
      */
+    static CpuArchLevel getArchLevel(
+        AlgorithmType algo = AlgorithmType::eDefault);
+
+    /**
+     * @brief Get cached CPU architecture level for a specific algorithm
+     * @param algo The algorithm type to get architecture level for
+     * @return CpuArchLevel enum value (cached per algorithm type)
+     */
+    static CpuArchLevel getCachedArchLevel(
+        AlgorithmType algo = AlgorithmType::eDefault);
+
+    /**
+     * @brief Get CPU capabilities bitfield
+     * @return CpuCapability bitfield with available special features
+     */
+    static CpuCapability getCapabilities();
+
+    /**
+     * @brief Get cached CPU capabilities (initialized once)
+     * @return CpuCapability bitfield
+     */
+    static CpuCapability getCachedCapabilities();
+
+    /**
+     * @brief Check if a specific capability is available
+     * @param cap The capability to check
+     * @return true if the capability is available
+     */
+    static bool hasCapability(CpuCapability cap);
+
+    /**
+     * @brief Get vector of all supported architecture levels (for testing)
+     * @return Vector of CpuArchLevel from highest to lowest supported
+     */
+    static std::vector<CpuArchLevel> getSupportedArchLevels();
+
+    // AVX512 flags
     static bool cpuHasAvx512f();
-    /**
-     * @brief Returns true if CPU has AVX512DQ Flag
-     *
-     * @return true
-     * @return false
-     */
     static bool cpuHasAvx512dq();
-    /**
-     * @brief Retrurns true if CPU has AVX512BW Flag
-     *
-     * @return true
-     * @return false
-     */
     static bool cpuHasAvx512bw();
-    /**
-     * @brief Retrurns true if CPU has AVX512IFMA Flag
-     *
-     * @return true
-     * @return false
-     */
     static bool cpuHasAvx512ifma();
-    /**
-     * @brief Retrurns true if CPU has AVX512VL Flag
-     *
-     * @return true
-     * @return false
-     */
     static bool cpuHasAvx512vl();
-    /**
-     * @brief Returns true depending on the flag is available or not on CPU
-     *
-     * @param flag
-     * @return true
-     * @return false
-     */
+    static bool cpuHasAvx512VP2Intersect();
     static bool cpuHasAvx512(Avx512Flags flag);
 
-    // Milan functions
-    /**
-     * @brief Returns true if CPU supports vector AES
-     * @note  Will return true if either 256 or 512 bit vector AES is supported
-     *
-     * @return true
-     * @return false
-     */
+    // VAES/AESNI
     static bool cpuHasVaes();
-
-    // Rome functions
-    /**
-     * @brief Returns true if CPU supports block AES instruction
-     *
-     * @return true
-     * @return false
-     */
     static bool cpuHasAesni();
-    /**
-     * @brief Returns true if CPU supports block SHA instruction
-     *
-     * @return true
-     * @return false
-     */
+
+    // SHA
     static bool cpuHasShani();
-    /**
-     * @brief Returns true if CPU supports AVX2 instructions
-     *
-     * @return true
-     * @return false
-     */
+
+    // General SIMD
     static bool cpuHasAvx2();
-    /**
-     * @brief Returns true if CPU supports SSE3 instructions
-     *
-     * @return true
-     * @return false
-     */
     static bool cpuHasSse3();
-    /**
-     * @brief Returns true if RDRAND, secure RNG number generator is supported
-     * by CPU
-     *
-     * @return true
-     * @return false
-     */
+
+    // RNG
     static bool cpuHasRdRand();
-    /**
-     * @brief Returns true if ADX is supported
-     * by CPU
-     *
-     * @return true
-     * @return false
-     */
-    static bool cpuHasAdx();
-    /**
-     * @brief Returns true if BMI2 is supported
-     * by CPU
-     *
-     * @return true
-     * @return false
-     */
-    static bool cpuHasBmi2();
-    /**
-     * @brief Returns true if RDSEED, secure RNG seed generator is supported by
-     * CPU
-     *
-     * @return true
-     * @return false
-     */
     static bool cpuHasRdSeed();
+
+    // Integer operations
+    static bool cpuHasAdx();
+    static bool cpuHasBmi2();
+
     /**
-     * @brief Returns true if currently executing cpu is Zen1
-     *
-     * @return true
-     * @return false
+     * @brief Returns true if CPU has AVX512 base features (F, DQ, BW)
+     */
+    static bool cpuHasAvx512Base();
+
+    /**
+     * @brief Returns true if CPU has AVX512 VL features (F, VL, BW)
+     */
+    static bool cpuHasAvx512VL();
+
+    // Zen microarchitecture detection
+    /**
+     * @brief Returns true if currently executing CPU is Zen1
      */
     static bool cpuIsZen1();
+
     /**
-     * @brief Returns true if currently executing cpu is Zen2
-     *
-     * @return true
-     * @return false
+     * @brief Returns true if currently executing CPU is Zen2
      */
     static bool cpuIsZen2();
+
     /**
-     * @brief Returns true if currently executing cpu is Zen3
-     *
-     * @return true
-     * @return false
+     * @brief Returns true if currently executing CPU is Zen3
      */
     static bool cpuIsZen3();
+
     /**
-     * @brief Returns true if currently executing cpu is Zen4
-     *
-     * @return true
-     * @return false
+     * @brief Returns true if currently executing CPU is Zen4
      */
     static bool cpuIsZen4();
+
     /**
-     * @brief Returns true if currently executing cpu is Zen5
-     *
-     * @return true
-     * @return false
+     * @brief Returns true if currently executing CPU is Zen5
      */
     static bool cpuIsZen5();
+    /**
+     * @brief Returns true if the CPU vendor is AMD
+     */
+    static bool cpuIsAmd();
 
   private:
     class Impl;
@@ -237,4 +303,5 @@ class ALCP_API_EXPORT CpuId
   public:
     static std::unique_ptr<Impl> pImpl;
 };
+
 } // namespace alcp::utils

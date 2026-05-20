@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -31,11 +31,12 @@
 #include <string.h>
 
 namespace alcp::cipher {
+using utils::CpuId;
 
-// Class Siv functions
-
+// Helper methods
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-Siv::setKeys(const Uint8 key1[], Uint64 length)
+SivT<keyLenBits, arch>::setKeys(const Uint8 key1[], Uint64 length)
 {
 
     if (key1 == nullptr) {
@@ -52,8 +53,7 @@ Siv::setKeys(const Uint8 key1[], Uint64 length)
             return ALC_ERROR_INVALID_SIZE;
     }
 
-    alc_error_t err = m_cmac.init(
-        m_key1, length / 8); // m_cmac.init(m_key1, length, NULL, 0);
+    alc_error_t err = m_cmac.init(m_key1, length / 8);
 
     if (err != ALC_ERROR_NONE) {
         return err;
@@ -62,22 +62,29 @@ Siv::setKeys(const Uint8 key1[], Uint64 length)
     return err;
 }
 
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-Siv::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv, Uint64 ivLen)
+SivT<keyLenBits, arch>::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv, Uint64 ivLen)
 {
     alc_error_t err       = ALC_ERROR_NONE;
     Uint64      keyLength = keyLen;
 
+    // Validate and store synthetic IV (for decrypt, the IV is the tag from encrypt)
     if (pIv != nullptr) {
-        if (ivLen == 16) {
-            err = utils::SecureCopy<Uint8>(
-                m_iv_aes, MAX_CIPHER_IV_SIZE, pIv, ivLen);
-        } else {
+        if (ivLen != 16) {
             return ALC_ERROR_INVALID_SIZE;
         }
+        utils::CopyBytes(m_syntheticIv, pIv, 16);
     }
 
-    if (pKey != nullptr) {
+    // Validate and set keys -- SIV uses double-key: first half for S2V, second half for CTR
+    if (keyLen != 0 || pKey != nullptr) {
+        if (pKey == nullptr) {
+            return ALC_ERROR_INVALID_ARG;
+        }
+        if (keyLen == 0) {
+            return ALC_ERROR_INVALID_SIZE;
+        }
         err = utils::SecureCopy<Uint8>(m_key1, 32, pKey, keyLength / 8);
         if (err != ALC_ERROR_NONE) {
             return err;
@@ -96,8 +103,9 @@ Siv::init(const Uint8* pKey, Uint64 keyLen, const Uint8* pIv, Uint64 ivLen)
     return err;
 }
 
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-Siv::cmacWrapper(const Uint8 data[], Uint64 size, Uint8 mac[], Uint64 macSize)
+SivT<keyLenBits, arch>::cmacWrapper(const Uint8 data[], Uint64 size, Uint8 mac[], Uint64 macSize)
 {
     alc_error_t err = ALC_ERROR_NONE;
     if (data == nullptr || mac == nullptr) {
@@ -119,13 +127,14 @@ Siv::cmacWrapper(const Uint8 data[], Uint64 size, Uint8 mac[], Uint64 macSize)
     return err;
 }
 
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-Siv::cmacWrapperMultiData(const Uint8 data1[],
-                          Uint64      size1,
-                          const Uint8 data2[],
-                          Uint64      size2,
-                          Uint8       mac[],
-                          Uint64      macSize)
+SivT<keyLenBits, arch>::cmacWrapperMultiData(const Uint8 data1[],
+                                            Uint64      size1,
+                                            const Uint8 data2[],
+                                            Uint64      size2,
+                                            Uint8       mac[],
+                                            Uint64      macSize)
 {
     alc_error_t err = ALC_ERROR_NONE;
     if (data1 == nullptr || data2 == nullptr || mac == nullptr) {
@@ -151,8 +160,9 @@ Siv::cmacWrapperMultiData(const Uint8 data1[],
     return err;
 }
 
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-Siv::addAdditionalInput(const Uint8* pAad, Uint64 aadLen)
+SivT<keyLenBits, arch>::addAdditionalInput(const Uint8* pAad, Uint64 aadLen)
 {
     alc_error_t err = ALC_ERROR_NONE;
 
@@ -160,9 +170,6 @@ Siv::addAdditionalInput(const Uint8* pAad, Uint64 aadLen)
         err = ALC_ERROR_INVALID_ARG;
         return err;
     }
-
-    // FIXME: Allocate SIZE_CMAC for 10 vectors on intialization to be more
-    // optimal.
 
     // Extend size of additonalDataProcessed Vector in case of overflow
     if ((m_additionalDataProcessedSize + 1)
@@ -190,8 +197,9 @@ Siv::addAdditionalInput(const Uint8* pAad, Uint64 aadLen)
     return err;
 }
 
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-Siv::s2v(const Uint8 plainText[], Uint64 size)
+SivT<keyLenBits, arch>::s2v(const Uint8 plainText[], Uint64 size)
 {
     // Assume plaintest to be 128 bit multiples.
     alc_error_t err = ALC_ERROR_NONE;
@@ -216,7 +224,9 @@ Siv::s2v(const Uint8 plainText[], Uint64 size)
     if (size >= SIZE_CMAC) {
 
         // Take out last block
-        if (CpuId::cpuIsZen3()) {
+        static utils::CpuArchLevel cipherFeature =
+            CpuId::getCachedArchLevel(utils::AlgorithmType::eCipher);
+        if (cipherFeature >= utils::CpuArchLevel::eZen3) {
             zen3::xor_a_b((plainText + size - SIZE_CMAC),
                           m_cmacTemp,
                           m_cmacTemp,
@@ -246,22 +256,16 @@ Siv::s2v(const Uint8 plainText[], Uint64 size)
         xor_a_b(
             temp_bytes, m_cmacTemp + size, m_cmacTemp + size, (SIZE_CMAC)-size);
 
-        // std::cout << "xor:" << parseBytesToHexStr(m_cmacTemp) << std::endl;
-
         err = cmacWrapper(m_cmacTemp, SIZE_CMAC, m_cmacTemp, SIZE_CMAC);
     }
 
     return err;
 }
-Siv::~Siv()
-{
-    memset(m_key1, 0, 32);
-    memset(m_key2, 0, 32);
-}
-// class SivHash functions
 
+// Auth methods
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-SivHash::getTag(Uint8 out[], Uint64 len)
+SivT<keyLenBits, arch>::getTag(Uint8 out[], Uint64 len)
 {
     if (out == nullptr) {
         return ALC_ERROR_INVALID_ARG;
@@ -275,8 +279,9 @@ SivHash::getTag(Uint8 out[], Uint64 len)
     return ALC_ERROR_NONE;
 }
 
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-SivHash::setAad(const Uint8* pAad, Uint64 aadLen)
+SivT<keyLenBits, arch>::setAad(const Uint8* pAad, Uint64 aadLen)
 {
     if (pAad == nullptr) {
         printf("\n nullptr ");
@@ -286,29 +291,40 @@ SivHash::setAad(const Uint8* pAad, Uint64 aadLen)
     return err;
 }
 
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
-SivHash::setTagLength(Uint64 tagLength)
+SivT<keyLenBits, arch>::setTagLength(Uint64 tagLength)
 {
+    // AES-SIV always uses a 128-bit (16-byte) synthetic IV as the tag
+    // This is fundamental to the SIV construction and cannot be changed
+    if (tagLength != 16) {
+        return ALC_ERROR_INVALID_SIZE;
+    }
     return ALC_ERROR_NONE;
 }
 
-// class SivAead Functions
-
-// aesni functions
-template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+// Encrypt/Decrypt methods
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 SivT<keyLenBits, arch>::encrypt(const Uint8* pPlainText,
-                                Uint8*       pCipherText,
-                                Uint64       len,
-                                Uint64*      outlen)
+                               Uint8*       pCipherText,
+                               Uint64       len,
+                               Uint64*      outlen)
 {
     alc_error_t err = ALC_ERROR_NONE;
+
+    if (pPlainText == nullptr && len > 0) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pCipherText == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+
     // Mask Vector for disabling 2 bits in the counter
     Uint8 q[16] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                     0x7f, 0xff, 0xff, 0xff, 0x7f, 0xff, 0xff, 0xff };
 
-    err = s2v(pPlainText, len); // Nullptr check inside this function
+    err = s2v(pPlainText, len);
     if (err != ALC_ERROR_NONE) {
         return err;
     }
@@ -317,9 +333,9 @@ SivT<keyLenBits, arch>::encrypt(const Uint8* pPlainText,
     for (Uint64 i = 0; i < SIZE_CMAC; i++) {
         q[i] = m_cmacTemp[i] & q[i];
     }
-    ctrobj->init(m_key2, (static_cast<Uint32>(keyLenBits)), q, 16);
+    m_ctrCipher.init(m_key2, (static_cast<Uint32>(keyLenBits)), q, 16);
     Uint64 ctr_outlen = 0;
-    err = ctrobj->encrypt(pPlainText, pCipherText, len + m_padLen, &ctr_outlen);
+    err = m_ctrCipher.encrypt(pPlainText, pCipherText, len + m_padLen, &ctr_outlen);
     if (alcp_is_error(err)) {
         err = ALC_ERROR_BAD_STATE;
         return err;
@@ -333,29 +349,35 @@ SivT<keyLenBits, arch>::encrypt(const Uint8* pPlainText,
     return err;
 }
 
-template<alcp::cipher::CipherKeyLen     keyLenBits,
-         alcp::utils::CpuCipherFeatures arch>
+template<CipherKeyLen keyLenBits, CpuArchLevel arch>
 alc_error_t
 SivT<keyLenBits, arch>::decrypt(const Uint8* pCipherText,
-                                Uint8*       pPlainText,
-                                Uint64       len,
-                                Uint64*      outlen)
+                               Uint8*       pPlainText,
+                               Uint64       len,
+                               Uint64*      outlen)
 
 {
     alc_error_t err = ALC_ERROR_NONE;
+
+    if (pCipherText == nullptr && len > 0) {
+        return ALC_ERROR_INVALID_ARG;
+    }
+    if (pPlainText == nullptr) {
+        return ALC_ERROR_INVALID_ARG;
+    }
 
     // Mask Vector for disabling 2 bits in the counter
     Uint8 q[16] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                     0x7f, 0xff, 0xff, 0xff, 0x7f, 0xff, 0xff, 0xff };
 
-    // Apply the mask and make q the IV
+    // Apply the mask to synthetic IV
     for (Uint64 i = 0; i < SIZE_CMAC; i++) {
-        q[i] = m_iv_aes[i] & q[i];
+        q[i] = m_syntheticIv[i] & q[i];
     }
 
-    ctrobj->init(m_key2, (static_cast<Uint32>(keyLenBits)), q, 16);
+    m_ctrCipher.init(m_key2, (static_cast<Uint32>(keyLenBits)), q, 16);
     Uint64 ctr_outlen = 0;
-    err = ctrobj->decrypt(pCipherText, pPlainText, len, &ctr_outlen); //, mac);
+    err = m_ctrCipher.decrypt(pCipherText, pPlainText, len, &ctr_outlen);
     if (alcp_is_error(err)) {
         err = ALC_ERROR_BAD_STATE;
         return err;
@@ -367,16 +389,9 @@ SivT<keyLenBits, arch>::decrypt(const Uint8* pCipherText,
         return err;
     }
 
-    // Verify tag, which just got generated
-    if (utils::CompareConstTime(&(m_cmacTemp[0]), m_iv_aes, SIZE_CMAC) == 0) {
-// FIXME: Initiate Wipedown!
-#if 0
-        auto cer =
-            cipher::CipherError(cipher::ErrorCode::eAuthenticationFailure);
-        s.update(cer, cer.message());
-#else
+    // Verify tag, which just got generated (compare with stored synthetic IV)
+    if (utils::CompareConstTime(&(m_cmacTemp[0]), m_syntheticIv, SIZE_CMAC) == 0) {
         return ALC_ERROR_TAG_MISMATCH;
-#endif
     }
 
     // AES-CMAC-SIV is an AEAD: output length equals input length on success
@@ -387,25 +402,17 @@ SivT<keyLenBits, arch>::decrypt(const Uint8* pCipherText,
     return err;
 }
 
-template class SivT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                    CpuCipherFeatures::eVaes512>;
-template class SivT<alcp::cipher::CipherKeyLen::eKey192Bit,
-                    CpuCipherFeatures::eVaes512>;
-template class SivT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                    CpuCipherFeatures::eVaes512>;
+// Explicit template instantiations
+template class SivT<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen4>;
+template class SivT<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen4>;
+template class SivT<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen4>;
 
-template class SivT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                    CpuCipherFeatures::eVaes256>;
-template class SivT<alcp::cipher::CipherKeyLen::eKey192Bit,
-                    CpuCipherFeatures::eVaes256>;
-template class SivT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                    CpuCipherFeatures::eVaes256>;
+template class SivT<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen3>;
+template class SivT<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen3>;
+template class SivT<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen3>;
 
-template class SivT<alcp::cipher::CipherKeyLen::eKey128Bit,
-                    CpuCipherFeatures::eAesni>;
-template class SivT<alcp::cipher::CipherKeyLen::eKey192Bit,
-                    CpuCipherFeatures::eAesni>;
-template class SivT<alcp::cipher::CipherKeyLen::eKey256Bit,
-                    CpuCipherFeatures::eAesni>;
+template class SivT<CipherKeyLen::eKey128Bit, CpuArchLevel::eZen>;
+template class SivT<CipherKeyLen::eKey192Bit, CpuArchLevel::eZen>;
+template class SivT<CipherKeyLen::eKey256Bit, CpuArchLevel::eZen>;
 
 } // namespace alcp::cipher

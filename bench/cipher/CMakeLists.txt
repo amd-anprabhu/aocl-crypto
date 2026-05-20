@@ -1,4 +1,4 @@
- # Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ # Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions are met:
@@ -58,4 +58,18 @@ TARGET_INCLUDE_DIRECTORIES(bench_cipher PRIVATE
 
 TARGET_COMPILE_OPTIONS(bench_cipher PUBLIC ${ALCP_WARNINGS})
 TARGET_LINK_LIBRARIES(bench_cipher ${LIBS})
+
+# Variable-Length Multibuffer Benchmark
+ADD_EXECUTABLE(bench_varlen_multibuffer bench_varlen_multibuffer.cc ${ALC_BASE_FILES} ${EXTRA_SOURCES})
+
+TARGET_INCLUDE_DIRECTORIES(bench_varlen_multibuffer PRIVATE
+	"${CMAKE_SOURCE_DIR}/include"
+	"${CMAKE_SOURCE_DIR}/lib/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${CMAKE_SOURCE_DIR}/tests/include"
+    "${CMAKE_SOURCE_DIR}/tests/common/include"
+    ${EXTRA_INCLUDES})
+
+TARGET_COMPILE_OPTIONS(bench_varlen_multibuffer PUBLIC ${ALCP_WARNINGS})
+TARGET_LINK_LIBRARIES(bench_varlen_multibuffer ${LIBS})
 

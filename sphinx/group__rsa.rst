@@ -70,11 +70,16 @@ Functions
 
 ----
 
-Variables
----------
-.. doxygenvariable:: alc_rsa_padding
+Enumerations
+------------
+.. doxygenenum:: alc_rsa_padding
    :project: crypto
-.. doxygenvariable:: alc_rsa_key_size
+.. doxygenenum:: alc_rsa_key_size
    :project: crypto
+
+----
+
+Type Definitions
+----------------
 .. doxygenvariable:: alc_rsa_context_t
    :project: crypto

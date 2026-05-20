@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -29,6 +29,7 @@
 #include "alcp/utils/cpuid.hh"
 #include <iostream>
 
+using alcp::utils::Avx512Flags;
 using alcp::utils::CpuId;
 
 #define GREEN "\033[0;32m"
@@ -59,6 +60,10 @@ checkAVX512Support()
     printBoolMsg("AVX512F", CpuId::cpuHasAvx512f());
     printBoolMsg("AVX512BW", CpuId::cpuHasAvx512bw());
     printBoolMsg("AVX512DQ", CpuId::cpuHasAvx512dq());
+    printBoolMsg("AVX512IFMA", CpuId::cpuHasAvx512ifma());
+    printBoolMsg("AVX512VL", CpuId::cpuHasAvx512vl());
+    printBoolMsg("AVX512_VP2INTERSECT",
+                 CpuId::cpuHasAvx512VP2Intersect());
 }
 
 void
@@ -106,20 +111,84 @@ checkBmi2Support()
 }
 
 void
-checkAMDSupport()
+checkVendorAndMicroarch()
 {
-    std::cout << "======AMD FLAGS=======" << std::endl;
+    std::cout << "======CPU VENDOR=======" << std::endl;
+    printBoolMsg("AMD", CpuId::cpuIsAmd());
+
+    std::cout << "======MICRO-ARCHITECTURE (AMD)=======" << std::endl;
     printBoolMsg("ZEN1", CpuId::cpuIsZen1());
     printBoolMsg("ZEN2", CpuId::cpuIsZen2());
     printBoolMsg("ZEN3", CpuId::cpuIsZen3());
     printBoolMsg("ZEN4", CpuId::cpuIsZen4());
     printBoolMsg("ZEN5", CpuId::cpuIsZen5());
+
+    std::cout << "======ISA FEATURE GROUPS=======" << std::endl;
+    printBoolMsg("BASELINE (ADX+AVX2+BMI2)",
+                 CpuId::cpuHasAdx() && CpuId::cpuHasAvx2()
+                     && CpuId::cpuHasBmi2());
+    printBoolMsg("AVX512_BASE (F+DQ+BW)", CpuId::cpuHasAvx512Base());
+    printBoolMsg("AVX512_FULL (F+DQ+BW+IFMA+VL)",
+                 CpuId::cpuHasAvx512(Avx512Flags::AVX512_F)
+                     && CpuId::cpuHasAvx512(Avx512Flags::AVX512_DQ)
+                     && CpuId::cpuHasAvx512(Avx512Flags::AVX512_BW)
+                     && CpuId::cpuHasAvx512(Avx512Flags::AVX512_IFMA)
+                     && CpuId::cpuHasAvx512(Avx512Flags::AVX512_VL));
+}
+
+void
+checkArchLevel()
+{
+    using alcp::utils::AlgorithmType;
+    using alcp::utils::CpuArchLevel;
+    using alcp::utils::CpuCapability;
+
+    std::cout << "======DEFAULT ARCH LEVEL (Backward Compatible)======="
+              << std::endl;
+    CpuArchLevel defaultArch = CpuId::getCachedArchLevel();
+    std::cout << "\tDefault: " << alcp::utils::CpuArchLevelToString(defaultArch) << std::endl;
+
+    std::cout << "======PER-ALGORITHM ARCH LEVELS=======" << std::endl;
+    std::cout << "\tCipher:   "
+              << alcp::utils::CpuArchLevelToString(
+                     CpuId::getCachedArchLevel(AlgorithmType::eCipher))
+              << std::endl;
+    std::cout << "\tRSA:      "
+              << alcp::utils::CpuArchLevelToString(
+                     CpuId::getCachedArchLevel(AlgorithmType::eRsa))
+              << std::endl;
+    std::cout << "\tPoly1305: "
+              << alcp::utils::CpuArchLevelToString(
+                     CpuId::getCachedArchLevel(AlgorithmType::ePoly1305))
+              << std::endl;
+    std::cout << "\tX25519:   "
+              << alcp::utils::CpuArchLevelToString(
+                     CpuId::getCachedArchLevel(AlgorithmType::eX25519))
+              << std::endl;
+    std::cout << "\tSHA2-256: "
+              << alcp::utils::CpuArchLevelToString(
+                     CpuId::getCachedArchLevel(AlgorithmType::eSha2_256))
+              << std::endl;
+    std::cout << "\tSHA2-512: "
+              << alcp::utils::CpuArchLevelToString(
+                     CpuId::getCachedArchLevel(AlgorithmType::eSha2_512))
+              << std::endl;
+    std::cout << "\tSHA3:     "
+              << alcp::utils::CpuArchLevelToString(
+                     CpuId::getCachedArchLevel(AlgorithmType::eSha3))
+              << std::endl;
+
+    std::cout << "======SPECIAL CAPABILITIES=======" << std::endl;
+    printBoolMsg("SHA-NI", CpuId::hasCapability(CpuCapability::eShaNi));
+    printBoolMsg("RDRAND", CpuId::hasCapability(CpuCapability::eRdRand));
+    printBoolMsg("RDSEED", CpuId::hasCapability(CpuCapability::eRdSeed));
 }
 
 int
 main()
 {
-    checkAMDSupport();
+    checkArchLevel();
+    checkVendorAndMicroarch();
     checkAESSupport();
     checkSHASupport();
     checkRandSupport();

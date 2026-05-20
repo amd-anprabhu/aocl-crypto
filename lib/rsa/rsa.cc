@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -38,6 +38,8 @@
 #include "alcp/utils/cpuid.hh"
 #include "config.h"
 
+using alcp::utils::AlgorithmType;
+using alcp::utils::CpuArchLevel;
 using alcp::utils::CpuId;
 
 namespace alcp::rsa {
@@ -208,51 +210,40 @@ Rsa::encryptPublic(const Uint8* pText, Uint64 textSize, Uint8* pEncText)
         return ALC_ERROR_INVALID_DATA;
     }
 
-    // FIXME: We should probably use flag base dispatching than ZENVER dispatch
-    //        as this kind of dispatch will pick reference in non AMD machines.
-    static bool zen4_available = CpuId::cpuIsZen4() || CpuId::cpuIsZen5();
-    static bool zen3_available = CpuId::cpuIsZen3();
-    static bool zen_available  = CpuId::cpuIsZen1() || CpuId::cpuIsZen2();
-    static bool has_Avx512 =
-        CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_DQ)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_IFMA)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_VL);
+    static CpuArchLevel archLevel =
+        CpuId::getCachedArchLevel(AlgorithmType::eRsa);
 
-    static bool zen_available_flags =
-        CpuId::cpuHasAdx() && CpuId::cpuHasAvx2() && CpuId::cpuHasBmi2();
-
-    if (zen4_available && has_Avx512) {
-        if (m_key_size == 2048 / 8) {
-            zen4::archEncryptPublic<KEY_SIZE_2048>(
-                pEncText, bignum_text, m_pub_key, m_context_pub);
-        } else {
-            zen4::archEncryptPublic<KEY_SIZE_1024>(
-                pEncText, bignum_text, m_pub_key, m_context_pub);
-        }
-        return ALC_ERROR_NONE;
-    } else if (zen3_available) {
-        if (m_key_size == 2048 / 8) {
-            zen3::archEncryptPublic<KEY_SIZE_2048>(
-                pEncText, bignum_text, m_pub_key, m_context_pub);
-        } else {
-            zen3::archEncryptPublic<KEY_SIZE_1024>(
-                pEncText, bignum_text, m_pub_key, m_context_pub);
-        }
-        return ALC_ERROR_NONE;
-    } else if (zen_available || zen_available_flags) {
-        if (m_key_size == 2048 / 8) {
-            zen::archEncryptPublic<KEY_SIZE_2048>(
-                pEncText, bignum_text, m_pub_key, m_context_pub);
-        } else {
-            zen::archEncryptPublic<KEY_SIZE_1024>(
-                pEncText, bignum_text, m_pub_key, m_context_pub);
-        }
-        return ALC_ERROR_NONE;
+    switch (archLevel) {
+        case CpuArchLevel::eZen4:
+            if (m_key_size == 2048 / 8) {
+                zen4::archEncryptPublic<KEY_SIZE_2048>(
+                    pEncText, bignum_text, m_pub_key, m_context_pub);
+            } else {
+                zen4::archEncryptPublic<KEY_SIZE_1024>(
+                    pEncText, bignum_text, m_pub_key, m_context_pub);
+            }
+            return ALC_ERROR_NONE;
+        case CpuArchLevel::eZen3:
+            if (m_key_size == 2048 / 8) {
+                zen3::archEncryptPublic<KEY_SIZE_2048>(
+                    pEncText, bignum_text, m_pub_key, m_context_pub);
+            } else {
+                zen3::archEncryptPublic<KEY_SIZE_1024>(
+                    pEncText, bignum_text, m_pub_key, m_context_pub);
+            }
+            return ALC_ERROR_NONE;
+        case CpuArchLevel::eZen:
+            if (m_key_size == 2048 / 8) {
+                zen::archEncryptPublic<KEY_SIZE_2048>(
+                    pEncText, bignum_text, m_pub_key, m_context_pub);
+            } else {
+                zen::archEncryptPublic<KEY_SIZE_1024>(
+                    pEncText, bignum_text, m_pub_key, m_context_pub);
+            }
+            return ALC_ERROR_NONE;
+        default:
+            return ALC_ERROR_NOT_SUPPORTED;
     }
-
-    return ALC_ERROR_NOT_SUPPORTED;
 }
 
 alc_error_t
@@ -276,52 +267,40 @@ Rsa::decryptPrivate(const Uint8* pEncText, Uint64 encSize, Uint8* pText)
         return ALC_ERROR_NOT_PERMITTED;
     }
 
-    // FIXME: We should probably use flag base dispatching than ZENVER dispatch
-    //        as this kind of dispatch will pick reference in non AMD machines.
-    static bool zen4_available = CpuId::cpuIsZen4() || CpuId::cpuIsZen5();
-    static bool zen3_available = CpuId::cpuIsZen3();
-    static bool zen_available  = CpuId::cpuIsZen1() || CpuId::cpuIsZen2();
+    static CpuArchLevel archLevel =
+        CpuId::getCachedArchLevel(AlgorithmType::eRsa);
 
-    static bool zen_available_flags =
-        CpuId::cpuHasAdx() && CpuId::cpuHasAvx2() && CpuId::cpuHasBmi2();
-
-    static bool has_Avx512 =
-        CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_DQ)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_IFMA)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_VL);
-
-    if (zen4_available && has_Avx512) {
-        if (m_key_size == 2048 / 8) {
-            zen4::archDecryptPrivate<KEY_SIZE_2048>(
-                pText, bignum_text, m_priv_key, m_context_p, m_context_q);
-        } else {
-            zen4::archDecryptPrivate<KEY_SIZE_1024>(
-                pText, bignum_text, m_priv_key, m_context_p, m_context_q);
-        }
-        return ALC_ERROR_NONE;
-    } else if (zen3_available) {
-        if (m_key_size == 2048 / 8) {
-            zen3::archDecryptPrivate<KEY_SIZE_2048>(
-                pText, bignum_text, m_priv_key, m_context_p, m_context_q);
-        } else {
-            zen3::archDecryptPrivate<KEY_SIZE_1024>(
-                pText, bignum_text, m_priv_key, m_context_p, m_context_q);
-        }
-        return ALC_ERROR_NONE;
-    } else if (zen_available || zen_available_flags) {
-        if (m_key_size == 2048 / 8) {
-            zen::archDecryptPrivate<KEY_SIZE_2048>(
-                pText, bignum_text, m_priv_key, m_context_p, m_context_q);
-        } else {
-            zen::archDecryptPrivate<KEY_SIZE_1024>(
-                pText, bignum_text, m_priv_key, m_context_p, m_context_q);
-        }
-        return ALC_ERROR_NONE;
+    switch (archLevel) {
+        case CpuArchLevel::eZen4:
+            if (m_key_size == 2048 / 8) {
+                zen4::archDecryptPrivate<KEY_SIZE_2048>(
+                    pText, bignum_text, m_priv_key, m_context_p, m_context_q);
+            } else {
+                zen4::archDecryptPrivate<KEY_SIZE_1024>(
+                    pText, bignum_text, m_priv_key, m_context_p, m_context_q);
+            }
+            return ALC_ERROR_NONE;
+        case CpuArchLevel::eZen3:
+            if (m_key_size == 2048 / 8) {
+                zen3::archDecryptPrivate<KEY_SIZE_2048>(
+                    pText, bignum_text, m_priv_key, m_context_p, m_context_q);
+            } else {
+                zen3::archDecryptPrivate<KEY_SIZE_1024>(
+                    pText, bignum_text, m_priv_key, m_context_p, m_context_q);
+            }
+            return ALC_ERROR_NONE;
+        case CpuArchLevel::eZen:
+            if (m_key_size == 2048 / 8) {
+                zen::archDecryptPrivate<KEY_SIZE_2048>(
+                    pText, bignum_text, m_priv_key, m_context_p, m_context_q);
+            } else {
+                zen::archDecryptPrivate<KEY_SIZE_1024>(
+                    pText, bignum_text, m_priv_key, m_context_p, m_context_q);
+            }
+            return ALC_ERROR_NONE;
+        default:
+            return ALC_ERROR_NOT_PERMITTED;
     }
-
-    return ALC_ERROR_NOT_PERMITTED;
 }
 
 alc_error_t
@@ -1034,47 +1013,42 @@ Rsa::setPublicKey(const Uint64 exponent, const Uint8* mod, const Uint64 size)
     m_pub_key.m_public_exponent[0] = exponent;
 
     ConvertToBigNum(mod, m_pub_key.m_mod, size);
-    m_pub_key.m_size           = size / 8;
-    m_key_size                 = size;
-    static bool zen4_available = CpuId::cpuIsZen4() || CpuId::cpuIsZen5();
-    static bool zen3_available = CpuId::cpuIsZen3();
-    static bool zen_available  = CpuId::cpuIsZen1() || CpuId::cpuIsZen2();
-    static bool zen_available_flags =
-        CpuId::cpuHasAdx() && CpuId::cpuHasAvx2() && CpuId::cpuHasBmi2();
+    m_pub_key.m_size = size / 8;
+    m_key_size       = size;
 
-    static bool has_Avx512 =
-        CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_DQ)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_IFMA)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_VL);
+    static CpuArchLevel archLevel =
+        CpuId::getCachedArchLevel(AlgorithmType::eRsa);
 
-    if (zen4_available && has_Avx512) {
-        if (m_key_size == 2048 / 8) {
-            zen4::archCreateContext<KEY_SIZE_2048>(
-                m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
-        } else {
-            zen4::archCreateContext<KEY_SIZE_1024>(
-                m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
-        }
-    } else if (zen3_available) {
-        if (m_key_size == 2048 / 8) {
-            zen3::archCreateContext<KEY_SIZE_2048>(
-                m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
-        } else {
-            zen3::archCreateContext<KEY_SIZE_1024>(
-                m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
-        }
-    } else if (zen_available || zen_available_flags) {
-        if (m_key_size == 2048 / 8) {
-            zen::archCreateContext<KEY_SIZE_2048>(
-                m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
-        } else {
-            zen::archCreateContext<KEY_SIZE_1024>(
-                m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
-        }
-    } else {
-        return ALC_ERROR_NOT_PERMITTED;
+    switch (archLevel) {
+        case CpuArchLevel::eZen4:
+            if (m_key_size == 2048 / 8) {
+                zen4::archCreateContext<KEY_SIZE_2048>(
+                    m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
+            } else {
+                zen4::archCreateContext<KEY_SIZE_1024>(
+                    m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
+            }
+            break;
+        case CpuArchLevel::eZen3:
+            if (m_key_size == 2048 / 8) {
+                zen3::archCreateContext<KEY_SIZE_2048>(
+                    m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
+            } else {
+                zen3::archCreateContext<KEY_SIZE_1024>(
+                    m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
+            }
+            break;
+        case CpuArchLevel::eZen:
+            if (m_key_size == 2048 / 8) {
+                zen::archCreateContext<KEY_SIZE_2048>(
+                    m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
+            } else {
+                zen::archCreateContext<KEY_SIZE_1024>(
+                    m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
+            }
+            break;
+        default:
+            return ALC_ERROR_NOT_PERMITTED;
     }
     return ALC_ERROR_NONE;
 }
@@ -1097,52 +1071,46 @@ Rsa::setPublicKeyAsBigNum(const BigNum* exponent, const BigNum* pModulus)
     // m_pub_key.m_mod             = pModulus->num;
     utils::CopyQWord(m_pub_key.m_mod, pModulus->num, pModulus->size * 8);
 
-    m_pub_key.m_size           = pModulus->size;
-    m_key_size                 = pModulus->size * 8;
-    static bool zen4_available = CpuId::cpuIsZen4() || CpuId::cpuIsZen5();
-    static bool zen3_available = CpuId::cpuIsZen3();
-    static bool zen_available  = CpuId::cpuIsZen1() || CpuId::cpuIsZen2();
-    static bool zen_available_flags =
-        CpuId::cpuHasAdx() && CpuId::cpuHasAvx2() && CpuId::cpuHasBmi2();
+    m_pub_key.m_size = pModulus->size;
+    m_key_size       = pModulus->size * 8;
 
-    static bool has_Avx512 =
-        CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_DQ)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_IFMA)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_VL);
+    static CpuArchLevel archLevel =
+        CpuId::getCachedArchLevel(AlgorithmType::eRsa);
 
-    if (zen4_available && has_Avx512) {
-        if (m_key_size == 2048 / 8) {
-            zen4::archCreateContext<KEY_SIZE_2048>(
-                m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
-        } else {
-            zen4::archCreateContext<KEY_SIZE_1024>(
-                m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
-        }
-
-    } else if (zen3_available) {
-        if (m_key_size == 2048 / 8) {
-            zen3::archCreateContext<KEY_SIZE_2048>(
-                m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
-        } else {
-            zen3::archCreateContext<KEY_SIZE_1024>(
-                m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
-        }
-
-    } else if (zen_available || zen_available_flags) {
-        if (m_key_size == 2048 / 8) {
-            zen::archCreateContext<KEY_SIZE_2048>(
-                m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
-        } else {
-            zen::archCreateContext<KEY_SIZE_1024>(
-                m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
-        }
-    } else {
-        return ALC_ERROR_NOT_PERMITTED;
+    switch (archLevel) {
+        case CpuArchLevel::eZen4:
+            if (m_key_size == 2048 / 8) {
+                zen4::archCreateContext<KEY_SIZE_2048>(
+                    m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
+            } else {
+                zen4::archCreateContext<KEY_SIZE_1024>(
+                    m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
+            }
+            break;
+        case CpuArchLevel::eZen3:
+            if (m_key_size == 2048 / 8) {
+                zen3::archCreateContext<KEY_SIZE_2048>(
+                    m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
+            } else {
+                zen3::archCreateContext<KEY_SIZE_1024>(
+                    m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
+            }
+            break;
+        case CpuArchLevel::eZen:
+            if (m_key_size == 2048 / 8) {
+                zen::archCreateContext<KEY_SIZE_2048>(
+                    m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
+            } else {
+                zen::archCreateContext<KEY_SIZE_1024>(
+                    m_context_pub, m_pub_key.m_mod, m_pub_key.m_size);
+            }
+            break;
+        default:
+            return ALC_ERROR_NOT_PERMITTED;
     }
     return ALC_ERROR_NONE;
 }
+
 alc_error_t
 Rsa::setPrivateKey(const Uint8* dp,
                    const Uint8* dq,
@@ -1170,57 +1138,51 @@ Rsa::setPrivateKey(const Uint8* dp,
     ConvertToBigNum(mod, m_priv_key.m_mod, size * 2);
     m_priv_key.m_size = size / 8;
 
-    static bool zen4_available = CpuId::cpuIsZen4() || CpuId::cpuIsZen5();
-    static bool zen3_available = CpuId::cpuIsZen3();
-    static bool zen_available  = CpuId::cpuIsZen1() || CpuId::cpuIsZen2();
-    static bool zen_available_flags =
-        CpuId::cpuHasAdx() && CpuId::cpuHasAvx2() && CpuId::cpuHasBmi2();
+    static CpuArchLevel archLevel =
+        CpuId::getCachedArchLevel(AlgorithmType::eRsa);
 
-    static bool has_Avx512 =
-        CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_DQ)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_IFMA)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_VL);
-
-    if (zen4_available && has_Avx512) {
-        if (m_key_size == 2048 / 8) {
-            zen4::archCreateContext<KEY_SIZE_2048>(
-                m_context_p, m_priv_key.m_p, m_priv_key.m_size);
-            zen4::archCreateContext<KEY_SIZE_2048>(
-                m_context_q, m_priv_key.m_q, m_priv_key.m_size);
-        } else {
-            zen4::archCreateContext<KEY_SIZE_1024>(
-                m_context_p, m_priv_key.m_p, m_priv_key.m_size);
-            zen4::archCreateContext<KEY_SIZE_1024>(
-                m_context_q, m_priv_key.m_q, m_priv_key.m_size);
-        }
-    } else if (zen3_available) {
-        if (m_key_size == 2048 / 8) {
-            zen3::archCreateContext<KEY_SIZE_2048>(
-                m_context_p, m_priv_key.m_p, m_priv_key.m_size);
-            zen3::archCreateContext<KEY_SIZE_2048>(
-                m_context_q, m_priv_key.m_q, m_priv_key.m_size);
-        } else {
-            zen3::archCreateContext<KEY_SIZE_1024>(
-                m_context_p, m_priv_key.m_p, m_priv_key.m_size);
-            zen3::archCreateContext<KEY_SIZE_1024>(
-                m_context_q, m_priv_key.m_q, m_priv_key.m_size);
-        }
-    } else if (zen_available || zen_available_flags) {
-        if (m_key_size == 2048 / 8) {
-            zen::archCreateContext<KEY_SIZE_2048>(
-                m_context_p, m_priv_key.m_p, m_priv_key.m_size);
-            zen::archCreateContext<KEY_SIZE_2048>(
-                m_context_q, m_priv_key.m_q, m_priv_key.m_size);
-        } else {
-            zen::archCreateContext<KEY_SIZE_1024>(
-                m_context_p, m_priv_key.m_p, m_priv_key.m_size);
-            zen::archCreateContext<KEY_SIZE_1024>(
-                m_context_q, m_priv_key.m_q, m_priv_key.m_size);
-        }
-    } else {
-        return ALC_ERROR_NOT_PERMITTED;
+    switch (archLevel) {
+        case CpuArchLevel::eZen4:
+            if (m_key_size == 2048 / 8) {
+                zen4::archCreateContext<KEY_SIZE_2048>(
+                    m_context_p, m_priv_key.m_p, m_priv_key.m_size);
+                zen4::archCreateContext<KEY_SIZE_2048>(
+                    m_context_q, m_priv_key.m_q, m_priv_key.m_size);
+            } else {
+                zen4::archCreateContext<KEY_SIZE_1024>(
+                    m_context_p, m_priv_key.m_p, m_priv_key.m_size);
+                zen4::archCreateContext<KEY_SIZE_1024>(
+                    m_context_q, m_priv_key.m_q, m_priv_key.m_size);
+            }
+            break;
+        case CpuArchLevel::eZen3:
+            if (m_key_size == 2048 / 8) {
+                zen3::archCreateContext<KEY_SIZE_2048>(
+                    m_context_p, m_priv_key.m_p, m_priv_key.m_size);
+                zen3::archCreateContext<KEY_SIZE_2048>(
+                    m_context_q, m_priv_key.m_q, m_priv_key.m_size);
+            } else {
+                zen3::archCreateContext<KEY_SIZE_1024>(
+                    m_context_p, m_priv_key.m_p, m_priv_key.m_size);
+                zen3::archCreateContext<KEY_SIZE_1024>(
+                    m_context_q, m_priv_key.m_q, m_priv_key.m_size);
+            }
+            break;
+        case CpuArchLevel::eZen:
+            if (m_key_size == 2048 / 8) {
+                zen::archCreateContext<KEY_SIZE_2048>(
+                    m_context_p, m_priv_key.m_p, m_priv_key.m_size);
+                zen::archCreateContext<KEY_SIZE_2048>(
+                    m_context_q, m_priv_key.m_q, m_priv_key.m_size);
+            } else {
+                zen::archCreateContext<KEY_SIZE_1024>(
+                    m_context_p, m_priv_key.m_p, m_priv_key.m_size);
+                zen::archCreateContext<KEY_SIZE_1024>(
+                    m_context_q, m_priv_key.m_q, m_priv_key.m_size);
+            }
+            break;
+        default:
+            return ALC_ERROR_NOT_PERMITTED;
     }
     return ALC_ERROR_NONE;
 }
@@ -1260,56 +1222,51 @@ Rsa::setPrivateKeyAsBigNum(const BigNum* dp,
     utils::CopyQWord(m_priv_key.m_mod, mod->num, mod->size * 8);
     m_priv_key.m_size = dp->size;
 
-    static bool zen4_available = CpuId::cpuIsZen4() || CpuId::cpuIsZen5();
-    static bool zen3_available = CpuId::cpuIsZen3();
-    static bool zen_available  = CpuId::cpuIsZen1() || CpuId::cpuIsZen2();
-    static bool zen_available_flags =
-        CpuId::cpuHasAdx() && CpuId::cpuHasAvx2() && CpuId::cpuHasBmi2();
-    static bool has_Avx512 =
-        CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_F)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_DQ)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_BW)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_IFMA)
-        && CpuId::cpuHasAvx512(utils::Avx512Flags::AVX512_VL);
+    static CpuArchLevel archLevel =
+        CpuId::getCachedArchLevel(AlgorithmType::eRsa);
 
-    if (zen4_available && has_Avx512) {
-        if (m_key_size == 2048 / 8) {
-            zen4::archCreateContext<KEY_SIZE_2048>(
-                m_context_p, m_priv_key.m_p, m_priv_key.m_size);
-            zen4::archCreateContext<KEY_SIZE_2048>(
-                m_context_q, m_priv_key.m_q, m_priv_key.m_size);
-        } else {
-            zen4::archCreateContext<KEY_SIZE_1024>(
-                m_context_p, m_priv_key.m_p, m_priv_key.m_size);
-            zen4::archCreateContext<KEY_SIZE_1024>(
-                m_context_q, m_priv_key.m_q, m_priv_key.m_size);
-        }
-    } else if (zen3_available) {
-        if (m_key_size == 2048 / 8) {
-            zen3::archCreateContext<KEY_SIZE_2048>(
-                m_context_p, m_priv_key.m_p, m_priv_key.m_size);
-            zen3::archCreateContext<KEY_SIZE_2048>(
-                m_context_q, m_priv_key.m_q, m_priv_key.m_size);
-        } else {
-            zen3::archCreateContext<KEY_SIZE_1024>(
-                m_context_p, m_priv_key.m_p, m_priv_key.m_size);
-            zen3::archCreateContext<KEY_SIZE_1024>(
-                m_context_q, m_priv_key.m_q, m_priv_key.m_size);
-        }
-    } else if (zen_available || zen_available_flags) {
-        if (m_key_size == 2048 / 8) {
-            zen::archCreateContext<KEY_SIZE_2048>(
-                m_context_p, m_priv_key.m_p, m_priv_key.m_size);
-            zen::archCreateContext<KEY_SIZE_2048>(
-                m_context_q, m_priv_key.m_q, m_priv_key.m_size);
-        } else {
-            zen::archCreateContext<KEY_SIZE_1024>(
-                m_context_p, m_priv_key.m_p, m_priv_key.m_size);
-            zen::archCreateContext<KEY_SIZE_1024>(
-                m_context_q, m_priv_key.m_q, m_priv_key.m_size);
-        }
-    } else {
-        return ALC_ERROR_NOT_PERMITTED;
+    switch (archLevel) {
+        case CpuArchLevel::eZen4:
+            if (m_key_size == 2048 / 8) {
+                zen4::archCreateContext<KEY_SIZE_2048>(
+                    m_context_p, m_priv_key.m_p, m_priv_key.m_size);
+                zen4::archCreateContext<KEY_SIZE_2048>(
+                    m_context_q, m_priv_key.m_q, m_priv_key.m_size);
+            } else {
+                zen4::archCreateContext<KEY_SIZE_1024>(
+                    m_context_p, m_priv_key.m_p, m_priv_key.m_size);
+                zen4::archCreateContext<KEY_SIZE_1024>(
+                    m_context_q, m_priv_key.m_q, m_priv_key.m_size);
+            }
+            break;
+        case CpuArchLevel::eZen3:
+            if (m_key_size == 2048 / 8) {
+                zen3::archCreateContext<KEY_SIZE_2048>(
+                    m_context_p, m_priv_key.m_p, m_priv_key.m_size);
+                zen3::archCreateContext<KEY_SIZE_2048>(
+                    m_context_q, m_priv_key.m_q, m_priv_key.m_size);
+            } else {
+                zen3::archCreateContext<KEY_SIZE_1024>(
+                    m_context_p, m_priv_key.m_p, m_priv_key.m_size);
+                zen3::archCreateContext<KEY_SIZE_1024>(
+                    m_context_q, m_priv_key.m_q, m_priv_key.m_size);
+            }
+            break;
+        case CpuArchLevel::eZen:
+            if (m_key_size == 2048 / 8) {
+                zen::archCreateContext<KEY_SIZE_2048>(
+                    m_context_p, m_priv_key.m_p, m_priv_key.m_size);
+                zen::archCreateContext<KEY_SIZE_2048>(
+                    m_context_q, m_priv_key.m_q, m_priv_key.m_size);
+            } else {
+                zen::archCreateContext<KEY_SIZE_1024>(
+                    m_context_p, m_priv_key.m_p, m_priv_key.m_size);
+                zen::archCreateContext<KEY_SIZE_1024>(
+                    m_context_q, m_priv_key.m_q, m_priv_key.m_size);
+            }
+            break;
+        default:
+            return ALC_ERROR_NOT_PERMITTED;
     }
     return ALC_ERROR_NONE;
 }

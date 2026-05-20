@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2023-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -38,9 +38,6 @@ static void
 ALCP_prov_freectx(alc_prov_ctx_t* alcpctx)
 {
     if (alcpctx != NULL) {
-        if (alcpctx->libctx != NULL) {
-            OSSL_LIB_CTX_free(alcpctx->libctx);
-        }
         OPENSSL_free(alcpctx);
     }
 }
@@ -99,12 +96,9 @@ ALCP_query_operation(void* vctx, int operation_id, int* no_cache)
     const char* openssl_version = OpenSSL_version(OPENSSL_VERSION_STRING);
 #endif
     switch (operation_id) {
-/*FIXME: When Cipher Provider is enabled and MAC provider is
- * disabled, CMAC will fail with OpenSSL Provider as OpenSSL
- * internally tries to use CBC from alcp and multi update is not
- * supported in ALCP as of now.  */
-
-// FIXME: OpenSSL Test test_quic_multistream fails on OpenSSL 3.3.
+/* Note: CMAC requires CBC cipher support. If the Cipher Provider is
+ * enabled but MAC provider is disabled, ensure CBC is also enabled
+ * (ALCP_COMPAT_ENABLE_OPENSSL_CIPHER_CBC). */
 #ifdef ALCP_COMPAT_ENABLE_OPENSSL_CIPHER
         case OSSL_OP_CIPHER:
             // Check if openssl version is <= than the compiled "with" version
@@ -115,7 +109,7 @@ ALCP_query_operation(void* vctx, int operation_id, int* no_cache)
             break;
 #endif // ifdef ALCP_COMPAT_ENABLE_OPENSSL_CIPHER
 
-// Digest providers are disabled as of now due to provider overhead
+// SHA2 digest provider is disabled by default; SHA3 and SHAKE are enabled
 #ifdef ALCP_COMPAT_ENABLE_OPENSSL_DIGEST
         case OSSL_OP_DIGEST:
             EXIT();
@@ -273,15 +267,7 @@ OSSL_provider_init(const OSSL_CORE_HANDLE* handle,
         printf("\n alcp provider init failed");
         return 0;
     } else {
-#if 1
-        alcpctx->libctx = OSSL_LIB_CTX_new_from_dispatch(handle, in);
-#else
-        alcpctx->libctx = OSSL_LIB_CTX_new();
-#endif
-        if (alcpctx->libctx == NULL) {
-            ALCP_teardown((void*)alcpctx);
-            return 0;
-        }
+        alcpctx->libctx          = NULL;
         alcpctx->ap_core_handle = handle;
     }
     alcpctx->corebiometh = alcp_bio_prov_init_bio_method();

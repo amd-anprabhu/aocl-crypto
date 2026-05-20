@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2024, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -49,6 +49,143 @@
  */
 
 namespace alcp::cipher { namespace vaes512 {
+
+    static inline void cmul128(const __m128i hkey,
+                               const __m128i g,
+                               __m128i&      c00,
+                               __m128i&      c01,
+                               __m128i&      c10,
+                               __m128i&      c11)
+    {
+        c00 = _mm_clmulepi64_si128(g, hkey, 0x00);
+        c01 = _mm_clmulepi64_si128(g, hkey, 0x01);
+        c10 = _mm_clmulepi64_si128(g, hkey, 0x10);
+        c11 = _mm_clmulepi64_si128(g, hkey, 0x11);
+    }
+
+    static inline void cmul512(const __m512i hkey,
+                               const __m512i g,
+                               __m512i&      c00,
+                               __m512i&      c01,
+                               __m512i&      c10,
+                               __m512i&      c11)
+    {
+        c00 = _mm512_clmulepi64_epi128(g, hkey, 0x00);
+        c01 = _mm512_clmulepi64_epi128(g, hkey, 0x01);
+        c10 = _mm512_clmulepi64_epi128(g, hkey, 0x10);
+        c11 = _mm512_clmulepi64_epi128(g, hkey, 0x11);
+    }
+
+    /*
+     * Combine partial products from carry-less multiplication and perform
+     * modulo reduction.
+     *
+     * This function performs two operations:
+     *   1. Schoolbook combination of partial products (c00, c01, c10, c11)
+     *      to form 256-bit product (high:low)
+     *   2. Montgomery reduction modulo GCM polynomial P(x) = x^128 + x^7 +
+     *      x^2 + x + 1
+     *
+     * Reference: Algorithm 4 (Fast modulo reduction) in
+     * "Shay Gueron. AES-GCM for Efficient Authenticated Encryption -
+     *  Ending the reign of HMAC-SHA-1?, Workshop on Real-World Cryptography,
+     *  2013. https://crypto.stanford.edu/RealWorldCrypto/slides/gueron.pdf"
+     *
+     * The reduction polynomial constant 0xC200000000000001 represents
+     * the irreducible polynomial in reflected bit order.
+     */
+    static inline __m128i combine_cmul128(const __m128i c00,
+                                          const __m128i c01,
+                                          const __m128i c10,
+                                          const __m128i c11)
+    {
+        // Step 1: Combine partial products into 256-bit result (high:low)
+        // z1 = c01 XOR c10 (middle terms)
+        __m128i z1 = _mm_xor_si128(c01, c10);
+
+        __m128i t1   = _mm_srli_si128(z1, 8);
+        __m128i t2   = _mm_slli_si128(z1, 8);
+        __m128i high = _mm_xor_si128(c11, t1);
+        __m128i low  = _mm_xor_si128(c00, t2);
+
+        // Step 2: Montgomery reduction of 256-bit to 128-bit
+        __m128i cReductionPoly128 =
+            _mm_set_epi64x(0xC200000000000000ULL, 0x1ULL);
+
+        t1  = _mm_clmulepi64_si128(low, cReductionPoly128, 0x10);
+        low = _mm_shuffle_epi32(low, 0x4E);
+        low = _mm_xor_si128(low, t1);
+
+        t2  = _mm_clmulepi64_si128(low, cReductionPoly128, 0x10);
+        low = _mm_shuffle_epi32(low, 0x4E);
+        return _mm_ternarylogic_epi64(low, t2, high, 0x96);
+    }
+
+    /*
+     * Combine partial products from carry-less multiplication and perform
+     * modulo reduction (512-bit SIMD version for 4 parallel 128-bit
+     * operations).
+     *
+     * This function performs two operations:
+     *   1. Schoolbook combination of partial products (c00, c01, c10, c11)
+     *      to form 256-bit products (high:low) for each 128-bit lane
+     *   2. Montgomery reduction modulo GCM polynomial P(x) = x^128 + x^7 +
+     *      x^2 + x + 1
+     *
+     * Reference: Algorithm 4 (Fast modulo reduction) in
+     * "Shay Gueron. AES-GCM for Efficient Authenticated Encryption -
+     *  Ending the reign of HMAC-SHA-1?, Workshop on Real-World Cryptography,
+     *  2013. https://crypto.stanford.edu/RealWorldCrypto/slides/gueron.pdf"
+     *
+     * The reduction polynomial constant 0xC200000000000001 represents
+     * the irreducible polynomial in reflected bit order.
+     */
+    static inline __m512i combine_cmul512(const __m512i c00,
+                                          const __m512i c01,
+                                          const __m512i c10,
+                                          const __m512i c11)
+    {
+        // Step 1: Combine partial products into 256-bit results (high:low)
+        // z1 = c01 XOR c10 (middle terms)
+        __m512i z1 = _mm512_xor_si512(c01, c10);
+
+        __m512i t1   = _mm512_bsrli_epi128(z1, 8);
+        __m512i t2   = _mm512_bslli_epi128(z1, 8);
+        __m512i high = _mm512_xor_si512(c11, t1);
+        __m512i low  = _mm512_xor_si512(c00, t2);
+
+        // Step 2: Montgomery reduction of 256-bit to 128-bit for each lane
+        __m512i cReductionPoly512 = _mm512_set_epi64(0xC200000000000000ULL,
+                                                     0x1ULL,
+                                                     0xC200000000000000ULL,
+                                                     0x1ULL,
+                                                     0xC200000000000000ULL,
+                                                     0x1ULL,
+                                                     0xC200000000000000ULL,
+                                                     0x1ULL);
+
+        t1  = _mm512_clmulepi64_epi128(low, cReductionPoly512, 0x10);
+        low = _mm512_shuffle_epi32(low, _MM_PERM_BADC);
+        low = _mm512_xor_si512(low, t1);
+
+        t2  = _mm512_clmulepi64_epi128(low, cReductionPoly512, 0x10);
+        low = _mm512_shuffle_epi32(low, _MM_PERM_BADC);
+        return _mm512_ternarylogic_epi64(low, t2, high, 0x96);
+    }
+
+    static inline __m128i carryless_multiply(const __m128i a, const __m128i b)
+    {
+        __m128i c00, c01, c10, c11;
+        cmul128(a, b, c00, c01, c10, c11);
+        return combine_cmul128(c00, c01, c10, c11);
+    }
+
+    static inline __m512i carryless_multiply(const __m512i a, const __m512i b)
+    {
+        __m512i c00, c01, c10, c11;
+        cmul512(a, b, c00, c01, c10, c11);
+        return combine_cmul512(c00, c01, c10, c11);
+    }
 
     /*
      * Modulo Reduction of 256bit to 128bit
@@ -254,6 +391,39 @@ namespace alcp::cipher { namespace vaes512 {
         res          = _mm256_xor_si256(temp, res);
     }
 
+    /* Karatsuba multiplication in 512-bit followed by Montgomery reduction
+     * and single horizontal sum at the end
+     */
+    static inline void karatsubaMulMontReduce512(
+        __m512i&       z0_512,
+        __m512i&       z1_512,
+        __m512i&       z2_512,
+        __m512i&       res,
+        const __m512i& const_factor_512)
+    {
+        __m512i z1L_512;
+
+        z1_512 = _mm512_xor_si512(z1_512, z0_512);
+        z1_512 = _mm512_xor_si512(z1_512, z2_512);
+
+        z1L_512 = _mm512_bslli_epi128(z1_512, 8);
+        z1_512  = _mm512_bsrli_epi128(z1_512, 8);
+
+        z0_512 = _mm512_xor_si512(z0_512, z1L_512);
+        z2_512 = _mm512_xor_si512(z2_512, z1_512);
+
+        /* Montgomery reduction in 512-bit */
+        z1_512 = _mm512_clmulepi64_epi128(z0_512, const_factor_512, 0x10);
+        z0_512 = _mm512_shuffle_epi32(z0_512, _MM_PERM_BADC);
+        z1_512 = _mm512_xor_epi64(z1_512, z0_512);
+
+        z0_512 = _mm512_clmulepi64_epi128(z1_512, const_factor_512, 0x10);
+        z1_512 = _mm512_shuffle_epi32(z1_512, _MM_PERM_BADC);
+        z0_512 = _mm512_ternarylogic_epi64(z0_512, z1_512, z2_512, 0x96);
+
+        res = _mm512_castsi128_si512(amd512_horizontal_sum128(z0_512));
+    }
+
     /* 16 blocks aggregated reduction
      * Galois field Multiplication of 16 blocks followed by one modulo
      * Reducation
@@ -268,7 +438,7 @@ namespace alcp::cipher { namespace vaes512 {
                              __m512i        d,
                              const __m512i& reverse_mask_512,
                              __m512i&       res,
-                             const __m256i& const_factor_256)
+                             const __m512i& const_factor_512)
     {
 
         __m512i z0_512, z1_512, z2_512;
@@ -284,18 +454,12 @@ namespace alcp::cipher { namespace vaes512 {
         computeKaratsubaComponentsAccumulate(H2, c, z0_512, z1_512, z2_512);
         computeKaratsubaComponentsAccumulate(H1, d, z0_512, z1_512, z2_512);
 
-        __m128i z0_or_low, z1, z2_or_high;
-        z0_or_low  = amd512_horizontal_sum128(z0_512);
-        z2_or_high = amd512_horizontal_sum128(z2_512);
-        z1         = amd512_horizontal_sum128(z1_512);
-
-        aesni::computeKaratsubaMul(z0_or_low, z1, z2_or_high);
-        __m256i z2z0 = _mm256_set_m128i(z2_or_high, z0_or_low);
-        montgomeryReduction(z2z0, res, const_factor_256);
+        karatsubaMulMontReduce512(
+            z0_512, z1_512, z2_512, res, const_factor_512);
     }
 
     /* 8 blocks aggregated reduction
-     * Galois field Multiplication of 16 blocks followed by one modulo
+     * Galois field Multiplication of 8 blocks followed by one modulo
      * Reducation
      */
     static inline void gMulR(const __m512i& H1,
@@ -304,7 +468,7 @@ namespace alcp::cipher { namespace vaes512 {
                              __m512i        b,
                              const __m512i& reverse_mask_512,
                              __m512i&       res,
-                             const __m256i& const_factor_256)
+                             const __m512i& const_factor_512)
     {
         __m512i z0_512, z1_512, z2_512;
 
@@ -315,43 +479,23 @@ namespace alcp::cipher { namespace vaes512 {
         computeKaratsubaComponents(H2, a, z0_512, z1_512, z2_512);
         computeKaratsubaComponentsAccumulate(H1, b, z0_512, z1_512, z2_512);
 
-        __m128i z0_or_low, z1, z2_or_high;
-        z0_or_low  = amd512_horizontal_sum128(z0_512);
-        z2_or_high = amd512_horizontal_sum128(z2_512);
-        z1         = amd512_horizontal_sum128(z1_512);
-
-        aesni::computeKaratsubaMul(z0_or_low, z1, z2_or_high);
-        __m256i z2z0 = _mm256_set_m128i(z2_or_high, z0_or_low);
-        montgomeryReduction(z2z0, res, const_factor_256);
+        karatsubaMulMontReduce512(
+            z0_512, z1_512, z2_512, res, const_factor_512);
     }
 
     static inline void gMulR(const __m512i& H,
                              __m512i        a,
                              const __m512i& reverse_mask_512,
                              __m512i&       res,
-                             const __m256i& const_factor_256)
+                             const __m512i& const_factor_512)
     {
         __m512i z0_512, z1_512, z2_512;
-        __m128i z0_or_low, z1, z2_or_high;
 
         amd512_reverse512_xorLast128bit(a, reverse_mask_512, res);
         computeKaratsubaComponents(H, a, z0_512, z1_512, z2_512);
 
-        /* compute: z0 = x0y0
-         *        z0 component of below equation:
-         *        [(Xi • H1) + (Xi-1 • H2) + (Xi-2 • H3) + (Xi-3+Yi-4) •H4]
-         *
-         *  compute: z2 = x1y1
-         *        z2 component of below equation:
-         *        [(Xi • H1) + (Xi-1 • H2) + (Xi-2 • H3) + (Xi-3+Yi-4) •H4]
-         */
-        z0_or_low  = amd512_horizontal_sum128(z0_512);
-        z2_or_high = amd512_horizontal_sum128(z2_512);
-        z1         = amd512_horizontal_sum128(z1_512);
-
-        aesni::computeKaratsubaMul(z0_or_low, z1, z2_or_high);
-        __m256i z2z0 = _mm256_set_m128i(z2_or_high, z0_or_low);
-        montgomeryReduction(z2z0, res, const_factor_256);
+        karatsubaMulMontReduce512(
+            z0_512, z1_512, z2_512, res, const_factor_512);
     }
 
     static inline void gMulParallel4(__m512i&       res,
@@ -492,16 +636,10 @@ namespace alcp::cipher { namespace vaes512 {
                                 __m512i&       z1_512,
                                 __m512i&       z2_512,
                                 __m512i&       res,
-                                const __m256i& const_factor_256)
+                                const __m512i& const_factor_512)
     {
-
-        __m128i z0 = amd512_horizontal_sum128(z0_512);
-        __m128i z1 = amd512_horizontal_sum128(z1_512);
-        __m128i z2 = amd512_horizontal_sum128(z2_512);
-
-        __m256i res_256;
-        computeKaratsubaMul(z0, z1, z2, res_256);
-        montgomeryReduction(res_256, res, const_factor_256);
+        karatsubaMulMontReduce512(
+            z0_512, z1_512, z2_512, res, const_factor_512);
     }
 
 }} // namespace alcp::cipher::vaes512

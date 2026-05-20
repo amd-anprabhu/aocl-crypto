@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2022-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,8 +26,10 @@
  *
  */
 
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/types.hh"
+#include "alcp/cipher.hh"
+#include "alcp/cipher/rijndael.hh"
 
 #include "avx512.hh"
 #include "vaes_avx512.hh"
@@ -497,7 +499,7 @@ ctrBlk256(const __m512i* p_in_x,
 namespace alcp::cipher {
 
 // primary template
-template<alcp::cipher::CipherKeyLen T, alcp::utils::CpuCipherFeatures arch>
+template<alcp::cipher::CipherKeyLen T, alcp::utils::CpuArchLevel arch>
 alc_error_t
 CryptCtr(const Uint8* p_in_x,
          Uint8*       p_out_x,
@@ -519,7 +521,7 @@ CryptCtr(const Uint8* p_in_x,
 template<>
 alc_error_t
 CryptCtr<alcp::cipher::CipherKeyLen::eKey128Bit,
-         alcp::utils::CpuCipherFeatures::eVaes512>(const Uint8* p_in_x,
+         alcp::utils::CpuArchLevel::eZen4>(const Uint8* p_in_x,
                                                    Uint8*       p_out_x,
                                                    Uint64       len,
                                                    const Uint8* pKey,
@@ -538,7 +540,7 @@ CryptCtr<alcp::cipher::CipherKeyLen::eKey128Bit,
 template<>
 alc_error_t
 CryptCtr<alcp::cipher::CipherKeyLen::eKey192Bit,
-         alcp::utils::CpuCipherFeatures::eVaes512>(const Uint8* p_in_x,
+         alcp::utils::CpuArchLevel::eZen4>(const Uint8* p_in_x,
                                                    Uint8*       p_out_x,
                                                    Uint64       len,
                                                    const Uint8* pKey,
@@ -557,7 +559,7 @@ CryptCtr<alcp::cipher::CipherKeyLen::eKey192Bit,
 template<>
 alc_error_t
 CryptCtr<alcp::cipher::CipherKeyLen::eKey256Bit,
-         alcp::utils::CpuCipherFeatures::eVaes512>(const Uint8* p_in_x,
+         alcp::utils::CpuArchLevel::eZen4>(const Uint8* p_in_x,
                                                    Uint8*       p_out_x,
                                                    Uint64       len,
                                                    const Uint8* pKey,

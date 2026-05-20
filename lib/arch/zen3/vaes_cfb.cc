@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025, Advanced Micro Devices. All rights reserved.
+ * Copyright (C) 2025-2026, Advanced Micro Devices. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -27,7 +27,7 @@
  */
 
 #include "vaes_cfb.hh"
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/types.hh"
 #include "vaes.hh"
 #include "vaes_avx256_core.hh"
@@ -39,9 +39,16 @@
 
 #include "alcp/base.hh"
 #include "alcp/base/error.hh"
-#include "alcp/cipher/aes.hh"
+
 #include "alcp/cipher/aesni.hh"
 #include "alcp/types.hh"
+
+// Branch prediction hints (no-op on MSVC)
+#if defined(__GNUC__) || defined(__clang__)
+#define ALCP_EXPECT_UNLIKELY(x) __builtin_expect(!!(x), 0)
+#else
+#define ALCP_EXPECT_UNLIKELY(x) (x)
+#endif
 
 #include <cstdint>
 #include <immintrin.h>
@@ -61,11 +68,11 @@ EncryptCfb(const Uint8** pPlainText,
     Uint64      blocks = len / Rijndael::cBlockSize;
     alc_error_t err    = ALC_ERROR_NONE;
 
-    if (__builtin_expect(num_buffers == 0 || blocks == 0, 0)) {
+    if (ALCP_EXPECT_UNLIKELY(num_buffers == 0 || blocks == 0)) {
         return ALC_ERROR_NONE;
     }
 
-    if (__builtin_expect(nRounds != 10 && nRounds != 12 && nRounds != 14, 0)) {
+    if (ALCP_EXPECT_UNLIKELY(nRounds != 10 && nRounds != 12 && nRounds != 14)) {
         return ALC_ERROR_INVALID_ARG; // Invalid number of rounds
     }
 
