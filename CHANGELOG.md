@@ -17,6 +17,45 @@ AOCL Cryptography is a library consisting of basic cryptographic functions optim
 
 ---
 
+## [5.3.0] - 2026
+
+### Added
+
+- **Digest**: SHA-256 multi-buffer support
+- **MAC**: HMAC-SHA-256 multi-buffer support
+- **Cipher**: Variable-length multi-buffer support for CBC and CFB
+- **OpenSSL**: OpenSSL 3.5 is no longer experimental and is the default packaged OpenSSL version for 5.3
+- **OpenSSL Provider**: AES-CBC enabled by default
+- **RSA Provider**: Fallback support for verify/recover operations
+- **Dispatch**: ISA-based per-algorithm kernel dispatch across the library
+
+### Changed
+
+- **Performance**:
+  - ChaCha20: 8-block parallel AVX2 implementation for Zen 2 and Zen 3
+  - AES-XTS: Tweak block computation redesigned from O(n) to O(log n)
+  - AES-GCM: Reduced provider initialization overhead and optimized GHASH aggregated reduction / carry-less multiplication for Zen 4 and later
+  - Poly1305: Optimized for Zen 4 and later with BMI2/ADX scalar x1 fast-path and r^16 combined loop improvements
+- **Cipher**: CBC in-place buffer support is enabled by default; the same input/output buffer can be used without the `ALCP_ENABLE_CBC_INPLACE_BUFFER` flag
+- **Cipher**: AESNI fallback added for cipher multi-buffer kernels
+
+### Fixed
+
+- **Cipher (AES-CFB)**: Heap buffer overflow for input length smaller than one cipher block
+- **Cipher**: Segmentation fault on `nullptr` input/output in cipher operations
+- **OpenSSL Provider (RSA)**: Corrected init ordering and PSS dispatch
+- **OpenSSL Compat**: Buffer overrun in `memcpy` in cipher layer
+- **RNG**: Replaced deprecated WinCrypt API (`CryptGenRandom`) with CNG `ProcessPrng`
+- **RSA**: Corrected output size to use modulus size instead of input size
+- **Build**: GCC 15 compatibility fixes
+
+### Known Limitations
+
+- AES Ciphers, RSA and EC algorithms are not supported in pre-AVX2 architectures
+- RSA provider dispatch requires the runtime OpenSSL version to match the version used to compile the compat binary
+
+---
+
 ## [5.2.0] - 2025
 
 ### Added
