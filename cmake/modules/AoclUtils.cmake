@@ -38,13 +38,13 @@ IF(ENABLE_AOCL_UTILS)
             BINARY_DIR "${EXTERNAL_INSTALL_LOCATION}/aoclutils"
             CMAKE_ARGS  -DAU_BUILD_DOCS=OFF -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=${EXTERNAL_INSTALL_LOCATION} "${CMAKE_BINARY_DIR}/external/src/aoclutils"
             BYPRODUCTS ${EXTERNAL_INSTALL_LOCATION}/${CMAKE_INSTALL_LIBDIR}/libaoclutils.so ${EXTERNAL_INSTALL_LOCATION}/${CMAKE_INSTALL_LIBDIR}/libaoclutils.a
+                       ${EXTERNAL_INSTALL_LOCATION}/${CMAKE_INSTALL_LIBDIR}/libau_cpuid.so  ${EXTERNAL_INSTALL_LOCATION}/${CMAKE_INSTALL_LIBDIR}/libau_cpuid.a
         )
 
         add_dependencies(alcp aoclutils)
         add_dependencies(alcp_static aoclutils)
 
-		# FIXME: Bug, binary not found in external directory!
-		set(AOCL_UTILS_INSTALL_DIR ${EXTERNAL_INSTALL_LOCATION})
+		set(AOCL_UTILS_INSTALL_DIR ${EXTERNAL_INSTALL_LOCATION} CACHE STRING "AOCL UTILS INSTALLED DIRECTORY" FORCE)
 
         # FIXME: Workaround, need to find, this directory is not being created - Possobily created as build time
 		file(MAKE_DIRECTORY ${EXTERNAL_INSTALL_LOCATION})
