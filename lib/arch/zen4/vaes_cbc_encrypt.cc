@@ -166,7 +166,7 @@ EncryptCbc(const Uint8** pPlainText,
     alignas(64) __m128i*       p_out_128[128];
     alignas(64) __m128i        current_ivs[128];
     auto                       pkey128 = reinterpret_cast<const __m128i*>(pKey);
-    alignas(64) sKeys          keys;
+    alignas(64) sKeys          keys{};
 
     for (int i = 0; i < num_buffers; i++) {
         p_in_128[i]  = reinterpret_cast<const __m128i*>(pPlainText[i]);

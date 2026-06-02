@@ -64,7 +64,7 @@ DecryptCfbKernel(const Uint8* pSrc,
     __m512i b1, b2, b3, b4;
     //__m512i _a1;
 
-    sKeys keys;
+    sKeys keys{};
     alcp_load_key_zmm(pkey128, keys);
 
     Int32 isIvUsed = 0;
